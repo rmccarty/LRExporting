@@ -6,7 +6,6 @@ name = "pypi"
 [packages]
 osxphotos = "*"
 mutagen = "*"
-python-xmp-toolkit = "*"
 
 [dev-packages]
 
