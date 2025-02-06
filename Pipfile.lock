@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "a5f599d64baeb4f8468b54b56142eced93f652c2b5b51b529d1048468c27c23b"
+            "sha256": "ca2f3b3caf4c9c16e5f37a0907a35ed857bd1fd4e7c49efd250e3334222e725f"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -860,6 +860,14 @@
             "markers": "sys_platform == 'darwin' and platform_release >= '22.0'",
             "version": "==10.3.2"
         },
+        "python-xmp-toolkit": {
+            "hashes": [
+                "sha256:3a88431bb8222e9723da688b3ead50506f3ed3002749362845745dd995a7a68b",
+                "sha256:dad1c2dcf5392459ecf2d0e368a7bbcab099cac7ef9f75fa53612db4efbcda8a"
+            ],
+            "index": "pypi",
+            "version": "==2.0.2"
+        },
         "pytimeparse2": {
             "hashes": [
                 "sha256:98668cdcba4890e1789e432e8ea0059ccf72402f13f5d52be15bdfaeb3a8b253",
@@ -867,6 +875,13 @@
             ],
             "markers": "python_version >= '3.6'",
             "version": "==1.7.1"
+        },
+        "pytz": {
+            "hashes": [
+                "sha256:89dd22dca55b46eac6eda23b2d72721bf1bdfef212645d81513ef5d03038de57",
+                "sha256:c2db42be2a2518b28e65f9207c4d05e6ff547d1efa4086469ef855e4ab70178e"
+            ],
+            "version": "==2025.1"
         },
         "pyyaml": {
             "hashes": [

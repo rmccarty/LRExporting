@@ -1,0 +1,9 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Pipenv
+.env
+Pipfile.lock
