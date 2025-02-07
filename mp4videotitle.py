@@ -18,7 +18,7 @@ def get_metadata_from_xmp(file_path):
     xmp_path = os.path.splitext(file_path)[0] + ".xmp"
     if not os.path.exists(xmp_path):
         log_message(f"No XMP file found for: {os.path.basename(file_path)}")
-        return (None, None, [], None)  # Return tuple with default values
+        return (None, None, [], None, None)  # Added None for caption
     
     try:
         # Parse XMP file
@@ -35,6 +35,7 @@ def get_metadata_from_xmp(file_path):
             title = None
             keywords = []
             creation_date = None
+            caption = None
             
             # Look for title using exact XMP structure
             title_path = './/{http://purl.org/dc/elements/1.1/}title/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Alt/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}li'
@@ -45,6 +46,16 @@ def get_metadata_from_xmp(file_path):
                 log_message(f"Found XMP title: '{title}'")
             else:
                 log_message("No XMP title found in standard format")
+            
+            # Look for caption/description
+            description_path = './/{http://purl.org/dc/elements/1.1/}description/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Alt/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}li'
+            description_elem = rdf.find(description_path)
+            
+            if description_elem is not None and description_elem.text:
+                caption = description_elem.text.strip()
+                log_message(f"Found XMP caption: '{caption}'")
+            else:
+                log_message("No XMP caption found")
             
             # Look for keywords in all possible formats
             log_message("Looking for keywords in XMP metadata...")
@@ -86,17 +97,17 @@ def get_metadata_from_xmp(file_path):
             else:
                 log_message("No keywords found in any XMP format")
             
-            return (datetime.now(), title, keywords, tree)  # Return tuple
+            return (datetime.now(), title, keywords, tree, caption)  # Added caption to return tuple
         else:
-            return (None, None, [], None)  # Return tuple if no RDF found
+            return (None, None, [], None, None)  # Added None for caption
             
     except Exception as e:
         log_message(f"Error reading XMP file: {e}")
-        return (None, None, [], None)  # Return tuple on error
+        return (None, None, [], None, None)  # Added None for caption
 
 def add_metadata(file_path):
     # Try to get metadata from XMP - always unpack the tuple
-    video_date, xmp_title, keywords, tree = get_metadata_from_xmp(file_path) or (None, None, [], None)
+    video_date, xmp_title, keywords, tree, caption = get_metadata_from_xmp(file_path) or (None, None, [], None, None)
     
     try:
         if keywords:  # If we have keywords to add
@@ -124,6 +135,13 @@ def add_metadata(file_path):
                 f'-ItemList:Title={display_title}'
             ]
             
+            # Add caption if it exists
+            if caption:
+                exiftool_args.extend([
+                    f'-Description={caption}',
+                    f'-Caption-Abstract={caption}'
+                ])
+            
             # Add the file path at the end
             exiftool_args.append(file_path)
             
@@ -137,7 +155,8 @@ def add_metadata(file_path):
                 'exiftool',
                 '-s3',
                 '-DisplayName',
-                '-Keywords',  # Only check one of Keywords/Subject since they're identical
+                '-Keywords',
+                '-Description',  # Added Description to verification
                 file_path
             ]
             result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
@@ -147,6 +166,8 @@ def add_metadata(file_path):
                     log_message(f"Title: {lines[0]}")
                     if len(lines) > 1:
                         log_message(f"Keywords: {lines[1]}")
+                    if len(lines) > 2 and caption:
+                        log_message(f"Caption: {lines[2]}")
             else:
                 log_message("No metadata found in verification")
             
