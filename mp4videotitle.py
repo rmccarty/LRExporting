@@ -192,6 +192,13 @@ def add_metadata(file_path):
                         log_message(f"CreateDate: {lines[3]}")
             else:
                 log_message("No metadata found in verification")
+            
+            # Delete the source XMP file after successful processing
+            xmp_source = file_path.rsplit('.', 1)[0] + '.xmp'
+            if os.path.exists(xmp_source):
+                os.remove(xmp_source)
+                log_message(f"Removed XMP file: {os.path.basename(xmp_source)}")
+            
         else:
             log_message("No keywords found in XMP")
             
