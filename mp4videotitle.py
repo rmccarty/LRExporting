@@ -18,11 +18,26 @@ def get_metadata_from_xmp(file_path):
     xmp_path = os.path.splitext(file_path)[0] + ".xmp"
     if not os.path.exists(xmp_path):
         log_message(f"No XMP file found for: {os.path.basename(file_path)}")
-        return (None, None, [], None, None)  # Added None for caption
+        return (None, None, [], None, None, None)
     
     try:
-        # Parse XMP file
-        log_message(f"Reading metadata from XMP file: {os.path.basename(xmp_path)}")
+        # First try to get DateTimeOriginal directly using exiftool
+        exiftool_args = [
+            'exiftool',
+            '-s',
+            '-DateTimeOriginal',
+            xmp_path
+        ]
+        result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+        date_time_original = None
+        if result.stdout:
+            # Extract just the date value after the colon
+            date_line = result.stdout.strip()
+            if ': ' in date_line:
+                date_time_original = date_line.split(': ')[1].strip()
+                log_message(f"Found DateTimeOriginal from exiftool: {date_time_original}")
+        
+        # Continue with regular XMP parsing for other metadata
         tree = ET.parse(xmp_path)
         root = tree.getroot()
         
@@ -97,17 +112,17 @@ def get_metadata_from_xmp(file_path):
             else:
                 log_message("No keywords found in any XMP format")
             
-            return (datetime.now(), title, keywords, tree, caption)  # Added caption to return tuple
+            return (datetime.now(), title, keywords, tree, caption, date_time_original)
         else:
-            return (None, None, [], None, None)  # Added None for caption
+            return (None, None, [], None, None, date_time_original)
             
     except Exception as e:
         log_message(f"Error reading XMP file: {e}")
-        return (None, None, [], None, None)  # Added None for caption
+        return (None, None, [], None, None, None)
 
 def add_metadata(file_path):
     # Try to get metadata from XMP - always unpack the tuple
-    video_date, xmp_title, keywords, tree, caption = get_metadata_from_xmp(file_path) or (None, None, [], None, None)
+    video_date, xmp_title, keywords, tree, caption, date_time_original = get_metadata_from_xmp(file_path) or (None, None, [], None, None, None)
     
     try:
         if keywords:  # If we have keywords to add
@@ -135,11 +150,15 @@ def add_metadata(file_path):
                 f'-ItemList:Title={display_title}'
             ]
             
-            # Add caption if it exists
-            if caption:
+            # Add DateTimeOriginal if we found it
+            if date_time_original:
                 exiftool_args.extend([
-                    f'-Description={caption}',
-                    f'-Caption-Abstract={caption}'
+                    f'-DateTimeOriginal={date_time_original}',
+                    f'-CreateDate={date_time_original}',
+                    f'-MediaCreateDate={date_time_original}',
+                    f'-TrackCreateDate={date_time_original}',
+                    f'-MediaModifyDate={date_time_original}',
+                    f'-TrackModifyDate={date_time_original}'
                 ])
             
             # Add the file path at the end
@@ -156,7 +175,8 @@ def add_metadata(file_path):
                 '-s3',
                 '-DisplayName',
                 '-Keywords',
-                '-Description',  # Added Description to verification
+                '-DateTimeOriginal',  # Add date to verification
+                '-CreateDate',        # Add create date to verification
                 file_path
             ]
             result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
@@ -166,16 +186,14 @@ def add_metadata(file_path):
                     log_message(f"Title: {lines[0]}")
                     if len(lines) > 1:
                         log_message(f"Keywords: {lines[1]}")
-                    if len(lines) > 2 and caption:
-                        log_message(f"Caption: {lines[2]}")
+                    if len(lines) > 2:
+                        log_message(f"DateTimeOriginal: {lines[2]}")
+                    if len(lines) > 3:
+                        log_message(f"CreateDate: {lines[3]}")
             else:
                 log_message("No metadata found in verification")
-            
-            # Delete the source XMP file after successful processing
-            xmp_source = file_path.rsplit('.', 1)[0] + '.xmp'
-            if os.path.exists(xmp_source):
-                os.remove(xmp_source)
-                log_message(f"Removed XMP file: {os.path.basename(xmp_source)}")
+        else:
+            log_message("No keywords found in XMP")
             
     except Exception as e:
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
