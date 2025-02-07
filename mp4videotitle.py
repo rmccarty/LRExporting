@@ -100,22 +100,29 @@ def add_metadata(file_path):
     
     try:
         if keywords:  # If we have keywords to add
-            # First command for title and standard keywords
+            keywords_string = ", ".join(keywords)
+            
+            # Format the title - if using filename and contains "The McCartys ", replace with "The McCartys: "
+            if not xmp_title:  # If we're using the filename
+                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                if "The McCartys " in base_name:
+                    display_title = base_name.replace("The McCartys ", "The McCartys: ")
+                    log_message("Converting 'The McCartys ' to 'The McCartys: ' in media file title")
+                else:
+                    display_title = base_name
+            else:
+                display_title = xmp_title
+            
+            # Build exiftool command using ItemList format
             exiftool_args = [
                 'exiftool',
                 '-overwrite_original',
                 '-handler=mdta',  # Use mdta handler
-                f'-ItemList:Title={xmp_title if xmp_title else os.path.splitext(os.path.basename(file_path))[0]}',
-                # Write keywords to standard metadata
-                f'-keywords={", ".join(keywords)}',
-                f'-subject={", ".join(keywords)}'
+                f'-DisplayName={display_title}',
+                f'-Subject={keywords_string}',
+                f'-Keywords={keywords_string}',
+                f'-ItemList:Title={display_title}'
             ]
-            
-            # Add keywords individually as well
-            for keyword in keywords:
-                exiftool_args.extend([
-                    f'-ItemList:Keywords+={keyword}'
-                ])
             
             # Add the file path at the end
             exiftool_args.append(file_path)
@@ -129,10 +136,8 @@ def add_metadata(file_path):
             verify_args = [
                 'exiftool',
                 '-s3',
-                '-ItemList:Title',
-                '-ItemList:Keywords',
-                '-keywords',
-                '-subject',
+                '-DisplayName',
+                '-Keywords',  # Only check one of Keywords/Subject since they're identical
                 file_path
             ]
             result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
@@ -140,10 +145,16 @@ def add_metadata(file_path):
                 lines = result.stdout.strip().splitlines()
                 if lines:
                     log_message(f"Title: {lines[0]}")
-                    for line in lines[1:]:
-                        log_message(f"Keywords: {line}")
+                    if len(lines) > 1:
+                        log_message(f"Keywords: {lines[1]}")
             else:
                 log_message("No metadata found in verification")
+            
+            # Delete the source XMP file after successful processing
+            xmp_source = file_path.rsplit('.', 1)[0] + '.xmp'
+            if os.path.exists(xmp_source):
+                os.remove(xmp_source)
+                log_message(f"Removed XMP file: {os.path.basename(xmp_source)}")
             
     except Exception as e:
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
