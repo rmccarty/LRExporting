@@ -98,67 +98,53 @@ def add_metadata(file_path):
     # Try to get metadata from XMP - always unpack the tuple
     video_date, xmp_title, keywords, tree = get_metadata_from_xmp(file_path) or (None, None, [], None)
     
-    # Use XMP title if available, otherwise generate from filename
-    if xmp_title:
-        title = xmp_title
-        log_message(f"Found title in XMP metadata, adding to media file: {title}")
-    else:
-        title = os.path.splitext(os.path.basename(file_path))[0]
-        title = title.replace("The McCartys ", "The McCartys: ")
-        log_message(f"No title in XMP metadata, using filename as media title: {title}")
-    
     try:
-        # Write title using exiftool
-        exiftool_args = [
-            'exiftool',
-            '-overwrite_original',  # Only needed for initial title write
-            f'-title={title}',
-            file_path
-        ]
-        
-        # Run exiftool for title
-        result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
-        log_message("Added title metadata using exiftool")
-        
-        # Add keywords one at a time
-        if keywords:
-            # Add each keyword to both Keywords and XMP:Subject
+        if keywords:  # If we have keywords to add
+            # First command for title and standard keywords
+            exiftool_args = [
+                'exiftool',
+                '-overwrite_original',
+                '-handler=mdta',  # Use mdta handler
+                f'-ItemList:Title={xmp_title if xmp_title else os.path.splitext(os.path.basename(file_path))[0]}',
+                # Write keywords to standard metadata
+                f'-keywords={", ".join(keywords)}',
+                f'-subject={", ".join(keywords)}'
+            ]
+            
+            # Add keywords individually as well
             for keyword in keywords:
-                # Quote the keyword if it contains spaces
-                quoted_keyword = f'"{keyword}"' if ' ' in keyword else keyword
-                
-                # Add to Keywords
-                keyword_args = [
-                    'exiftool',
-                    f'-Keywords+={quoted_keyword}',
-                    file_path
-                ]
-                result = subprocess.run(keyword_args, capture_output=True, text=True, check=True)
-                log_message(f"Added Keyword: {keyword}")
-                
-                # Add to XMP:Subject using RDF Bag structure
-                subject_args = [
-                    'exiftool',
-                    f'-XMP-dc:Subject-={quoted_keyword}',  # Remove if exists
-                    f'-XMP-dc:Subject+={quoted_keyword}',  # Add to Bag
-                    file_path
-                ]
-                result = subprocess.run(subject_args, capture_output=True, text=True, check=True)
-                log_message(f"Added XMP:Subject: {keyword}")
-        
-        # Verify metadata
-        log_message("\nVerifying metadata in saved file:")
-        
-        # Verify title
-        verify_title = subprocess.run(['exiftool', '-title', file_path], 
-                                    capture_output=True, text=True, check=True)
-        log_message(verify_title.stdout.strip())
-        
-        # Verify both keyword formats
-        verify_keywords = subprocess.run(['exiftool', '-Keywords', '-XMP-dc:Subject', file_path], 
-                                       capture_output=True, text=True, check=True)
-        log_message(verify_keywords.stdout.strip())
-        
+                exiftool_args.extend([
+                    f'-ItemList:Keywords+={keyword}'
+                ])
+            
+            # Add the file path at the end
+            exiftool_args.append(file_path)
+            
+            # Run exiftool
+            result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+            log_message("Added ItemList metadata using exiftool")
+            log_message("Verifying metadata in saved file:")
+            
+            # Verify metadata using QuickTime format
+            verify_args = [
+                'exiftool',
+                '-s3',
+                '-ItemList:Title',
+                '-ItemList:Keywords',
+                '-keywords',
+                '-subject',
+                file_path
+            ]
+            result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
+            if result.stdout:
+                lines = result.stdout.strip().splitlines()
+                if lines:
+                    log_message(f"Title: {lines[0]}")
+                    for line in lines[1:]:
+                        log_message(f"Keywords: {line}")
+            else:
+                log_message("No metadata found in verification")
+            
     except Exception as e:
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
         raise
