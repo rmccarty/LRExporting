@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import os
 import time
 from datetime import datetime
+import subprocess
 
 def log_message(message):
     """Log a message with timestamp."""
@@ -94,17 +95,8 @@ def get_metadata_from_xmp(file_path):
         return (None, None, [], None)  # Return tuple on error
 
 def add_metadata(file_path):
-    video = MP4(file_path)
-    
     # Try to get metadata from XMP - always unpack the tuple
     video_date, xmp_title, keywords, tree = get_metadata_from_xmp(file_path) or (None, None, [], None)
-    
-    if video_date:
-        date_str = video_date.strftime('%Y-%m-%d %H:%M:%S')
-        log_message(f"Using original video creation date: {date_str}")
-    else:
-        date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        log_message(f"Original creation date not found, using current time: {date_str}")
     
     # Use XMP title if available, otherwise generate from filename
     if xmp_title:
@@ -116,48 +108,56 @@ def add_metadata(file_path):
         log_message(f"No title in XMP metadata, using filename as media title: {title}")
     
     try:
-        # Add metadata
-        video["\xa9nam"] = title  # Title
-        video["\xa9day"] = date_str  # Creation date
+        # Write title using exiftool
+        exiftool_args = [
+            'exiftool',
+            '-overwrite_original',  # Only needed for initial title write
+            f'-title={title}',
+            file_path
+        ]
         
-        # Add keywords using multiple standards
+        # Run exiftool for title
+        result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+        log_message("Added title metadata using exiftool")
+        
+        # Add keywords one at a time
         if keywords:
-            if isinstance(keywords, str):
-                keywords = [keywords]
+            # Add each keyword to both Keywords and XMP:Subject
+            for keyword in keywords:
+                # Quote the keyword if it contains spaces
+                quoted_keyword = f'"{keyword}"' if ' ' in keyword else keyword
                 
-            # Write using Apple's standard
-            video["\xa9key"] = keywords
-            log_message(f"Added keywords using Apple format: {keywords}")
-            
-            try:
-                # Try to write keywords in a simpler XMP format
-                video["©xmp"] = [f"<keywords>{','.join(keywords)}</keywords>"]
-                log_message(f"Added keywords using simplified XMP structure")
-            except Exception as e:
-                log_message(f"Warning: Could not write XMP metadata: {e}")
+                # Add to Keywords
+                keyword_args = [
+                    'exiftool',
+                    f'-Keywords+={quoted_keyword}',
+                    file_path
+                ]
+                result = subprocess.run(keyword_args, capture_output=True, text=True, check=True)
+                log_message(f"Added Keyword: {keyword}")
+                
+                # Add to XMP:Subject using RDF Bag structure
+                subject_args = [
+                    'exiftool',
+                    f'-XMP-dc:Subject-={quoted_keyword}',  # Remove if exists
+                    f'-XMP-dc:Subject+={quoted_keyword}',  # Add to Bag
+                    file_path
+                ]
+                result = subprocess.run(subject_args, capture_output=True, text=True, check=True)
+                log_message(f"Added XMP:Subject: {keyword}")
         
-        video.save()
-        
-        # Verify keywords were written correctly
+        # Verify metadata
         log_message("\nVerifying metadata in saved file:")
-        verify_video = MP4(file_path)
         
-        # Check XMP format
-        if "©xmp" in verify_video:
-            xmp_content = verify_video["©xmp"]
-            log_message(f"Found XMP metadata structure:")
-            log_message(f"  {xmp_content}")
-        else:
-            log_message("No XMP metadata structure found in file")
-            
-        # Check Apple format
-        if "\xa9key" in verify_video:
-            saved_keywords_apple = verify_video["\xa9key"]
-            log_message(f"Found Apple keywords (©key):")
-            for kw in saved_keywords_apple:
-                log_message(f"  - '{kw}'")
-        else:
-            log_message("No Apple keywords (©key) found in file")
+        # Verify title
+        verify_title = subprocess.run(['exiftool', '-title', file_path], 
+                                    capture_output=True, text=True, check=True)
+        log_message(verify_title.stdout.strip())
+        
+        # Verify both keyword formats
+        verify_keywords = subprocess.run(['exiftool', '-Keywords', '-XMP-dc:Subject', file_path], 
+                                       capture_output=True, text=True, check=True)
+        log_message(verify_keywords.stdout.strip())
         
     except Exception as e:
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
@@ -170,17 +170,11 @@ def process_video(file_path):
         # Add metadata
         add_metadata(file_path)
         
-        # Remove XMP sidecar file if it exists
-        xmp_path = os.path.splitext(file_path)[0] + ".xmp"
-        if os.path.exists(xmp_path):
-            os.remove(xmp_path)
-            log_message(f"Removed XMP file: {os.path.basename(xmp_path)}")
-        
-        # Rename with "__LRE" suffix
+        # Rename with "__LRE" suffix (two underscores before LRE)
         directory = os.path.dirname(file_path)
         filename = os.path.basename(file_path)
         base, ext = os.path.splitext(filename)
-        new_filename = f"{base}__LRE{ext}"
+        new_filename = f"{base}___LRE{ext}"  # Three underscores here to get two in final name
         new_path = os.path.join(directory, new_filename)
         
         os.rename(file_path, new_path)
