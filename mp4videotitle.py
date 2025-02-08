@@ -7,6 +7,7 @@ import os
 import time
 from datetime import datetime
 import subprocess
+from mp4video_get_location import get_location_from_rdf
 
 def log_message(message):
     """Log a message with timestamp."""
@@ -104,7 +105,7 @@ def get_metadata_from_xmp(file_path):
     xmp_path = os.path.splitext(file_path)[0] + ".xmp"
     if not os.path.exists(xmp_path):
         log_message(f"No XMP file found for: {os.path.basename(file_path)}")
-        return (None, None, [], None, None, None)
+        return (None, None, [], None, None, None, None)
     
     try:
         # Get DateTimeOriginal using exiftool
@@ -122,110 +123,306 @@ def get_metadata_from_xmp(file_path):
             title = get_title_from_rdf(rdf)
             keywords = get_keywords_from_rdf(rdf)
             caption = get_caption_from_rdf(rdf)
+            location_data = get_location_from_rdf(rdf, log_message)
             
-            return (datetime.now(), title, keywords, tree, caption, date_time_original)
+            return (datetime.now(), title, keywords, tree, caption, date_time_original, location_data)
         
-        return (None, None, [], None, None, date_time_original)
+        return (None, None, [], None, None, date_time_original, None)
             
     except Exception as e:
         log_message(f"Error reading XMP file: {e}")
-        return (None, None, [], None, None, None)
+        return (None, None, [], None, None, None, None)
 
-def add_metadata(file_path):
-    # Try to get metadata from XMP - always unpack the tuple
-    video_date, xmp_title, keywords, tree, caption, date_time_original = get_metadata_from_xmp(file_path) or (None, None, [], None, None, None)
+def convert_decimal_to_dms(decimal_str):
+    """Convert decimal coordinates to degrees/minutes/seconds format."""
+    try:
+        # Parse the decimal degrees format like "48,54.48336"
+        # First, split on comma to get the degrees and decimal minutes
+        deg_min = decimal_str.split(',')
+        degrees = int(deg_min[0])  # degrees is the first part
+        
+        if len(deg_min) > 1:
+            # Convert the decimal minutes part
+            minutes_str = deg_min[1].replace(',', '.')  # handle any additional commas
+            minutes_val = float(minutes_str)
+            minutes = int(minutes_val)  # whole minutes
+            seconds = round((minutes_val - minutes) * 60, 2)  # decimal part to seconds
+            return f"{degrees} deg {minutes}' {seconds:.2f}\""
+        else:
+            return f"{degrees} deg 0' 0.00\""
+            
+    except Exception as e:
+        log_message(f"Error converting coordinate: {e}")
+        return decimal_str
+
+def verify_metadata(file_path, expected_title, expected_keywords, expected_date, expected_caption=None, expected_location=None):
+    """Verify metadata was written correctly."""
+    verification_failed = False
+    
+    log_message("=== Starting Metadata Verification ===")
     
     try:
-        if keywords:  # If we have keywords to add
-            keywords_string = ", ".join(keywords)
+        verify_args = [
+            'exiftool',
+            '-s',
+            '-DisplayName',
+            '-Title',
+            '-ItemList:Title',
+            '-Keywords',
+            '-Subject',
+            '-DateTimeOriginal',
+            '-Location',
+            '-LocationName',
+            '-City',
+            '-State',
+            '-Country',
+            '-GPSLatitude',
+            '-GPSLongitude',
+            '-Description',
+            '-Caption-Abstract',
+            file_path
+        ]
+        
+        result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
+        output_lines = result.stdout.splitlines()
+        
+        # Verify title
+        if expected_title:
+            title_found = any(expected_title in line for line in output_lines if 'Title' in line or 'DisplayName' in line)
+            if title_found:
+                log_message(f"Found title: {expected_title}")
+            else:
+                log_message("△ Title mismatch")
+                verification_failed = True
+
+        # Verify keywords
+        if expected_keywords:
+            for line in output_lines:
+                if 'Keywords' in line or 'Subject' in line:
+                    log_message(f"Found keywords: {line}")
+                    for keyword in expected_keywords:
+                        if keyword not in line:
+                            log_message(f"△ Missing keyword: {keyword}")
+                            verification_failed = True
+
+        # Verify date
+        if expected_date:
+            date_found = any(expected_date in line for line in output_lines if 'DateTimeOriginal' in line)
+            if date_found:
+                log_message(f"Found date: {expected_date}")
+            else:
+                log_message("△ Date mismatch")
+                verification_failed = True
+
+        # Verify caption
+        if expected_caption:
+            caption_found = any(expected_caption in line for line in output_lines if 'Description' in line or 'Caption-Abstract' in line)
+            if caption_found:
+                log_message(f"Found caption: {expected_caption}")
+            else:
+                log_message("△ Caption mismatch")
+                verification_failed = True
+
+        # Verify location data
+        if expected_location and isinstance(expected_location, dict):
+            location_fields = {
+                'location': ['Location', 'LocationName'],
+                'city': ['City'],
+                'state': ['State'],
+                'country': ['Country']
+            }
             
-            # Format the title
-            if not xmp_title:
-                base_name = os.path.splitext(os.path.basename(file_path))[0]
-                if "The McCartys " in base_name:
-                    display_title = base_name.replace("The McCartys ", "The McCartys: ")
-                    log_message("Converting 'The McCartys ' to 'The McCartys: ' in media file title")
+            # Handle regular location fields
+            for field, exiftool_fields in location_fields.items():
+                if expected_location.get(field):
+                    expected_value = expected_location[field]
+                    field_found = any(
+                        expected_value in line 
+                        for line in output_lines 
+                        for field_name in exiftool_fields 
+                        if field_name in line
+                    )
+                    if field_found:
+                        log_message(f"Found {field}: {expected_value}")
+                    else:
+                        log_message(f"△ {field.title()} mismatch")
+                        verification_failed = True
+
+            # Special handling for GPS
+            if expected_location.get('gps'):
+                gps_found = False
+                expected_gps = expected_location['gps']
+                
+                # Log the raw expected format first
+                log_message(f"Expected GPS (raw): {expected_gps}")
+                
+                # Get actual values
+                gps_lines = [line for line in output_lines if 'GPS' in line]
+                actual_lat = next((line.split(': ')[1] for line in gps_lines if 'Latitude ' in line), 'Not found')
+                actual_lon = next((line.split(': ')[1] for line in gps_lines if 'Longitude ' in line), 'Not found')
+                
+                # Log actual values
+                log_message(f"Actual GPS (DMS): {actual_lat}, {actual_lon}")
+                
+                # Only convert expected to DMS if needed for comparison
+                if 'deg' in actual_lat:
+                    # Parse expected coordinates
+                    lat, lon = expected_gps.split(', ')
+                    lat_val = lat.rstrip('N').rstrip('S')
+                    lon_val = lon.rstrip('E').rstrip('W')
+                    
+                    # Convert to DMS format for comparison
+                    expected_lat_dms = f"{convert_decimal_to_dms(lat_val)} N"
+                    expected_lon_dms = f"{convert_decimal_to_dms(lon_val)} E"
+                    
+                    log_message(f"Expected GPS (DMS): {expected_lat_dms}, {expected_lon_dms}")
+                    
+                    if actual_lat.strip() == expected_lat_dms and actual_lon.strip() == expected_lon_dms:
+                        log_message("✓ GPS coordinates verified (DMS format)")
+                        gps_found = True
                 else:
-                    display_title = base_name
-            else:
-                display_title = xmp_title
-            
-            # Build exiftool command using ItemList format
-            exiftool_args = [
-                'exiftool',
-                '-overwrite_original',
-                '-handler=mdta',  # Use mdta handler
-                f'-DisplayName={display_title}',
-                f'-Subject={keywords_string}',
-                f'-Keywords={keywords_string}',
-                f'-ItemList:Title={display_title}'
-            ]
-            
-            # Add caption if we have one
-            if caption:
-                exiftool_args.extend([
-                    f'-Description={caption}',
-                    f'-Caption-Abstract={caption}'
-                ])
-            
-            # Add DateTimeOriginal if we found it
-            if date_time_original:
-                exiftool_args.extend([
-                    f'-DateTimeOriginal={date_time_original}',
-                    f'-CreateDate={date_time_original}',
-                    f'-MediaCreateDate={date_time_original}',
-                    f'-TrackCreateDate={date_time_original}',
-                    f'-MediaModifyDate={date_time_original}',
-                    f'-TrackModifyDate={date_time_original}'
-                ])
-            
-            # Add the file path at the end
-            exiftool_args.append(file_path)
-            
-            # Run exiftool
-            result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
-            log_message("Added ItemList metadata using exiftool")
-            log_message("Verifying metadata in saved file:")
-            
-            # Verify metadata using QuickTime format
-            verify_args = [
-                'exiftool',
-                '-s3',
-                '-DisplayName',
-                '-Keywords',
-                '-DateTimeOriginal',
-                '-CreateDate',
-                '-Description',
-                '-Caption-Abstract',
-                file_path
-            ]
-            result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
-            if result.stdout:
-                lines = result.stdout.strip().splitlines()
-                if lines:
-                    log_message(f"Title: {lines[0]}")
-                    if len(lines) > 1:
-                        log_message(f"Keywords: {lines[1]}")
-                    if len(lines) > 2:
-                        log_message(f"DateTimeOriginal: {lines[2]}")
-                    if len(lines) > 3:
-                        log_message(f"CreateDate: {lines[3]}")
-                    if len(lines) > 4:
-                        log_message(f"Description: {lines[4]}")
-                    if len(lines) > 5:
-                        log_message(f"Caption: {lines[5]}")
-            else:
-                log_message("No metadata found in verification")
-            
-            # Delete the source XMP file after successful processing
-            xmp_source = file_path.rsplit('.', 1)[0] + '.xmp'
-            if os.path.exists(xmp_source):
-                os.remove(xmp_source)
-                log_message(f"Removed XMP file: {os.path.basename(xmp_source)}")
-            
+                    # Compare raw formats
+                    if f"{actual_lat}, {actual_lon}" == expected_gps:
+                        log_message("✓ GPS coordinates verified (raw format)")
+                        gps_found = True
+                
+                if not gps_found:
+                    log_message("△ GPS coordinates mismatch")
+                    verification_failed = True
+
+        log_message("=== Metadata Verification Complete ===")
+        if verification_failed:
+            log_message("△ Some metadata verification failed")
         else:
-            log_message("No keywords found in XMP")
-            
+            log_message("✓ All metadata verification passed")
+        return not verification_failed
+
+    except Exception as e:
+        log_message(f"Error verifying metadata: {e}")
+        log_message("=== Metadata Verification Failed ===")
+        return False
+
+def add_metadata(file_path):
+    """Main function to handle metadata operations."""
+    video_date, xmp_title, keywords, tree, caption, date_time_original, location_data = get_metadata_from_xmp(file_path) or (None, None, [], None, None, None, None)
+    
+    try:
+        # Format the title
+        if xmp_title:
+            display_title = xmp_title
+            log_message(f"Using XMP title: {display_title}")
+        else:
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            if "The McCartys " in base_name:
+                display_title = base_name.replace("The McCartys ", "The McCartys: ")
+                log_message("Converting 'The McCartys ' to 'The McCartys: ' in media file title")
+            else:
+                display_title = base_name
+            log_message(f"Using filename as title: {display_title}")
+        
+        # Build exiftool command
+        exiftool_args = [
+            'exiftool',
+            '-overwrite_original',
+            '-handler=mdta',
+            f'-Title={display_title}',
+            f'-DisplayName={display_title}',
+            f'-ItemList:Title={display_title}'
+        ]
+        
+        # Add keywords if present
+        if keywords:
+            keywords_string = ", ".join(keywords)
+            exiftool_args.extend([
+                f'-Keywords={keywords_string}',
+                f'-Subject={keywords_string}'
+            ])
+        
+        # Add caption if present
+        if caption:
+            exiftool_args.extend([
+                f'-Description={caption}',
+                f'-Caption-Abstract={caption}'
+            ])
+        
+        # Add location data if present
+        if location_data:
+            if location_data.get('location'):
+                exiftool_args.extend([
+                    f'-LocationName={location_data["location"]}',
+                    f'-Location={location_data["location"]}'
+                ])
+            if location_data.get('city'):
+                exiftool_args.append(f'-City={location_data["city"]}')
+            if location_data.get('state'):
+                exiftool_args.append(f'-State={location_data["state"]}')
+            if location_data.get('country'):
+                exiftool_args.append(f'-Country={location_data["country"]}')
+            if location_data.get('gps'):
+                # Parse GPS coordinates
+                lat, lon = location_data['gps'].split(', ')
+                lat_val = lat.rstrip('N').rstrip('S')
+                lon_val = lon.rstrip('E').rstrip('W')
+                lat_ref = 'N' if 'N' in lat else 'S'
+                lon_ref = 'E' if 'E' in lon else 'W'
+                
+                # Add GPS metadata in format that Apple Photos recognizes
+                exiftool_args.extend([
+                    '-api', 'QuickTimeUTC',  # Ensure proper GPS format
+                    f'-GPSCoordinates={lat_val}"{lat_ref},{lon_val}"{lon_ref}',
+                    f'-GPSLatitude={lat_val}',
+                    f'-GPSLatitudeRef={lat_ref}',
+                    f'-GPSLongitude={lon_val}',
+                    f'-GPSLongitudeRef={lon_ref}',
+                    '-XMP:GPSLatitude=' + lat_val,
+                    '-XMP:GPSLongitude=' + lon_val,
+                    '-XMP:GPSLatitudeRef=' + lat_ref,
+                    '-XMP:GPSLongitudeRef=' + lon_ref
+                ])
+                log_message(f"Adding GPS coordinates in Apple Photos format: {lat_val}{lat_ref}, {lon_val}{lon_ref}")
+        
+        # Add date if present
+        if date_time_original:
+            exiftool_args.extend([
+                f'-DateTimeOriginal={date_time_original}',
+                f'-CreateDate={date_time_original}',
+                f'-MediaCreateDate={date_time_original}',
+                f'-TrackCreateDate={date_time_original}',
+                f'-MediaModifyDate={date_time_original}',
+                f'-TrackModifyDate={date_time_original}'
+            ])
+        
+        # Add the file path
+        exiftool_args.append(file_path)
+        
+        # Run exiftool
+        result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+        
+        # Log what was written
+        log_message("Added metadata using exiftool:")
+        log_message(f"  Title: {display_title}")
+        if keywords:
+            log_message(f"  Keywords: {keywords_string}")
+        if date_time_original:
+            log_message(f"  Date: {date_time_original}")
+        if caption:
+            log_message(f"  Caption: {caption}")
+        if location_data:
+            log_message("  Location data:")
+            for key, value in location_data.items():
+                if value:
+                    log_message(f"    {key}: {value}")
+        
+        # Verify metadata with full location data
+        if not verify_metadata(file_path, display_title, keywords, date_time_original, caption, location_data):
+            log_message("△ Some metadata verification failed")
+        
+        # Delete the source XMP file after successful processing
+        xmp_source = file_path.rsplit('.', 1)[0] + '.xmp'
+        if os.path.exists(xmp_source):
+            os.remove(xmp_source)
+            log_message(f"Removed XMP file: {os.path.basename(xmp_source)}")
+        
     except Exception as e:
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
         raise
