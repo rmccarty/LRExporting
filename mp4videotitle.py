@@ -427,6 +427,16 @@ def add_metadata(file_path):
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
         raise
 
+def get_new_filename(file_path, title):
+    """Generate new filename from title."""
+    directory = os.path.dirname(file_path)
+    ext = os.path.splitext(file_path)[1].lower()  # Preserve original extension
+    
+    # Clean title for filename
+    clean_title = title.replace(':', ' -').replace('/', '_')
+    new_name = f"{clean_title}__LRE{ext}"  # Will work with .m4v
+    return os.path.join(directory, new_name)
+
 def process_video(file_path):
     try:
         log_message(f"Found new McCartys video: {os.path.basename(file_path)}")
@@ -450,18 +460,20 @@ def process_video(file_path):
         log_message(f"Error processing {os.path.basename(file_path)}: {e}")
         return False
 
-def watch_folder(folder_path):
+def watch_folders(folder_paths):
     while True:
         try:
-            # Look for video files
-            for filename in os.listdir(folder_path):
-                if "The McCartys" in filename and not "__LRE" in filename and filename.lower().endswith(('.mov', '.mp4')):
-                    file_path = os.path.join(folder_path, filename)
-                    
-                    # Process the video
-                    if process_video(file_path):
-                        log_message(f"Successfully processed: {filename}")
-                    
+            for folder_path in folder_paths:
+                log_message(f"Watching folder: {folder_path}")
+                # Look for video files in the current folder
+                for filename in os.listdir(folder_path):
+                    if not "__LRE" in filename and filename.lower().endswith(('.mov', '.mp4', '.m4v', '.avi')):
+                        file_path = os.path.join(folder_path, filename)
+                        
+                        # Process the video
+                        if process_video(file_path):
+                            log_message(f"Successfully processed: {filename}")
+            
             time.sleep(1)  # Wait before checking again
             
         except Exception as e:
@@ -469,6 +481,10 @@ def watch_folder(folder_path):
             time.sleep(1)  # Wait before retrying
 
 if __name__ == "__main__":
-    downloads_folder = os.path.expanduser("~/Downloads")
-    log_message("Watching Downloads folder for 'The McCartys' video files...")
-    watch_folder(downloads_folder)
+    folders_to_watch = [
+        os.path.expanduser("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
+        os.path.expanduser("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming"),  # Claudia's Incoming folder
+        os.path.expanduser("/Users/rmccarty/Transfers/Both/Both_Incoming")  # Added Both's Incoming folder
+    ]
+    log_message("Starting to watch specified folders for video files...")
+    watch_folders(folders_to_watch)
