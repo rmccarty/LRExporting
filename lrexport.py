@@ -23,7 +23,7 @@ class JPEGExifProcessor:
             output_path (str): Optional path for output file. If None, will use input directory
             
         Raises:
-            SystemExit: If file is not JPEG or username cannot be extracted
+            SystemExit: If file is not JPEG
         """
         self.input_path = Path(input_path)
         self.output_path = (Path(output_path) if output_path 
@@ -41,17 +41,19 @@ class JPEGExifProcessor:
             self.logger.error(f"File must be JPEG format. Found: {self.input_path.suffix}")
             sys.exit(1)
             
-        # Validate username in original filename
+        # Remove the username validation logic
         try:
             original_name = self.input_path.stem
-            if '_' not in original_name:
-                self.logger.error(f"Original filename must contain username followed by underscore. Found: {original_name}")
-                sys.exit(1)
+            # Removed the check for underscore in the filename
+            # if '_' not in original_name:
+            #     self.logger.error(f"Original filename must contain username followed by underscore. Found: {original_name}")
+            #     sys.exit(1)
             
-            username = original_name.split('_')[0]
-            if not username:
-                self.logger.error("Username cannot be empty")
-                sys.exit(1)
+            # The rest of the logic can remain unchanged
+            # username = original_name.split('_')[0]
+            # if not username:
+            #     self.logger.error("Username cannot be empty")
+            #     sys.exit(1)
                 
         except Exception as e:
             self.logger.error(f"Error validating filename: {str(e)}")
@@ -200,16 +202,6 @@ class JPEGExifProcessor:
             self.logger.error(f"Error updating keywords: {e.stderr}")
             raise
             
-    def get_username_from_original(self) -> str:
-        """
-        Extract username from original filename (characters before first underscore).
-        
-        Returns:
-            str: Username from original filename
-        """
-        original_name = self.input_path.stem  # Get filename without extension
-        return original_name.split('_')[0]
-
     def generate_filename(self) -> str:
         """
         Generate new filename based on EXIF data and add user/LRE tags.
@@ -241,12 +233,9 @@ class JPEGExifProcessor:
         if country:
             components.append(country.replace(' ', '_'))
             
-        # Get username from original filename
-        username = self.get_username_from_original()
-        
-        # Add user and LRE tags
+        # Add LRE tags
         base_name = '_'.join(components)
-        filename = f"{base_name}_{username}__LRE.jpg"
+        filename = f"{base_name}__LRE.jpg"
         
         # Replace any slashes in the final filename
         return filename.replace('/', '-').replace('\\', '-')
@@ -326,76 +315,33 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     
-    # Get user's Downloads directory
-    if sys.platform == "win32":
-        WATCH_DIR = Path.home() / "Downloads"
-    elif sys.platform == "darwin":  # macOS
-        WATCH_DIR = Path.home() / "Downloads"
-    else:  # Linux and others
-        WATCH_DIR = Path.home() / "Downloads"
+    # Set the directories to watch
+    WATCH_DIRS = [
+        Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
+        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")  # Add another directory here
+    ]
     
-    # List of allowed filename prefixes
-    ALLOWED_PREFIXES = ['ron_', 'claudia_', 'both_']
-    
-    logger.info(f"Watching directory: {WATCH_DIR}")
+    logger.info(f"Watching directories: {', '.join(str(dir) for dir in WATCH_DIRS)}")
     
     while True:
         try:
             found_files = False
-            # Find all JPEG files
-            for file in WATCH_DIR.glob('*.[Jj][Pp][Gg]'):
-                # Handle both_ files first
-                if file.name.lower().startswith('both_'):
-                    found_files = True
-                    logger.info(f"Found 'both_' file to process: {file}")
-                    
-                    # Create base names with new prefixes
-                    ron_name = file.name.replace('both_', 'ron_', 1)
-                    claudia_name = file.name.replace('both_', 'claudia_', 1)
-                    
-                    try:
-                        # Handle ron_ file
-                        ron_path = file.parent / ron_name
-                        counter = 1
-                        while ron_path.exists():
-                            name_parts = ron_name.rsplit('.', 1)
-                            ron_path = file.parent / f"{name_parts[0]}_{counter:03d}.{name_parts[1]}"
-                            counter += 1
-                            
-                        # Handle claudia_ file
-                        claudia_path = file.parent / claudia_name
-                        counter = 1
-                        while claudia_path.exists():
-                            name_parts = claudia_name.rsplit('.', 1)
-                            claudia_path = file.parent / f"{name_parts[0]}_{counter:03d}.{name_parts[1]}"
-                            counter += 1
+            # Iterate through each directory
+            for watch_dir in WATCH_DIRS:
+                # Find all JPEG files in the current directory
+                for file in watch_dir.glob('*.[Jj][Pp][Gg]'):
+                    if "__LRE" not in file.name:  # Correctly check the file name
+                        found_files = True
+                        logger.info(f"Found file to process: {file}")
                         
-                        # Copy files with final names
-                        shutil.copy2(file, ron_path)
-                        shutil.copy2(file, claudia_path)
-                        logger.info(f"Created copies: {ron_path.name} and {claudia_path.name}")
-                        
-                        # Delete the original both_ file
-                        file.unlink()
-                        logger.info(f"Deleted original file: {file.name}")
-                        
-                    except Exception as e:
-                        logger.error(f"Error creating copies: {e}")
-                    continue
-                
-                # Process ron_ and claudia_ files
-                if file.name.lower().startswith(('ron_', 'claudia_')):
-                    found_files = True
-                    logger.info(f"Found file to process: {file}")
-                    
-                    # Process the image
-                    processor = JPEGExifProcessor(str(file))
-                    try:
-                        new_path = processor.process_image()
-                        logger.info(f"Image processed successfully: {new_path}")
-                    except Exception as e:
-                        logger.error(f"Error processing image: {e}")
-            
+                        # Process the image
+                        processor = JPEGExifProcessor(str(file))
+                        try:
+                            new_path = processor.process_image()
+                            logger.info(f"Image processed successfully: {new_path}")
+                        except Exception as e:
+                            logger.error(f"Error processing image: {e}")
+
             # Only sleep if no files were found
             if not found_files:
                 time.sleep(3)
