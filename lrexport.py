@@ -318,7 +318,8 @@ if __name__ == "__main__":
     # Set the directories to watch
     WATCH_DIRS = [
         Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")  # Add another directory here
+        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming"),
+        Path("/Users/rmccarty/Transfers/Both/Both_Incoming"),   # Add another directory here
     ]
     
     logger.info(f"Watching directories: {', '.join(str(dir) for dir in WATCH_DIRS)}")
