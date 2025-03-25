@@ -12,7 +12,14 @@ from config import (
     LOG_LEVEL,
     SLEEP_TIME,
     VIDEO_PATTERNS,
-    XML_NAMESPACES
+    XML_NAMESPACES,
+    MCCARTYS_PREFIX,
+    MCCARTYS_REPLACEMENT,
+    EXIFTOOL_BASE_ARGS,
+    METADATA_FIELDS,
+    VERIFY_FIELDS,
+    FILENAME_REPLACEMENTS,
+    LRE_SUFFIX
 )
 
 def log_message(message):
@@ -162,10 +169,14 @@ def get_location_from_rdf(rdf):
 
 def get_metadata_from_xmp(file_path):
     """Get metadata from XMP sidecar file."""
+    # First check for XMP with original filename
     xmp_path = os.path.splitext(file_path)[0] + ".xmp"
     if not os.path.exists(xmp_path):
-        log_message(f"No XMP file found for: {os.path.basename(file_path)}")
-        return (None, None, [], None, None, None, None)
+        # If not found, check for XMP with same name as video
+        xmp_path = file_path + ".xmp"
+        if not os.path.exists(xmp_path):
+            log_message(f"No XMP file found for: {os.path.basename(file_path)}")
+            return (None, None, [], None, None, None, None)
     
     try:
         # Get DateTimeOriginal using exiftool
@@ -222,33 +233,16 @@ def verify_metadata(file_path, expected_title, expected_keywords, expected_date,
     log_message("=== Starting Metadata Verification ===")
     
     try:
-        verify_args = [
-            'exiftool',
-            '-s',
-            '-DisplayName',
-            '-Title',
-            '-ItemList:Title',
-            '-Keywords',
-            '-Subject',
-            '-DateTimeOriginal',
-            '-Location',
-            '-LocationName',
-            '-City',
-            '-State',
-            '-Country',
-            '-GPSLatitude',
-            '-GPSLongitude',
-            '-Description',
-            '-Caption-Abstract',
-            file_path
-        ]
+        verify_args = ['exiftool', '-s'] + VERIFY_FIELDS + [file_path]
         
         result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
         output_lines = result.stdout.splitlines()
         
         # Verify title
         if expected_title:
-            title_found = any(expected_title in line for line in output_lines if 'Title' in line or 'DisplayName' in line)
+            title_found = any(expected_title in line for line in output_lines if any(
+                field.lstrip('-') in line for field in METADATA_FIELDS['title']
+            ))
             if title_found:
                 log_message(f"Found title: {expected_title}")
             else:
@@ -267,7 +261,9 @@ def verify_metadata(file_path, expected_title, expected_keywords, expected_date,
 
         # Verify date
         if expected_date:
-            date_found = any(expected_date in line for line in output_lines if 'DateTimeOriginal' in line)
+            date_found = any(expected_date in line for line in output_lines if any(
+                field.lstrip('-') in line for field in METADATA_FIELDS['date']
+            ))
             if date_found:
                 log_message(f"Found date: {expected_date}")
             else:
@@ -276,7 +272,9 @@ def verify_metadata(file_path, expected_title, expected_keywords, expected_date,
 
         # Verify caption
         if expected_caption:
-            caption_found = any(expected_caption in line for line in output_lines if 'Description' in line or 'Caption-Abstract' in line)
+            caption_found = any(expected_caption in line for line in output_lines if any(
+                field.lstrip('-') in line for field in METADATA_FIELDS['caption']
+            ))
             if caption_found:
                 log_message(f"Found caption: {expected_caption}")
             else:
@@ -285,76 +283,37 @@ def verify_metadata(file_path, expected_title, expected_keywords, expected_date,
 
         # Verify location data
         if expected_location and isinstance(expected_location, dict):
-            location_fields = {
-                'location': ['Location', 'LocationName'],
-                'city': ['City'],
-                'state': ['State'],
-                'country': ['Country']
-            }
-            
             # Handle regular location fields
-            for field, exiftool_fields in location_fields.items():
-                if expected_location.get(field):
-                    expected_value = expected_location[field]
+            for key, fields in METADATA_FIELDS.items():
+                if key in ['location', 'city', 'state', 'country'] and expected_location.get(key):
+                    expected_value = expected_location[key]
                     field_found = any(
                         expected_value in line 
                         for line in output_lines 
-                        for field_name in exiftool_fields 
-                        if field_name in line
+                        for field_name in fields 
+                        if field_name.lstrip('-') in line
                     )
                     if field_found:
-                        log_message(f"Found {field}: {expected_value}")
+                        log_message(f"Found {key}: {expected_value}")
                     else:
-                        log_message(f"△ {field.title()} mismatch")
+                        log_message(f"△ {key.title()} mismatch")
                         verification_failed = True
-
-            # Special handling for GPS
+            
+            # Handle GPS coordinates
             if expected_location.get('gps'):
-                gps_found = False
-                expected_gps = expected_location['gps']
-                
-                # Log the raw expected format first
-                log_message(f"Expected GPS (raw): {expected_gps}")
-                
-                # Get actual values
-                gps_lines = [line for line in output_lines if 'GPS' in line]
-                actual_lat = next((line.split(': ')[1] for line in gps_lines if 'Latitude ' in line), 'Not found')
-                actual_lon = next((line.split(': ')[1] for line in gps_lines if 'Longitude ' in line), 'Not found')
-                
-                # Log actual values
-                log_message(f"Actual GPS (DMS): {actual_lat}, {actual_lon}")
-                
-                # Only convert expected to DMS if needed for comparison
-                if 'deg' in actual_lat:
-                    # Parse expected coordinates
-                    lat, lon = expected_gps.split(', ')
-                    lat_val = lat.rstrip('N').rstrip('S')
-                    lon_val = lon.rstrip('E').rstrip('W')
-                    
-                    # Convert to DMS format for comparison
-                    expected_lat_dms = f"{convert_decimal_to_dms(lat_val)} N"
-                    expected_lon_dms = f"{convert_decimal_to_dms(lon_val)} E"
-                    
-                    log_message(f"Expected GPS (DMS): {expected_lat_dms}, {expected_lon_dms}")
-                    
-                    if actual_lat.strip() == expected_lat_dms and actual_lon.strip() == expected_lon_dms:
-                        log_message("✓ GPS coordinates verified (DMS format)")
-                        gps_found = True
+                lat, lon = expected_location['gps']
+                gps_found = any(
+                    lat in line for line in output_lines if 'GPSLatitude' in line
+                ) and any(
+                    lon in line for line in output_lines if 'GPSLongitude' in line
+                )
+                if gps_found:
+                    log_message(f"Found GPS coordinates: {lat}, {lon}")
                 else:
-                    # Compare raw formats
-                    if f"{actual_lat}, {actual_lon}" == expected_gps:
-                        log_message("✓ GPS coordinates verified (raw format)")
-                        gps_found = True
-                
-                if not gps_found:
                     log_message("△ GPS coordinates mismatch")
                     verification_failed = True
 
         log_message("=== Metadata Verification Complete ===")
-        if verification_failed:
-            log_message("△ Some metadata verification failed")
-        else:
-            log_message("✓ All metadata verification passed")
         return not verification_failed
 
     except Exception as e:
@@ -362,162 +321,188 @@ def verify_metadata(file_path, expected_title, expected_keywords, expected_date,
         log_message("=== Metadata Verification Failed ===")
         return False
 
-def add_metadata(file_path):
-    """Main function to handle metadata operations."""
-    video_date, xmp_title, keywords, tree, caption, date_time_original, location_data = get_metadata_from_xmp(file_path) or (None, None, [], None, None, None, None)
+class VideoProcessor:
+    """
+    A class to process video files and their metadata using exiftool.
+    """
     
-    try:
-        # Format the title
-        if xmp_title:
-            display_title = xmp_title
-            log_message(f"Using XMP title: {display_title}")
-        else:
-            base_name = os.path.splitext(os.path.basename(file_path))[0]
-            if "The McCartys " in base_name:
-                display_title = base_name.replace("The McCartys ", "The McCartys: ")
-                log_message("Converting 'The McCartys ' to 'The McCartys: ' in media file title")
+    def __init__(self, file_path: str):
+        """
+        Initialize the video processor with a file path.
+        
+        Args:
+            file_path (str): Path to input video file
+        """
+        self.file_path = file_path
+        self.logger = logging.getLogger(__name__)
+        
+        # Verify exiftool is available
+        if not shutil.which('exiftool'):
+            self.logger.error("exiftool is not installed or not in PATH")
+            sys.exit(1)
+            
+        # Validate file extension
+        if Path(file_path).suffix.lower() not in VIDEO_PATTERNS:
+            self.logger.error(f"File must be a video format. Found: {Path(file_path).suffix}")
+            sys.exit(1)
+    
+    def add_metadata(self):
+        """Main method to handle metadata operations."""
+        try:
+            video_date, xmp_title, keywords, tree, caption, date_time_original, location_data = get_metadata_from_xmp(self.file_path) or (None, None, [], None, None, None, None)
+            
+            # Format the title
+            if xmp_title:
+                display_title = xmp_title
+                log_message(f"Using XMP title: {display_title}")
             else:
-                display_title = base_name
-            log_message(f"Using filename as title: {display_title}")
-        
-        # Build exiftool command
-        exiftool_args = [
-            'exiftool',
-            '-overwrite_original',
-            '-handler=mdta',
-            f'-Title={display_title}',
-            f'-DisplayName={display_title}',
-            f'-ItemList:Title={display_title}'
-        ]
-        
-        # Add keywords if present
-        if keywords:
-            keywords_string = ", ".join(keywords)
-            exiftool_args.extend([
-                f'-Keywords={keywords_string}',
-                f'-Subject={keywords_string}'
-            ])
-        
-        # Add caption if present
-        if caption:
-            exiftool_args.extend([
-                f'-Description={caption}',
-                f'-Caption-Abstract={caption}'
-            ])
-        
-        # Add location data if present
-        if location_data:
-            if location_data.get('location'):
-                exiftool_args.extend([
-                    f'-LocationName={location_data["location"]}',
-                    f'-Location={location_data["location"]}'
-                ])
-            if location_data.get('city'):
-                exiftool_args.append(f'-City={location_data["city"]}')
-            if location_data.get('state'):
-                exiftool_args.append(f'-State={location_data["state"]}')
-            if location_data.get('country'):
-                exiftool_args.append(f'-Country={location_data["country"]}')
-            if location_data.get('gps'):
-                # Parse GPS coordinates
-                lat, lon = location_data['gps'].split(', ')
-                lat_val = lat.rstrip('N').rstrip('S')
-                lon_val = lon.rstrip('E').rstrip('W')
-                lat_ref = 'N' if 'N' in lat else 'S'
-                lon_ref = 'E' if 'E' in lon else 'W'
+                base_name = os.path.splitext(os.path.basename(self.file_path))[0]
+                if MCCARTYS_PREFIX in base_name:
+                    display_title = base_name.replace(MCCARTYS_PREFIX, MCCARTYS_REPLACEMENT)
+                    log_message("Converting 'The McCartys ' to 'The McCartys: ' in media file title")
+                else:
+                    display_title = base_name
+                log_message(f"Using filename as title: {display_title}")
+            
+            # Start with base exiftool args
+            exiftool_args = EXIFTOOL_BASE_ARGS.copy()
+            
+            # Add title
+            for field in METADATA_FIELDS['title']:
+                exiftool_args.append(f"{field}={display_title}")
+            
+            # Add date if available
+            if date_time_original:
+                for field in METADATA_FIELDS['date']:
+                    exiftool_args.append(f"{field}={date_time_original}")
+            
+            # Add location data if available
+            if location_data:
+                for key, fields in METADATA_FIELDS.items():
+                    if key in ['location', 'city', 'state', 'country'] and location_data.get(key):
+                        for field in fields:
+                            exiftool_args.append(f"{field}={location_data[key]}")
                 
-                # Add GPS metadata in format that Apple Photos recognizes
-                exiftool_args.extend([
-                    '-api', 'QuickTimeUTC',  # Ensure proper GPS format
-                    f'-GPSCoordinates={lat_val}"{lat_ref},{lon_val}"{lon_ref}',
-                    f'-GPSLatitude={lat_val}',
-                    f'-GPSLatitudeRef={lat_ref}',
-                    f'-GPSLongitude={lon_val}',
-                    f'-GPSLongitudeRef={lon_ref}',
-                    '-XMP:GPSLatitude=' + lat_val,
-                    '-XMP:GPSLongitude=' + lon_val,
-                    '-XMP:GPSLatitudeRef=' + lat_ref,
-                    '-XMP:GPSLongitudeRef=' + lon_ref
-                ])
-                log_message(f"Adding GPS coordinates in Apple Photos format: {lat_val}{lat_ref}, {lon_val}{lon_ref}")
-        
-        # Add date if present
-        if date_time_original:
-            exiftool_args.extend([
-                f'-DateTimeOriginal={date_time_original}',
-                f'-CreateDate={date_time_original}',
-                f'-MediaCreateDate={date_time_original}',
-                f'-TrackCreateDate={date_time_original}',
-                f'-MediaModifyDate={date_time_original}',
-                f'-TrackModifyDate={date_time_original}'
-            ])
-        
-        # Add the file path
-        exiftool_args.append(file_path)
-        
-        # Run exiftool
-        result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
-        
-        # Log what was written
-        log_message("Added metadata using exiftool:")
-        log_message(f"  Title: {display_title}")
-        if keywords:
-            log_message(f"  Keywords: {keywords_string}")
-        if date_time_original:
-            log_message(f"  Date: {date_time_original}")
-        if caption:
-            log_message(f"  Caption: {caption}")
-        if location_data:
-            log_message("  Location data:")
-            for key, value in location_data.items():
-                if value:
-                    log_message(f"    {key}: {value}")
-        
-        # Verify metadata with full location data
-        if not verify_metadata(file_path, display_title, keywords, date_time_original, caption, location_data):
-            log_message("△ Some metadata verification failed")
-        
-        # Delete the source XMP file after successful processing
-        xmp_source = file_path.rsplit('.', 1)[0] + '.xmp'
-        if os.path.exists(xmp_source):
-            os.remove(xmp_source)
-            log_message(f"Removed XMP file: {os.path.basename(xmp_source)}")
-        
-    except Exception as e:
-        log_message(f"Error processing {os.path.basename(file_path)}: {e}")
-        raise
+                # Handle GPS separately
+                if location_data.get('gps'):
+                    lat, lon = location_data['gps']
+                    for field, value in zip(METADATA_FIELDS['gps'], [lat, lon]):
+                        exiftool_args.append(f"{field}={value}")
+            
+            # Add keywords if available
+            if keywords:
+                keywords_str = ', '.join(keywords)
+                exiftool_args.append(f"-Keywords={keywords_str}")
+            
+            # Add caption if available
+            if caption:
+                for field in METADATA_FIELDS['caption']:
+                    exiftool_args.append(f"{field}={caption}")
+            
+            # Add the file path at the end
+            exiftool_args.append(self.file_path)
+            
+            # Run exiftool
+            log_message("Added metadata using exiftool:")
+            log_message(f"  Title: {display_title}")
+            if date_time_original:
+                log_message(f"  Date: {date_time_original}")
+            if keywords:
+                log_message(f"  Keywords: {keywords}")
+            if caption:
+                log_message(f"  Caption: {caption}")
+            if location_data:
+                log_message("  Location data:")
+                for key, value in location_data.items():
+                    if value:
+                        log_message(f"    {key}: {value}")
+            
+            subprocess.run(exiftool_args, check=True, capture_output=True, text=True)
+            
+            # Verify the metadata was written correctly
+            if not verify_metadata(self.file_path, display_title, keywords, date_time_original, caption, location_data):
+                log_message("Metadata verification failed")
+                return None
+            
+            return {
+                'title': display_title,
+                'keywords': keywords,
+                'date': date_time_original,
+                'caption': caption,
+                'location': location_data
+            }
+            
+        except Exception as e:
+            log_message(f"Error processing {os.path.basename(self.file_path)}: {e}")
+            return None
 
 def get_new_filename(file_path, title):
     """Generate new filename from title."""
     directory = os.path.dirname(file_path)
     ext = os.path.splitext(file_path)[1].lower()  # Preserve original extension
-    
-    # Clean title for filename
-    clean_title = title.replace(':', ' -').replace('/', '_')
-    new_name = f"{clean_title}__LRE{ext}"  # Will work with .m4v
+    clean_title = title
+    for old, new in FILENAME_REPLACEMENTS.items():
+        clean_title = clean_title.replace(old, new)
+    new_name = f"{clean_title}{LRE_SUFFIX}{ext}"
     return os.path.join(directory, new_name)
 
 def process_video(file_path):
+    """Process a video file."""
     try:
         log_message(f"Found new McCartys video: {os.path.basename(file_path)}")
         
-        # Add metadata
-        add_metadata(file_path)
+        # Check for both possible XMP locations
+        xmp_paths = [
+            os.path.splitext(file_path)[0] + ".xmp",  # Original filename XMP
+            file_path + ".xmp"  # Full filename XMP
+        ]
+        xmp_exists = False
+        found_xmp_path = None
         
-        # Rename with "__LRE" suffix (two underscores before LRE)
-        directory = os.path.dirname(file_path)
-        filename = os.path.basename(file_path)
-        base, ext = os.path.splitext(filename)
-        new_filename = f"{base}___LRE{ext}"  # Three underscores here to get two in final name
-        new_path = os.path.join(directory, new_filename)
+        for xmp_path in xmp_paths:
+            if os.path.exists(xmp_path):
+                xmp_exists = True
+                found_xmp_path = xmp_path
+                break
         
+        # Add metadata first
+        metadata_result = VideoProcessor(file_path).add_metadata()
+        if not metadata_result:
+            log_message(f"Failed to add metadata to {os.path.basename(file_path)}")
+            return False
+            
+        # Get the title for renaming
+        title = metadata_result.get('title')
+        if not title:
+            log_message(f"No title found for {os.path.basename(file_path)}")
+            return False
+            
+        # Generate new filename
+        new_path = get_new_filename(file_path, title)
+        new_xmp_path = new_path + ".xmp"
+        
+        # Rename video file
         os.rename(file_path, new_path)
-        log_message(f"Renamed to: {new_filename}")
+        log_message(f"Renamed video to: {os.path.basename(new_path)}")
         
+        # Handle XMP file if it exists
+        if xmp_exists and found_xmp_path:
+            try:
+                # First try to rename it
+                os.rename(found_xmp_path, new_xmp_path)
+                log_message(f"Renamed XMP to: {os.path.basename(new_xmp_path)}")
+                
+                # Then remove it
+                os.remove(new_xmp_path)
+                log_message(f"Removed XMP file: {os.path.basename(new_xmp_path)}")
+            except Exception as e:
+                log_message(f"Error handling XMP file: {e}")
+                # Continue even if XMP handling fails - we've already processed the video
+            
         return True
         
     except Exception as e:
-        log_message(f"Error processing {os.path.basename(file_path)}: {e}")
+        log_message(f"Error processing video {os.path.basename(file_path)}: {e}")
         return False
 
 def watch_folders(folder_paths):
@@ -528,7 +513,9 @@ def watch_folders(folder_paths):
             for folder in folder_paths:
                 log_message(f"Checking {folder} for new video files...")
                 for file in os.scandir(folder):
-                    if file.is_file() and file.name.lower().endswith(VIDEO_PATTERNS):
+                    if (file.is_file() and 
+                        file.name.lower().endswith(VIDEO_PATTERNS) and
+                        "__LRE" not in file.name):  # Skip already processed files
                         found_files = True
                         process_video(file.path)
             
