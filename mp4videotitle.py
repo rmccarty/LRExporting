@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 
-# Requires: pip install mutagen
-from mutagen.mp4 import MP4
-import xml.etree.ElementTree as ET
-import os
-import time
-from datetime import datetime
+from pathlib import Path
 import subprocess
+import json
+import logging
+import sys
+import shutil
+import os
+import xml.etree.ElementTree as ET
+from datetime import datetime
+import time
+from mutagen.mp4 import MP4
+import re
+import glob
+
 from config import (
-    WATCH_DIRS,
     LOG_LEVEL,
     SLEEP_TIME,
     VIDEO_PATTERNS,
@@ -19,307 +25,14 @@ from config import (
     METADATA_FIELDS,
     VERIFY_FIELDS,
     FILENAME_REPLACEMENTS,
-    LRE_SUFFIX
+    LRE_SUFFIX,
+    WATCH_DIRS
 )
 
 def log_message(message):
     """Log a message with timestamp."""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] {message}")
-
-def get_date_from_exiftool(xmp_path):
-    """Get DateTimeOriginal from XMP using exiftool."""
-    try:
-        exiftool_args = [
-            'exiftool',
-            '-s',
-            '-DateTimeOriginal',
-            xmp_path
-        ]
-        result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
-        if result.stdout:
-            date_line = result.stdout.strip()
-            if ': ' in date_line:
-                date_time_original = date_line.split(': ')[1].strip()
-                log_message(f"Found DateTimeOriginal from exiftool: {date_time_original}")
-                return date_time_original
-    except Exception as e:
-        log_message(f"Error getting date from exiftool: {e}")
-    return None
-
-def get_title_from_rdf(rdf):
-    """Extract title from RDF data."""
-    ns = XML_NAMESPACES
-    title_path = f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
-    title_elem = rdf.find(title_path)
-    if title_elem is not None and title_elem.text:
-        title = title_elem.text.strip()
-        log_message(f"Found XMP title: '{title}'")
-        return title
-    log_message("No XMP title found in standard format")
-    return None
-
-def get_caption_from_rdf(rdf):
-    """Extract caption from RDF data."""
-    ns = XML_NAMESPACES
-    description_path = f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
-    description_elem = rdf.find(description_path)
-    if description_elem is not None and description_elem.text:
-        caption = description_elem.text.strip()
-        log_message(f"Found XMP caption: '{caption}'")
-        return caption
-    log_message("No XMP caption found")
-    return None
-
-def get_keywords_from_rdf(rdf):
-    """Extract keywords from RDF data."""
-    keywords = []
-    log_message("Looking for keywords in XMP metadata...")
-    ns = XML_NAMESPACES
-    
-    # Try dc:subject/rdf:Seq format
-    keyword_path_seq = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Seq/{{{ns["rdf"]}}}li'
-    seq_keywords = rdf.findall(keyword_path_seq)
-    if seq_keywords:
-        log_message("Found keywords in dc:subject/rdf:Seq format:")
-        for keyword_elem in seq_keywords:
-            if keyword_elem.text and keyword_elem.text.strip():
-                keywords.append(keyword_elem.text.strip())
-                log_message(f"  - '{keyword_elem.text.strip()}'")
-    
-    # Try dc:subject/rdf:Bag format
-    keyword_path_bag = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
-    bag_keywords = rdf.findall(keyword_path_bag)
-    if bag_keywords:
-        log_message("Found keywords in dc:subject/rdf:Bag format:")
-        for keyword_elem in bag_keywords:
-            if keyword_elem.text and keyword_elem.text.strip():
-                if keyword_elem.text.strip() not in keywords:  # Avoid duplicates
-                    keywords.append(keyword_elem.text.strip())
-                    log_message(f"  - '{keyword_elem.text.strip()}'")
-    
-    # Try direct dc:subject format
-    keyword_path_direct = f'.//{{{ns["dc"]}}}subject'
-    direct_keywords = rdf.findall(keyword_path_direct)
-    if direct_keywords:
-        log_message("Found keywords in direct dc:subject format:")
-        for keyword_elem in direct_keywords:
-            if keyword_elem.text and keyword_elem.text.strip():
-                if keyword_elem.text.strip() not in keywords:  # Avoid duplicates
-                    keywords.append(keyword_elem.text.strip())
-                    log_message(f"  - '{keyword_elem.text.strip()}'")
-    
-    if keywords:
-        log_message(f"Found total of {len(keywords)} unique keywords in XMP")
-    else:
-        log_message("No keywords found in any XMP format")
-    
-    return keywords
-
-def get_location_from_rdf(rdf):
-    """Extract location data from RDF data."""
-    location_data = {
-        'location': None,
-        'city': None,
-        'state': None,
-        'country': None,
-        'gps': None
-    }
-    
-    log_message("Looking for location data in XMP metadata...")
-    
-    # Find the rdf:Description element
-    ns = XML_NAMESPACES
-    desc = rdf.find(f'.//{{{ns["rdf"]}}}Description')
-    if desc is not None:
-        log_message("Found rdf:Description element")
-        
-        # Try to get location from Iptc4xmpCore:Location
-        location_elem = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}Location')
-        if location_elem is not None and location_elem.text:
-            location_data['location'] = location_elem.text.strip()
-            log_message(f"Found Location: {location_data['location']}")
-        
-        # Try to get city from photoshop:City
-        city_elem = desc.find(f'.//{{{ns["photoshop"]}}}City')
-        if city_elem is not None and city_elem.text:
-            location_data['city'] = city_elem.text.strip()
-            log_message(f"Found City: {location_data['city']}")
-        
-        # Try to get state from photoshop:State
-        state_elem = desc.find(f'.//{{{ns["photoshop"]}}}State')
-        if state_elem is not None and state_elem.text:
-            location_data['state'] = state_elem.text.strip()
-            log_message(f"Found State: {location_data['state']}")
-        
-        # Try to get country from photoshop:Country
-        country_elem = desc.find(f'.//{{{ns["photoshop"]}}}Country')
-        if country_elem is not None and country_elem.text:
-            location_data['country'] = country_elem.text.strip()
-            log_message(f"Found Country: {location_data['country']}")
-        
-        # Try to get GPS coordinates
-        gps_lat = desc.find(f'.//{{{ns["exif"]}}}GPSLatitude')
-        gps_lon = desc.find(f'.//{{{ns["exif"]}}}GPSLongitude')
-        if gps_lat is not None and gps_lon is not None:
-            location_data['gps'] = (gps_lat.text, gps_lon.text)
-            log_message(f"Found GPS coordinates: {location_data['gps']}")
-    
-    return location_data
-
-def get_metadata_from_xmp(file_path):
-    """Get metadata from XMP sidecar file."""
-    # First check for XMP with original filename
-    xmp_path = os.path.splitext(file_path)[0] + ".xmp"
-    if not os.path.exists(xmp_path):
-        # If not found, check for XMP with same name as video
-        xmp_path = file_path + ".xmp"
-        if not os.path.exists(xmp_path):
-            log_message(f"No XMP file found for: {os.path.basename(file_path)}")
-            return (None, None, [], None, None, None, None)
-    
-    try:
-        # Get DateTimeOriginal using exiftool
-        date_time_original = get_date_from_exiftool(xmp_path)
-        
-        # Parse XMP file
-        tree = ET.parse(xmp_path)
-        root = tree.getroot()
-        log_message(f"XMP root tag: {root.tag}")
-        
-        # Look for RDF inside xmpmeta
-        rdf = root.find('.//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF')
-        if rdf is not None:
-            log_message("Found RDF data in XMP")
-            title = get_title_from_rdf(rdf)
-            keywords = get_keywords_from_rdf(rdf)
-            caption = get_caption_from_rdf(rdf)
-            location_data = get_location_from_rdf(rdf)
-            
-            return (datetime.now(), title, keywords, tree, caption, date_time_original, location_data)
-        
-        return (None, None, [], None, None, date_time_original, None)
-            
-    except Exception as e:
-        log_message(f"Error reading XMP file: {e}")
-        return (None, None, [], None, None, None, None)
-
-def convert_decimal_to_dms(decimal_str):
-    """Convert decimal coordinates to degrees/minutes/seconds format."""
-    try:
-        # Parse the decimal degrees format like "48,54.48336"
-        # First, split on comma to get the degrees and decimal minutes
-        deg_min = decimal_str.split(',')
-        degrees = int(deg_min[0])  # degrees is the first part
-        
-        if len(deg_min) > 1:
-            # Convert the decimal minutes part
-            minutes_str = deg_min[1].replace(',', '.')  # handle any additional commas
-            minutes_val = float(minutes_str)
-            minutes = int(minutes_val)  # whole minutes
-            seconds = round((minutes_val - minutes) * 60, 2)  # decimal part to seconds
-            return f"{degrees} deg {minutes}' {seconds:.2f}\""
-        else:
-            return f"{degrees} deg 0' 0.00\""
-            
-    except Exception as e:
-        log_message(f"Error converting coordinate: {e}")
-        return decimal_str
-
-def verify_metadata(file_path, expected_title, expected_keywords, expected_date, expected_caption=None, expected_location=None):
-    """Verify metadata was written correctly."""
-    verification_failed = False
-    
-    log_message("=== Starting Metadata Verification ===")
-    
-    try:
-        verify_args = ['exiftool', '-s'] + VERIFY_FIELDS + [file_path]
-        
-        result = subprocess.run(verify_args, capture_output=True, text=True, check=True)
-        output_lines = result.stdout.splitlines()
-        
-        # Verify title
-        if expected_title:
-            title_found = any(expected_title in line for line in output_lines if any(
-                field.lstrip('-') in line for field in METADATA_FIELDS['title']
-            ))
-            if title_found:
-                log_message(f"Found title: {expected_title}")
-            else:
-                log_message("△ Title mismatch")
-                verification_failed = True
-
-        # Verify keywords
-        if expected_keywords:
-            for line in output_lines:
-                if 'Keywords' in line or 'Subject' in line:
-                    log_message(f"Found keywords: {line}")
-                    for keyword in expected_keywords:
-                        if keyword not in line:
-                            log_message(f"△ Missing keyword: {keyword}")
-                            verification_failed = True
-
-        # Verify date
-        if expected_date:
-            date_found = any(expected_date in line for line in output_lines if any(
-                field.lstrip('-') in line for field in METADATA_FIELDS['date']
-            ))
-            if date_found:
-                log_message(f"Found date: {expected_date}")
-            else:
-                log_message("△ Date mismatch")
-                verification_failed = True
-
-        # Verify caption
-        if expected_caption:
-            caption_found = any(expected_caption in line for line in output_lines if any(
-                field.lstrip('-') in line for field in METADATA_FIELDS['caption']
-            ))
-            if caption_found:
-                log_message(f"Found caption: {expected_caption}")
-            else:
-                log_message("△ Caption mismatch")
-                verification_failed = True
-
-        # Verify location data
-        if expected_location and isinstance(expected_location, dict):
-            # Handle regular location fields
-            for key, fields in METADATA_FIELDS.items():
-                if key in ['location', 'city', 'state', 'country'] and expected_location.get(key):
-                    expected_value = expected_location[key]
-                    field_found = any(
-                        expected_value in line 
-                        for line in output_lines 
-                        for field_name in fields 
-                        if field_name.lstrip('-') in line
-                    )
-                    if field_found:
-                        log_message(f"Found {key}: {expected_value}")
-                    else:
-                        log_message(f"△ {key.title()} mismatch")
-                        verification_failed = True
-            
-            # Handle GPS coordinates
-            if expected_location.get('gps'):
-                lat, lon = expected_location['gps']
-                gps_found = any(
-                    lat in line for line in output_lines if 'GPSLatitude' in line
-                ) and any(
-                    lon in line for line in output_lines if 'GPSLongitude' in line
-                )
-                if gps_found:
-                    log_message(f"Found GPS coordinates: {lat}, {lon}")
-                else:
-                    log_message("△ GPS coordinates mismatch")
-                    verification_failed = True
-
-        log_message("=== Metadata Verification Complete ===")
-        return not verification_failed
-
-    except Exception as e:
-        log_message(f"Error verifying metadata: {e}")
-        log_message("=== Metadata Verification Failed ===")
-        return False
 
 class VideoProcessor:
     """
@@ -346,95 +59,575 @@ class VideoProcessor:
             self.logger.error(f"File must be a video format. Found: {Path(file_path).suffix}")
             sys.exit(1)
     
-    def add_metadata(self):
-        """Main method to handle metadata operations."""
+    def get_date_from_exiftool(self, xmp_path):
+        """Get DateTimeOriginal from XMP using exiftool."""
         try:
-            video_date, xmp_title, keywords, tree, caption, date_time_original, location_data = get_metadata_from_xmp(self.file_path) or (None, None, [], None, None, None, None)
+            exiftool_args = [
+                'exiftool',
+                '-s',
+                '-d', '%Y:%m:%d %H:%M:%S',  # Specify consistent date format
+                '-DateTimeOriginal',
+                xmp_path
+            ]
+            result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+            if result.stdout:
+                date_line = result.stdout.strip()
+                if ': ' in date_line:
+                    date_time_original = date_line.split(': ')[1].strip()
+                    log_message(f"Found DateTimeOriginal from exiftool: {date_time_original}")
+                    return date_time_original
+        except Exception as e:
+            log_message(f"Error getting date from exiftool: {e}")
+        return None
+
+    def parse_gps_coordinate(self, coord_str):
+        """Parse GPS coordinate from exiftool format to decimal degrees."""
+        try:
+            # Handle format like "32 deg 54' 59.76\" N"
+            parts = coord_str.replace('"', '').split()
+            degrees = float(parts[0])
+            minutes = float(parts[2].rstrip("'"))
+            seconds = float(parts[3])
+            direction = parts[4]
             
-            # Format the title
-            if xmp_title:
-                display_title = xmp_title
-                log_message(f"Using XMP title: {display_title}")
-            else:
-                base_name = os.path.splitext(os.path.basename(self.file_path))[0]
-                if MCCARTYS_PREFIX in base_name:
-                    display_title = base_name.replace(MCCARTYS_PREFIX, MCCARTYS_REPLACEMENT)
-                    log_message("Converting 'The McCartys ' to 'The McCartys: ' in media file title")
-                else:
-                    display_title = base_name
-                log_message(f"Using filename as title: {display_title}")
+            decimal = degrees + minutes/60 + seconds/3600
+            if direction in ['S', 'W']:
+                decimal = -decimal
             
-            # Start with base exiftool args
-            exiftool_args = EXIFTOOL_BASE_ARGS.copy()
+            return decimal
+        except Exception as e:
+            log_message(f"Error parsing GPS coordinate '{coord_str}': {e}")
+            return None
+
+    def get_title_from_rdf(self, rdf):
+        """Extract title from RDF data."""
+        ns = XML_NAMESPACES
+        
+        # First try dc:title format
+        title_path = f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
+        title_elem = rdf.find(title_path)
+        if title_elem is not None and title_elem.text:
+            title = title_elem.text.strip()
+            log_message(f"Found XMP title in dc:title format: '{title}'")
+            return title
             
-            # Add title
-            for field in METADATA_FIELDS['title']:
-                exiftool_args.append(f"{field}={display_title}")
+        # Try direct dc:title format
+        title_path = f'.//{{{ns["dc"]}}}title'
+        title_elem = rdf.find(title_path)
+        if title_elem is not None and title_elem.text:
+            title = title_elem.text.strip()
+            log_message(f"Found XMP title in direct format: '{title}'")
+            return title
             
-            # Add date if available
-            if date_time_original:
-                for field in METADATA_FIELDS['date']:
-                    exiftool_args.append(f"{field}={date_time_original}")
+        # Try photoshop:Headline format
+        title_path = f'.//{{{ns["photoshop"]}}}Headline'
+        title_elem = rdf.find(title_path)
+        if title_elem is not None and title_elem.text:
+            title = title_elem.text.strip()
+            log_message(f"Found XMP title in Headline format: '{title}'")
+            return title
+        
+        log_message("No XMP title found in any format")
+        return None
+
+    def get_caption_from_rdf(self, rdf):
+        """Extract caption from RDF data."""
+        ns = XML_NAMESPACES
+        description_path = f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
+        description_elem = rdf.find(description_path)
+        if description_elem is not None and description_elem.text:
+            caption = description_elem.text.strip()
+            log_message(f"Found XMP caption: '{caption}'")
+            return caption
+        log_message("No XMP caption found")
+        return None
+
+    def get_keywords_from_rdf(self, rdf):
+        """Extract keywords from RDF data."""
+        ns = XML_NAMESPACES
+        keywords = []
+        
+        # Try hierarchical subject first
+        subject_path = f'.//{{{ns["lr"]}}}hierarchicalSubject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
+        subject_elems = rdf.findall(subject_path)
+        
+        if subject_elems:
+            log_message("Found hierarchical subjects")
+            for elem in subject_elems:
+                if elem.text:
+                    # Split hierarchical subject into parts
+                    parts = elem.text.split('|')
+                    # Add each part as a separate keyword
+                    for part in parts:
+                        part = part.strip()
+                        if part and part not in keywords:
+                            keywords.append(part)
+                            log_message(f"Added keyword from hierarchical subject: {part}")
+        
+        # Try flat subject list
+        if not keywords:
+            subject_path = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
+            subject_elems = rdf.findall(subject_path)
             
-            # Add location data if available
-            if location_data:
-                for key, fields in METADATA_FIELDS.items():
-                    if key in ['location', 'city', 'state', 'country'] and location_data.get(key):
-                        for field in fields:
-                            exiftool_args.append(f"{field}={location_data[key]}")
+            if subject_elems:
+                log_message("Found subject keywords")
+                for elem in subject_elems:
+                    if elem.text:
+                        keyword = elem.text.strip()
+                        if keyword and keyword not in keywords:
+                            keywords.append(keyword)
+                            log_message(f"Added keyword from subject: {keyword}")
+        
+        if not keywords:
+            log_message("No keywords found")
+            
+        return keywords
+
+    def get_location_from_rdf(self, rdf):
+        """Extract location data from RDF data."""
+        ns = XML_NAMESPACES
+        location_data = {
+            'location': None,
+            'city': None,
+            'state': None,
+            'country': None,
+            'gps': None
+        }
+        
+        # Get location
+        location_path = f'.//{{{ns["Iptc4xmpCore"]}}}Location'
+        location_elem = rdf.find(location_path)
+        if location_elem is not None and location_elem.text:
+            location_data['location'] = location_elem.text.strip()
+            log_message(f"Found location: {location_data['location']}")
+            
+        # Get city
+        city_path = f'.//{{{ns["photoshop"]}}}City'
+        city_elem = rdf.find(city_path)
+        if city_elem is not None and city_elem.text:
+            location_data['city'] = city_elem.text.strip()
+            log_message(f"Found city: {location_data['city']}")
+            
+        # Get state
+        state_path = f'.//{{{ns["photoshop"]}}}State'
+        state_elem = rdf.find(state_path)
+        if state_elem is not None and state_elem.text:
+            location_data['state'] = state_elem.text.strip()
+            log_message(f"Found state: {location_data['state']}")
+            
+        # Get country
+        country_path = f'.//{{{ns["photoshop"]}}}Country'
+        country_elem = rdf.find(country_path)
+        if country_elem is not None and country_elem.text:
+            location_data['country'] = country_elem.text.strip()
+            log_message(f"Found country: {location_data['country']}")
+            
+        # Get GPS coordinates
+        lat_path = f'.//{{{ns["exif"]}}}GPSLatitude'
+        lon_path = f'.//{{{ns["exif"]}}}GPSLongitude'
+        lat_elem = rdf.find(lat_path)
+        lon_elem = rdf.find(lon_path)
+        
+        if lat_elem is not None and lon_elem is not None:
+            try:
+                lat = float(lat_elem.text)
+                lon = float(lon_elem.text)
+                location_data['gps'] = (lat, lon)
+                log_message(f"Found GPS coordinates: {lat}, {lon}")
+            except (ValueError, TypeError) as e:
+                log_message(f"Error parsing GPS coordinates: {e}")
+        
+        return location_data
+
+    def get_metadata_from_xmp(self):
+        """Get metadata from XMP sidecar file."""
+        log_message("=" * 50)
+        log_message("Starting XMP metadata extraction")
+        log_message("=" * 50)
+        
+        # Initialize return values
+        title = None
+        keywords = []
+        caption = None
+        location_data = None
+        tree = None
+        
+        # Try both possible XMP file locations
+        xmp_path = os.path.splitext(self.file_path)[0] + ".xmp"
+        if not os.path.exists(xmp_path):
+            xmp_path = self.file_path + ".xmp"
+            if not os.path.exists(xmp_path):
+                log_message("No XMP file found")
+                log_message("=" * 50)
+                return None
+        
+        log_message("Found XMP file")
+        
+        # Get DateTimeOriginal from exiftool
+        date_time_original = self.get_date_from_exiftool(xmp_path)
+        if date_time_original:
+            log_message(f"Found DateTimeOriginal from exiftool: {date_time_original}")
+        
+        # Get all metadata using exiftool
+        log_message("-" * 30)
+        log_message("Extracting metadata using exiftool")
+        log_message("-" * 30)
+        
+        exiftool_args = [
+            'exiftool',
+            '-s',
+            '-j',  # Output as JSON for better parsing
+            '-Title',
+            '-DisplayName',
+            '-ItemList:Title',
+            '-Description',
+            '-Caption-Abstract',
+            '-Subject',  # Keywords/tags
+            '-Keywords',
+            '-Location',
+            '-City',
+            '-State',
+            '-Country',
+            '-GPSLatitude',
+            '-GPSLongitude',
+            '-DateTimeOriginal',
+            '-CreateDate',
+            '-ModifyDate',
+            xmp_path
+        ]
+        try:
+            result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+            if result.stdout:
+                metadata = json.loads(result.stdout)
+                log_message("Raw exiftool metadata:")
+                log_message("-" * 30)
+                log_message(json.dumps(metadata, indent=2))
+                log_message("-" * 30)
                 
-                # Handle GPS separately
-                if location_data.get('gps'):
-                    lat, lon = location_data['gps']
-                    for field, value in zip(METADATA_FIELDS['gps'], [lat, lon]):
-                        exiftool_args.append(f"{field}={value}")
+                if metadata and isinstance(metadata, list) and len(metadata) > 0:
+                    metadata = metadata[0]  # Get first item from array
+                    
+                    # Extract title
+                    for field in ['Title', 'DisplayName', 'ItemList:Title', 'Description', 'Caption-Abstract']:
+                        if field in metadata and metadata[field]:
+                            title = metadata[field]
+                            log_message(f"Found title in {field}: '{title}'")
+                            break
+                    
+                    # Extract keywords/tags
+                    for field in ['Subject', 'Keywords']:
+                        if field in metadata:
+                            if isinstance(metadata[field], list):
+                                keywords.extend(metadata[field])
+                            elif isinstance(metadata[field], str):
+                                keywords.append(metadata[field])
+                    if keywords:
+                        log_message(f"Found keywords: {keywords}")
+                    
+                    # Extract caption
+                    for field in ['Description', 'Caption-Abstract']:
+                        if field in metadata and metadata[field]:
+                            caption = metadata[field]
+                            log_message(f"Found caption in {field}: '{caption}'")
+                            break
+                    
+                    # Extract location data
+                    location_parts = []
+                    if 'Location' in metadata and metadata['Location']:
+                        location_parts.append(metadata['Location'])
+                    if 'City' in metadata and metadata['City']:
+                        location_parts.append(metadata['City'])
+                    if 'State' in metadata and metadata['State']:
+                        location_parts.append(metadata['State'])
+                    if 'Country' in metadata and metadata['Country']:
+                        location_parts.append(metadata['Country'])
+                    
+                    if location_parts:
+                        location_data = ', '.join(location_parts)
+                        log_message(f"Found location: {location_data}")
+                    
+                    # Add GPS coordinates if available
+                    if 'GPSLatitude' in metadata and 'GPSLongitude' in metadata:
+                        lat = self.parse_gps_coordinate(metadata['GPSLatitude'])
+                        lon = self.parse_gps_coordinate(metadata['GPSLongitude'])
+                        if lat is not None and lon is not None:
+                            if location_data:
+                                location_data = f"{location_data} ({lat:.6f}, {lon:.6f})"
+                            else:
+                                location_data = f"{lat:.6f}, {lon:.6f}"
+                            log_message(f"Found GPS coordinates: {lat:.6f}, {lon:.6f}")
+                    
+                    # Get date if not already set
+                    if not date_time_original:
+                        for field in ['DateTimeOriginal', 'CreateDate', 'ModifyDate']:
+                            if field in metadata and metadata[field]:
+                                date_time_original = metadata[field].replace(':', '-', 2)
+                                log_message(f"Found date in {field}: {date_time_original}")
+                                break
+                
+                else:
+                    log_message("No metadata found in exiftool output")
+        except json.JSONDecodeError as e:
+            log_message(f"Error parsing exiftool JSON output: {e}")
+            log_message(f"Raw output was: {result.stdout}")
+        except Exception as e:
+            log_message(f"Error getting metadata from exiftool: {e}")
+
+        # Try to parse XMP for any missing data
+        try:
+            tree = ET.parse(xmp_path)
+            root = tree.getroot()
+            log_message("XMP root tag: " + root.tag)
             
-            # Add keywords if available
-            if keywords:
-                keywords_str = ', '.join(keywords)
-                exiftool_args.append(f"-Keywords={keywords_str}")
+            ns = XML_NAMESPACES
+            rdf = root.find('.//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF')
+            if rdf is not None:
+                log_message("Found RDF data in XMP")
+                
+                # Only get data from XML if we didn't get it from exiftool
+                if not title:
+                    title = self.get_title_from_rdf(rdf)
+                if not keywords:
+                    keywords = self.get_keywords_from_rdf(rdf)
+                if not caption:
+                    caption = self.get_caption_from_rdf(rdf)
+                if not location_data:
+                    location_data = self.get_location_from_rdf(rdf)
+            else:
+                log_message("No RDF data found in XMP")
+        except ET.ParseError as e:
+            log_message(f"Error parsing XMP file: {e}")
+        except Exception as e:
+            log_message(f"Error processing XMP file: {e}")
+        
+        log_message("=" * 50)
+        log_message("Final metadata values:")
+        if title:
+            log_message(f"Title: '{title}'")
+        if keywords:
+            log_message(f"Keywords: {keywords}")
+        if caption:
+            log_message(f"Caption: '{caption}'")
+        if location_data:
+            log_message(f"Location: {location_data}")
+        if date_time_original:
+            log_message(f"Date: {date_time_original}")
+        log_message("=" * 50)
+        
+        return (None, title, keywords, tree, caption, date_time_original, location_data)
+
+    def normalize_date(self, date_str):
+        """Normalize date format."""
+        if not date_str:
+            return None
+        # Keep colons in time part but use hyphens in date part
+        parts = date_str.split(' ')
+        if len(parts) >= 1:
+            date_part = parts[0]  # Keep the colons as exiftool expects them
+            if len(parts) > 1:
+                return f"{date_part} {' '.join(parts[1:])}"
+            return date_part
+        return date_str
+
+    def process_video(self):
+        """Process a video file."""
+        try:
+            # 1. Check if file has __LRE suffix - skip if it does
+            if '__LRE' in os.path.basename(self.file_path):
+                return True
+                
+            # 2. Read metadata from XMP
+            metadata = self.get_metadata_from_xmp()
+            if not metadata:
+                return False
+            video_date, xmp_title, keywords, tree, caption, date_time_original, location_data = metadata
             
-            # Add caption if available
+            # 3. Write metadata to video file
+            metadata_args = [
+                '-overwrite_original',
+                '-m',  # Ignore minor warnings
+                '-P'  # Preserve file modification date/time
+            ]
+            
+            if xmp_title:
+                metadata_args.append(f'-Title={xmp_title}')
+            
             if caption:
-                for field in METADATA_FIELDS['caption']:
-                    exiftool_args.append(f"{field}={caption}")
+                metadata_args.extend([
+                    f'-Description={caption}',
+                    f'-Caption-Abstract={caption}'
+                ])
             
-            # Add the file path at the end
+            if keywords:
+                # Clear existing keywords
+                metadata_args.extend([
+                    '-overwrite_original',
+                    '-m',  # Ignore minor warnings
+                    '-P',  # Preserve file modification date/time
+                    '-QuickTime:Keywords:=',  # Clear QuickTime keywords
+                    '-UserData:Keywords:=',   # Clear QuickTime user data keywords
+                    '-XMP-apple:Keywords:='   # Clear Apple-specific XMP keywords
+                ])
+                
+                # Add keywords in Apple/QuickTime formats
+                keywords_str = ','.join(keywords)
+                metadata_args.extend([
+                    f'-QuickTime:Keywords={keywords_str}',
+                    f'-UserData:Keywords={keywords_str}',
+                    f'-XMP-apple:Keywords={keywords_str}'
+                ])
+            
+            if location_data:
+                metadata_args.append(f'-Location={location_data}')
+            
+            if date_time_original:
+                normalized_date = self.normalize_date(date_time_original)
+                if normalized_date:
+                    metadata_args.extend([
+                        f'-CreateDate={normalized_date}',
+                        f'-ModifyDate={normalized_date}',
+                        f'-DateTimeOriginal={normalized_date}'
+                    ])
+            
+            # Run exiftool to write metadata
+            exiftool_args = EXIFTOOL_BASE_ARGS.copy()
+            exiftool_args.extend(metadata_args)
             exiftool_args.append(self.file_path)
             
-            # Run exiftool
-            log_message("Added metadata using exiftool:")
-            log_message(f"  Title: {display_title}")
-            if date_time_original:
-                log_message(f"  Date: {date_time_original}")
-            if keywords:
-                log_message(f"  Keywords: {keywords}")
-            if caption:
-                log_message(f"  Caption: {caption}")
-            if location_data:
-                log_message("  Location data:")
-                for key, value in location_data.items():
-                    if value:
-                        log_message(f"    {key}: {value}")
+            try:
+                result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+                log_message("Added metadata using exiftool:")
+                log_message(result.stdout)
+            except subprocess.CalledProcessError as e:
+                log_message(f"Error adding metadata using exiftool: {e}")
+                log_message(f"Error output: {e.stderr}")
+                return False
             
-            subprocess.run(exiftool_args, check=True, capture_output=True, text=True)
-            
-            # Verify the metadata was written correctly
-            if not verify_metadata(self.file_path, display_title, keywords, date_time_original, caption, location_data):
+            # 4. Verify metadata was written correctly
+            if not self.verify_metadata(xmp_title, keywords, normalized_date, caption, location_data):
                 log_message("Metadata verification failed")
-                return None
+                return False
             
-            return {
-                'title': display_title,
-                'keywords': keywords,
-                'date': date_time_original,
-                'caption': caption,
-                'location': location_data
-            }
+            # 5. Rename video file
+            base_name = os.path.splitext(os.path.basename(self.file_path))[0]
+            new_name = f"{base_name}__LRE{os.path.splitext(self.file_path)[1]}"
+            new_path = os.path.join(os.path.dirname(self.file_path), new_name)
+            os.rename(self.file_path, new_path)
+            log_message(f"Renamed video to: {new_name}")
+            
+            # 6. Delete XMP file
+            xmp_path = os.path.splitext(self.file_path)[0] + ".xmp"
+            if not os.path.exists(xmp_path):
+                xmp_path = self.file_path + ".xmp"
+            if os.path.exists(xmp_path):
+                os.remove(xmp_path)
+                log_message(f"Removed XMP file: {os.path.basename(xmp_path)}")
+            
+            return True
             
         except Exception as e:
-            log_message(f"Error processing {os.path.basename(self.file_path)}: {e}")
-            return None
+            log_message(f"Error processing video: {e}")
+            return False
+
+    def verify_metadata(self, expected_title, expected_keywords, expected_date, expected_caption=None, expected_location=None):
+        """Verify that metadata was written correctly."""
+        try:
+            log_message("=== Starting Metadata Verification ===")
+            
+            # Run exiftool to get all metadata
+            exiftool_args = [
+                'exiftool',
+                '-json',
+                '-Title',
+                '-Keywords',
+                '-Subject',
+                '-CreateDate',
+                '-Description',
+                '-Caption-Abstract',
+                '-Location',
+                '-QuickTime:Keywords',
+                '-XMP:Keywords',
+                self.file_path
+            ]
+            
+            result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
+            metadata = json.loads(result.stdout)[0]
+            
+            # Check title
+            if expected_title:
+                title = metadata.get('Title')
+                if title == expected_title:
+                    log_message(f"Found title: {title}")
+                else:
+                    log_message(f"Title mismatch. Expected: {expected_title}, Found: {title}")
+                    return False
+            
+            # Check keywords in all possible locations
+            if expected_keywords:
+                found_keywords = set()
+                keyword_fields = [
+                    'Keywords',
+                    'Subject',
+                    'QuickTimeKeywords',
+                    'TagsList',
+                    'PersonInImage',
+                    'Subject',
+                    'HierarchicalSubject'
+                ]
+                
+                for field in keyword_fields:
+                    if field in metadata:
+                        value = metadata[field]
+                        if isinstance(value, str):
+                            found_keywords.update(value.split(','))
+                        elif isinstance(value, list):
+                            found_keywords.update(value)
+                
+                # Clean and sort keywords for comparison
+                found_keywords = {k.strip() for k in found_keywords if k.strip()}
+                expected_set = set(expected_keywords)
+                
+                if found_keywords == expected_set:
+                    log_message(f"Found keywords: {', '.join(sorted(found_keywords))}")
+                else:
+                    log_message(f"Keyword mismatch. Expected: {expected_keywords}, Found: {found_keywords}")
+                    return False
+            
+            # Check date
+            if expected_date:
+                create_date = metadata.get('CreateDate')
+                # Convert expected date hyphens to colons for comparison
+                expected_date_colons = expected_date.replace('-', ':')
+                if create_date and create_date.startswith(expected_date_colons):
+                    log_message(f"Found matching date in CreateDate: {create_date}")
+                else:
+                    log_message(f"Date mismatch. Expected: {expected_date_colons}, Found: {create_date}")
+                    return False
+            
+            # Check caption
+            if expected_caption:
+                caption = metadata.get('Description') or metadata.get('Caption-Abstract')
+                if caption == expected_caption:
+                    log_message(f"Found caption: {caption}")
+                else:
+                    log_message(f"Caption mismatch. Expected: {expected_caption}, Found: {caption}")
+                    return False
+            
+            # Check location
+            if expected_location:
+                location = metadata.get('Location')
+                if location == expected_location:
+                    log_message(f"Found location: {location}")
+                else:
+                    log_message(f"Location mismatch. Expected: {expected_location}, Found: {location}")
+                    return False
+            
+            log_message("=== Metadata Verification Complete ===")
+            return True
+            
+        except Exception as e:
+            log_message(f"Error verifying metadata: {e}")
+            return False
 
 def get_new_filename(file_path, title):
     """Generate new filename from title."""
@@ -446,88 +639,46 @@ def get_new_filename(file_path, title):
     new_name = f"{clean_title}{LRE_SUFFIX}{ext}"
     return os.path.join(directory, new_name)
 
-def process_video(file_path):
-    """Process a video file."""
+def watch_directories():
+    """Watch directories for new video files."""
     try:
-        log_message(f"Found new McCartys video: {os.path.basename(file_path)}")
-        
-        # Check for both possible XMP locations
-        xmp_paths = [
-            os.path.splitext(file_path)[0] + ".xmp",  # Original filename XMP
-            file_path + ".xmp"  # Full filename XMP
-        ]
-        xmp_exists = False
-        found_xmp_path = None
-        
-        for xmp_path in xmp_paths:
-            if os.path.exists(xmp_path):
-                xmp_exists = True
-                found_xmp_path = xmp_path
-                break
-        
-        # Add metadata first
-        metadata_result = VideoProcessor(file_path).add_metadata()
-        if not metadata_result:
-            log_message(f"Failed to add metadata to {os.path.basename(file_path)}")
-            return False
-            
-        # Get the title for renaming
-        title = metadata_result.get('title')
-        if not title:
-            log_message(f"No title found for {os.path.basename(file_path)}")
-            return False
-            
-        # Generate new filename
-        new_path = get_new_filename(file_path, title)
-        new_xmp_path = new_path + ".xmp"
-        
-        # Rename video file
-        os.rename(file_path, new_path)
-        log_message(f"Renamed video to: {os.path.basename(new_path)}")
-        
-        # Handle XMP file if it exists
-        if xmp_exists and found_xmp_path:
-            try:
-                # First try to rename it
-                os.rename(found_xmp_path, new_xmp_path)
-                log_message(f"Renamed XMP to: {os.path.basename(new_xmp_path)}")
+        while True:
+            for directory in WATCH_DIRS:
+                log_message(f"Checking {directory} for new video files...")
                 
-                # Then remove it
-                os.remove(new_xmp_path)
-                log_message(f"Removed XMP file: {os.path.basename(new_xmp_path)}")
-            except Exception as e:
-                log_message(f"Error handling XMP file: {e}")
-                # Continue even if XMP handling fails - we've already processed the video
-            
-        return True
-        
-    except Exception as e:
-        log_message(f"Error processing video {os.path.basename(file_path)}: {e}")
-        return False
-
-def watch_folders(folder_paths):
-    """Watch folders for new video files."""
-    while True:
-        try:
-            found_files = False
-            for folder in folder_paths:
-                log_message(f"Checking {folder} for new video files...")
-                for file in os.scandir(folder):
-                    if (file.is_file() and 
-                        file.name.lower().endswith(VIDEO_PATTERNS) and
-                        "__LRE" not in file.name):  # Skip already processed files
-                        found_files = True
-                        process_video(file.path)
-            
-            if not found_files:
-                time.sleep(SLEEP_TIME)
-                
-        except KeyboardInterrupt:
-            log_message("Stopping video watch")
-            break
-        except Exception as e:
-            log_message(f"Error in watch_folders: {e}")
+                # Get all video files that have XMP files
+                for pattern in VIDEO_PATTERNS:
+                    # Handle both upper and lower case extensions
+                    for file_path in glob.glob(os.path.join(directory, f"*{pattern.lower()}")) + \
+                                   glob.glob(os.path.join(directory, f"*{pattern.upper()}")):
+                        try:
+                            # Skip if already processed
+                            if '__LRE' in os.path.basename(file_path):
+                                continue
+                                
+                            # Check for XMP file
+                            xmp_path = os.path.splitext(file_path)[0] + ".xmp"
+                            if not os.path.exists(xmp_path):
+                                xmp_path = file_path + ".xmp"
+                                if not os.path.exists(xmp_path):
+                                    continue  # Skip if no XMP file
+                            
+                            # Process new McCartys video
+                            log_message(f"Found new McCartys video: {os.path.basename(file_path)}")
+                            processor = VideoProcessor(file_path)
+                            processor.process_video()
+                            
+                        except Exception as e:
+                            log_message(f"Error processing {file_path}: {e}")
+                            continue
+                            
             time.sleep(SLEEP_TIME)
+            
+    except KeyboardInterrupt:
+        log_message("Stopping video watch")
+    except Exception as e:
+        log_message(f"Error in watch_directories: {e}")
+        time.sleep(SLEEP_TIME)
 
 if __name__ == "__main__":
     # Configure logging
@@ -535,4 +686,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=getattr(logging, LOG_LEVEL))
     
     # Start watching the folders
-    watch_folders(WATCH_DIRS)
+    watch_directories()
