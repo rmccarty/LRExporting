@@ -551,10 +551,12 @@ class VideoProcessor(MediaProcessor):
         base = self.file_path.stem
         ext = self.file_path.suffix
         
-        # Add LRE suffix
-        new_filename = f"{base}{LRE_SUFFIX}{ext}"
-        return directory / new_filename
-    
+        # Add LRE suffix if not already present
+        if not base.endswith(LRE_SUFFIX):
+            new_filename = f"{base}{LRE_SUFFIX}{ext}"
+            return directory / new_filename
+        return self.file_path
+
     def get_metadata_from_xmp(self):
         """Get metadata from XMP sidecar file."""
         title = None
