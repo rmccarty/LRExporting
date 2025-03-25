@@ -7,7 +7,10 @@ import os
 import time
 from datetime import datetime
 import subprocess
-from mp4video_get_location import get_location_from_rdf
+from datetime import datetime
+import subprocess
+from datetime import datetime
+import subprocess
 
 def log_message(message):
     """Log a message with timestamp."""
@@ -100,6 +103,63 @@ def get_keywords_from_rdf(rdf):
     
     return keywords
 
+def get_location_from_rdf(rdf):
+    """Extract location data from RDF data."""
+    location_data = {
+        'location': None,
+        'city': None,
+        'state': None,
+        'country': None,
+        'gps': None
+    }
+    
+    log_message("Looking for location data in XMP metadata...")
+    
+    # Find the rdf:Description element
+    desc = rdf.find('.//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description')
+    if desc is not None:
+        log_message("Found rdf:Description element")
+        
+        # Check attributes with correct namespaces
+        ns = {
+            'Iptc4xmpCore': 'http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/',
+            'photoshop': 'http://ns.adobe.com/photoshop/1.0/',
+            'exif': 'http://ns.adobe.com/exif/1.0/'
+        }
+        
+        # Try to get location from Iptc4xmpCore:Location
+        location_elem = desc.find('.//{%s}Location' % ns['Iptc4xmpCore'])
+        if location_elem is not None and location_elem.text:
+            location_data['location'] = location_elem.text.strip()
+            log_message(f"Found Location: {location_data['location']}")
+        
+        # Try to get city from photoshop:City
+        city_elem = desc.find('.//{%s}City' % ns['photoshop'])
+        if city_elem is not None and city_elem.text:
+            location_data['city'] = city_elem.text.strip()
+            log_message(f"Found City: {location_data['city']}")
+        
+        # Try to get state from photoshop:State
+        state_elem = desc.find('.//{%s}State' % ns['photoshop'])
+        if state_elem is not None and state_elem.text:
+            location_data['state'] = state_elem.text.strip()
+            log_message(f"Found State: {location_data['state']}")
+        
+        # Try to get country from photoshop:Country
+        country_elem = desc.find('.//{%s}Country' % ns['photoshop'])
+        if country_elem is not None and country_elem.text:
+            location_data['country'] = country_elem.text.strip()
+            log_message(f"Found Country: {location_data['country']}")
+        
+        # Try to get GPS coordinates
+        gps_lat = desc.find('.//{%s}GPSLatitude' % ns['exif'])
+        gps_lon = desc.find('.//{%s}GPSLongitude' % ns['exif'])
+        if gps_lat is not None and gps_lon is not None:
+            location_data['gps'] = (gps_lat.text, gps_lon.text)
+            log_message(f"Found GPS coordinates: {location_data['gps']}")
+    
+    return location_data
+
 def get_metadata_from_xmp(file_path):
     """Get metadata from XMP sidecar file."""
     xmp_path = os.path.splitext(file_path)[0] + ".xmp"
@@ -123,7 +183,7 @@ def get_metadata_from_xmp(file_path):
             title = get_title_from_rdf(rdf)
             keywords = get_keywords_from_rdf(rdf)
             caption = get_caption_from_rdf(rdf)
-            location_data = get_location_from_rdf(rdf, log_message)
+            location_data = get_location_from_rdf(rdf)
             
             return (datetime.now(), title, keywords, tree, caption, date_time_original, location_data)
         
