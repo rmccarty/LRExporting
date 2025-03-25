@@ -18,7 +18,7 @@ SLEEP_TIME = 10
 
 # File patterns
 JPEG_PATTERN = '*.[Jj][Pp][Gg]'
-VIDEO_PATTERNS = ('.mp4', '.MP4', '.mov', '.MOV', '.m4v', '.M4V')
+VIDEO_PATTERN = '*.[mM][pP]4|*.[mM][oO][vV]|*.[mM]4[vV]'  # Case-insensitive using glob syntax
 
 # XML/RDF Namespaces
 XML_NAMESPACES = {

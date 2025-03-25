@@ -17,7 +17,7 @@ import glob
 from config import (
     LOG_LEVEL,
     SLEEP_TIME,
-    VIDEO_PATTERNS,
+    VIDEO_PATTERN,
     XML_NAMESPACES,
     MCCARTYS_PREFIX,
     MCCARTYS_REPLACEMENT,
@@ -55,8 +55,9 @@ class VideoProcessor:
             sys.exit(1)
             
         # Validate file extension
-        if Path(file_path).suffix.lower() not in VIDEO_PATTERNS:
-            self.logger.error(f"File must be a video format. Found: {Path(file_path).suffix}")
+        ext = Path(file_path).suffix.lower()
+        if not any(ext.endswith(pattern) for pattern in ['.mp4', '.mov', '.m4v']):
+            self.logger.error(f"File must be a video format. Found: {ext}")
             sys.exit(1)
     
     def get_date_from_exiftool(self, xmp_path):
@@ -698,33 +699,30 @@ class VideoWatcher:
                 for directory in self.directories:
                     log_message(f"Checking {directory} for new video files...")
                     
-                    # Get all video files that have XMP files
-                    for pattern in VIDEO_PATTERNS:
-                        # Debug: print pattern being searched
-                        log_message(f"Searching for pattern: *{pattern}")
-                        
-                        # Debug: print full search path
-                        search_path = os.path.join(directory, f"*{pattern}")
-                        log_message(f"Search path: {search_path}")
+                    # Split pattern into individual patterns
+                    patterns = VIDEO_PATTERN.split('|')
+                    for pattern in patterns:
+                        # Get all video files using case-insensitive pattern
+                        search_path = os.path.join(directory, pattern.strip())
+                        log_message(f"Searching with pattern: {search_path}")
                         
                         # Find matching files
-                        files = glob.glob(search_path)
+                        found = glob.glob(search_path)
                         
                         # Debug: print found files
-                        if files:
-                            log_message(f"Found files: {files}")
+                        if found:
+                            log_message(f"Found files: {found}")
+                            for file_path in found:
+                                self.process_file(file_path)
                         else:
-                            log_message("No files found with this pattern")
-                        
-                        for file_path in files:
-                            self.process_file(file_path)
+                            log_message(f"No files found with pattern: {pattern}")
                             
                 time.sleep(SLEEP_TIME)
                 
         except KeyboardInterrupt:
             log_message("Stopping video watch")
             self.running = False
-    
+
     def stop(self):
         """Stop watching directories."""
         self.running = False
