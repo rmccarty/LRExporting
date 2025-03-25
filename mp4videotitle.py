@@ -474,7 +474,7 @@ def watch_folders(folder_paths):
                         if process_video(file_path):
                             log_message(f"Successfully processed: {filename}")
             
-            time.sleep(1)  # Wait before checking again
+            time.sleep(3)  # Wait before checking again
             
         except Exception as e:
             log_message(f"Error in watch loop: {e}")
@@ -483,8 +483,8 @@ def watch_folders(folder_paths):
 if __name__ == "__main__":
     folders_to_watch = [
         os.path.expanduser("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-        os.path.expanduser("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming"),  # Claudia's Incoming folder
-        os.path.expanduser("/Users/rmccarty/Transfers/Both/Both_Incoming")  # Added Both's Incoming folder
+        os.path.expanduser("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
+        # Both_Incoming directory has been removed
     ]
     log_message("Starting to watch specified folders for video files...")
     watch_folders(folders_to_watch)
