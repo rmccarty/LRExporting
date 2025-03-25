@@ -8,6 +8,7 @@ import sys
 from datetime import datetime
 import shutil
 import time
+from config import WATCH_DIRS, BOTH_INCOMING, LOG_LEVEL, SLEEP_TIME
 
 class JPEGExifProcessor:
     """
@@ -342,6 +343,7 @@ class DirectoryWatcher:
         self.watch_dirs = [Path(d) for d in watch_dirs]
         self.both_incoming = Path(both_incoming_dir) if both_incoming_dir else None
         self.logger = logging.getLogger(__name__)
+        self.sleep_time = SLEEP_TIME
     
     def process_both_incoming(self):
         """Check Both_Incoming directory and copy files to individual incoming directories."""
@@ -414,7 +416,7 @@ class DirectoryWatcher:
                 
                 # Only sleep if no files were found
                 if not found_files:
-                    time.sleep(3)
+                    time.sleep(self.sleep_time)
                     
             except KeyboardInterrupt:
                 self.logger.info("Stopping directory watch")
@@ -424,15 +426,12 @@ class DirectoryWatcher:
 
 if __name__ == "__main__":
     # Configure logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=getattr(logging, LOG_LEVEL))
     
     # Initialize and start the watcher
     watcher = DirectoryWatcher(
-        watch_dirs=[
-            Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-            Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
-        ],
-        both_incoming_dir=Path("/Users/rmccarty/Transfers/Both/Both_Incoming")
+        watch_dirs=WATCH_DIRS,
+        both_incoming_dir=BOTH_INCOMING
     )
     
     watcher.watch_directories()
