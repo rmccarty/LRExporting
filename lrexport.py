@@ -7,6 +7,8 @@ import logging
 import sys
 from datetime import datetime
 import shutil
+import time
+from watch_both_incoming import watch_and_process
 
 class JPEGExifProcessor:
     """
@@ -226,19 +228,33 @@ class JPEGExifProcessor:
         title = self.get_exif_title()
         _, city, country = self.get_location_data()
         
-        if title:
-            components.append(title.replace(' ', '_'))
-        if city:
-            components.append(city.replace(' ', '_'))
-        if country:
-            components.append(country.replace(' ', '_'))
-            
-        # Add LRE tags
-        base_name = '_'.join(components)
-        filename = f"{base_name}__LRE.jpg"
+        def clean_component(text):
+            """Clean component for filename use"""
+            if not text:
+                return ""
+            # First replace slashes and backslashes with hyphens
+            text = text.replace('/', '-').replace('\\', '-')
+            # Replace spaces and multiple underscores with single underscore
+            text = text.replace(' ', '_')
+            while '__' in text:
+                text = text.replace('__', '_')
+            return text
         
-        # Replace any slashes in the final filename
-        return filename.replace('/', '-').replace('\\', '-')
+        # Clean and add each component
+        if title:
+            components.append(clean_component(title))
+        if city:
+            components.append(clean_component(city))
+        if country:
+            components.append(clean_component(country))
+            
+        # Join with single underscore and ensure no double underscores
+        base_name = '_'.join(components)
+        while '__' in base_name:
+            base_name = base_name.replace('__', '_')
+            
+        filename = f"{base_name}__LRE.jpg"
+        return filename
         
     def rename_file(self) -> Path:
         """
@@ -308,9 +324,9 @@ class JPEGExifProcessor:
         return self.rename_file()
 
 if __name__ == "__main__":
-    import time
-    from pathlib import Path
+    # Call the watch_and_process function before the existing logic
     
+
     # Configure logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
@@ -318,24 +334,35 @@ if __name__ == "__main__":
     # Set the directories to watch
     WATCH_DIRS = [
         Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming"),
-       # Add another directory here
+        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
+        # Both_Incoming directory has been removed
     ]
     
     logger.info(f"Watching directories: {', '.join(str(dir) for dir in WATCH_DIRS)}")
     
+    # Existing logic to watch directories
     while True:
+        watch_and_process()
         try:
             found_files = False
             # Iterate through each directory
             for watch_dir in WATCH_DIRS:
                 # Find all JPEG files in the current directory
+                print(f"\nChecking {watch_dir} for new files...")
                 for file in watch_dir.glob('*.[Jj][Pp][Gg]'):
                     if "__LRE" not in file.name:  # Correctly check the file name
                         found_files = True
                         logger.info(f"Found file to process: {file}")
                         
-                        # Process the image
+                        # Try to open file exclusively first
+                        try:
+                            with open(file, 'r+b'):  # Binary mode for images
+                                pass  # File is not locked, proceed with processing
+                        except IOError:
+                            logger.info(f"File {file.name} is currently in use. Skipping.")
+                            continue
+                        
+                        # If we get here, file is not locked so process it
                         processor = JPEGExifProcessor(str(file))
                         try:
                             new_path = processor.process_image()
