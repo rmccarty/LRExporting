@@ -7,10 +7,13 @@ import os
 import time
 from datetime import datetime
 import subprocess
-from datetime import datetime
-import subprocess
-from datetime import datetime
-import subprocess
+from config import (
+    WATCH_DIRS,
+    LOG_LEVEL,
+    SLEEP_TIME,
+    VIDEO_PATTERNS,
+    XML_NAMESPACES
+)
 
 def log_message(message):
     """Log a message with timestamp."""
@@ -39,7 +42,8 @@ def get_date_from_exiftool(xmp_path):
 
 def get_title_from_rdf(rdf):
     """Extract title from RDF data."""
-    title_path = './/{http://purl.org/dc/elements/1.1/}title/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Alt/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}li'
+    ns = XML_NAMESPACES
+    title_path = f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
     title_elem = rdf.find(title_path)
     if title_elem is not None and title_elem.text:
         title = title_elem.text.strip()
@@ -50,7 +54,8 @@ def get_title_from_rdf(rdf):
 
 def get_caption_from_rdf(rdf):
     """Extract caption from RDF data."""
-    description_path = './/{http://purl.org/dc/elements/1.1/}description/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Alt/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}li'
+    ns = XML_NAMESPACES
+    description_path = f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
     description_elem = rdf.find(description_path)
     if description_elem is not None and description_elem.text:
         caption = description_elem.text.strip()
@@ -63,9 +68,10 @@ def get_keywords_from_rdf(rdf):
     """Extract keywords from RDF data."""
     keywords = []
     log_message("Looking for keywords in XMP metadata...")
+    ns = XML_NAMESPACES
     
     # Try dc:subject/rdf:Seq format
-    keyword_path_seq = './/{http://purl.org/dc/elements/1.1/}subject/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Seq/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}li'
+    keyword_path_seq = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Seq/{{{ns["rdf"]}}}li'
     seq_keywords = rdf.findall(keyword_path_seq)
     if seq_keywords:
         log_message("Found keywords in dc:subject/rdf:Seq format:")
@@ -75,7 +81,7 @@ def get_keywords_from_rdf(rdf):
                 log_message(f"  - '{keyword_elem.text.strip()}'")
     
     # Try dc:subject/rdf:Bag format
-    keyword_path_bag = './/{http://purl.org/dc/elements/1.1/}subject/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Bag/{http://www.w3.org/1999/02/22-rdf-syntax-ns#}li'
+    keyword_path_bag = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
     bag_keywords = rdf.findall(keyword_path_bag)
     if bag_keywords:
         log_message("Found keywords in dc:subject/rdf:Bag format:")
@@ -86,7 +92,7 @@ def get_keywords_from_rdf(rdf):
                     log_message(f"  - '{keyword_elem.text.strip()}'")
     
     # Try direct dc:subject format
-    keyword_path_direct = './/{http://purl.org/dc/elements/1.1/}subject'
+    keyword_path_direct = f'.//{{{ns["dc"]}}}subject'
     direct_keywords = rdf.findall(keyword_path_direct)
     if direct_keywords:
         log_message("Found keywords in direct dc:subject format:")
@@ -116,44 +122,38 @@ def get_location_from_rdf(rdf):
     log_message("Looking for location data in XMP metadata...")
     
     # Find the rdf:Description element
-    desc = rdf.find('.//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description')
+    ns = XML_NAMESPACES
+    desc = rdf.find(f'.//{{{ns["rdf"]}}}Description')
     if desc is not None:
         log_message("Found rdf:Description element")
         
-        # Check attributes with correct namespaces
-        ns = {
-            'Iptc4xmpCore': 'http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/',
-            'photoshop': 'http://ns.adobe.com/photoshop/1.0/',
-            'exif': 'http://ns.adobe.com/exif/1.0/'
-        }
-        
         # Try to get location from Iptc4xmpCore:Location
-        location_elem = desc.find('.//{%s}Location' % ns['Iptc4xmpCore'])
+        location_elem = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}Location')
         if location_elem is not None and location_elem.text:
             location_data['location'] = location_elem.text.strip()
             log_message(f"Found Location: {location_data['location']}")
         
         # Try to get city from photoshop:City
-        city_elem = desc.find('.//{%s}City' % ns['photoshop'])
+        city_elem = desc.find(f'.//{{{ns["photoshop"]}}}City')
         if city_elem is not None and city_elem.text:
             location_data['city'] = city_elem.text.strip()
             log_message(f"Found City: {location_data['city']}")
         
         # Try to get state from photoshop:State
-        state_elem = desc.find('.//{%s}State' % ns['photoshop'])
+        state_elem = desc.find(f'.//{{{ns["photoshop"]}}}State')
         if state_elem is not None and state_elem.text:
             location_data['state'] = state_elem.text.strip()
             log_message(f"Found State: {location_data['state']}")
         
         # Try to get country from photoshop:Country
-        country_elem = desc.find('.//{%s}Country' % ns['photoshop'])
+        country_elem = desc.find(f'.//{{{ns["photoshop"]}}}Country')
         if country_elem is not None and country_elem.text:
             location_data['country'] = country_elem.text.strip()
             log_message(f"Found Country: {location_data['country']}")
         
         # Try to get GPS coordinates
-        gps_lat = desc.find('.//{%s}GPSLatitude' % ns['exif'])
-        gps_lon = desc.find('.//{%s}GPSLongitude' % ns['exif'])
+        gps_lat = desc.find(f'.//{{{ns["exif"]}}}GPSLatitude')
+        gps_lon = desc.find(f'.//{{{ns["exif"]}}}GPSLongitude')
         if gps_lat is not None and gps_lon is not None:
             location_data['gps'] = (gps_lat.text, gps_lon.text)
             log_message(f"Found GPS coordinates: {location_data['gps']}")
@@ -521,30 +521,31 @@ def process_video(file_path):
         return False
 
 def watch_folders(folder_paths):
+    """Watch folders for new video files."""
     while True:
         try:
-            for folder_path in folder_paths:
-                log_message(f"Watching folder: {folder_path}")
-                # Look for video files in the current folder
-                for filename in os.listdir(folder_path):
-                    if not "__LRE" in filename and filename.lower().endswith(('.mov', '.mp4', '.m4v', '.avi')):
-                        file_path = os.path.join(folder_path, filename)
-                        
-                        # Process the video
-                        if process_video(file_path):
-                            log_message(f"Successfully processed: {filename}")
+            found_files = False
+            for folder in folder_paths:
+                log_message(f"Checking {folder} for new video files...")
+                for file in os.scandir(folder):
+                    if file.is_file() and file.name.lower().endswith(VIDEO_PATTERNS):
+                        found_files = True
+                        process_video(file.path)
             
-            time.sleep(3)  # Wait before checking again
-            
+            if not found_files:
+                time.sleep(SLEEP_TIME)
+                
+        except KeyboardInterrupt:
+            log_message("Stopping video watch")
+            break
         except Exception as e:
-            log_message(f"Error in watch loop: {e}")
-            time.sleep(1)  # Wait before retrying
+            log_message(f"Error in watch_folders: {e}")
+            time.sleep(SLEEP_TIME)
 
 if __name__ == "__main__":
-    folders_to_watch = [
-        os.path.expanduser("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-        os.path.expanduser("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
-        # Both_Incoming directory has been removed
-    ]
-    log_message("Starting to watch specified folders for video files...")
-    watch_folders(folders_to_watch)
+    # Configure logging
+    import logging
+    logging.basicConfig(level=getattr(logging, LOG_LEVEL))
+    
+    # Start watching the folders
+    watch_folders(WATCH_DIRS)
