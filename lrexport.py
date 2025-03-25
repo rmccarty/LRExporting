@@ -326,93 +326,113 @@ class JPEGExifProcessor:
         self.update_keywords_with_rating_and_export_tags()
         return self.rename_file()
 
-if __name__ == "__main__":
-    # Define the directories to watch
-    WATCH_DIRS = [
-        Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
-    ]
-
-    BOTH_INCOMING = Path("/Users/rmccarty/Transfers/Both/Both_Incoming")
-
-    def watch_both_incoming():
+class DirectoryWatcher:
+    """
+    A class to watch directories for new JPEG files and process them.
+    """
+    
+    def __init__(self, watch_dirs, both_incoming_dir=None):
+        """
+        Initialize the directory watcher.
+        
+        Args:
+            watch_dirs: List of Path objects for directories to watch
+            both_incoming_dir: Optional Path object for a shared incoming directory
+        """
+        self.watch_dirs = [Path(d) for d in watch_dirs]
+        self.both_incoming = Path(both_incoming_dir) if both_incoming_dir else None
+        self.logger = logging.getLogger(__name__)
+    
+    def process_both_incoming(self):
         """Check Both_Incoming directory and copy files to individual incoming directories."""
+        if not self.both_incoming:
+            return False
+            
         found_files = False
         try:
             # Iterate through all files in the Both_Incoming directory
-            for file in BOTH_INCOMING.glob('*'):
+            for file in self.both_incoming.glob('*'):
                 # Check if the file is open
                 try:
                     with open(file, 'r+'):
                         pass  # File is not open, proceed to copy
                 except IOError:
-                    print(f"File {file.name} is currently open. Skipping copy.", flush=True)
+                    self.logger.warning(f"File {file.name} is currently open. Skipping copy.")
                     continue  # Skip to the next file
                 
                 found_files = True
                 # Copy the file to all incoming directories
-                for incoming_dir in WATCH_DIRS:
+                for incoming_dir in self.watch_dirs:
                     shutil.copy(file, incoming_dir / file.name)
-                    print(f"Copied {file.name} to {incoming_dir.name} directory.", flush=True)
+                    self.logger.info(f"Copied {file.name} to {incoming_dir.name} directory.")
                 
                 # Delete the original file
                 file.unlink()
-                print(f"Deleted {file.name} from Both_Incoming.", flush=True)
+                self.logger.info(f"Deleted {file.name} from Both_Incoming.")
         
         except Exception as e:
-            print(f"Error: {e}", flush=True)
+            self.logger.error(f"Error processing Both_Incoming: {e}")
         
         return found_files
+    
+    def process_file(self, file):
+        """Process a single JPEG file."""
+        if "__LRE" in file.name:  # Skip already processed files
+            return
+            
+        self.logger.info(f"Found file to process: {file}")
+        
+        # Check for zero-byte files
+        if file.stat().st_size == 0:
+            self.logger.warning(f"Skipping zero-byte file: {file}")
+            return
+            
+        # Process the file
+        processor = JPEGExifProcessor(str(file))
+        try:
+            new_path = processor.process_image()
+            self.logger.info(f"Image processed successfully: {new_path}")
+        except Exception as e:
+            self.logger.error(f"Error processing image: {e}")
+    
+    def watch_directories(self):
+        """Main loop to watch directories for new files."""
+        self.logger.info(f"Watching directories: {', '.join(str(dir) for dir in self.watch_dirs)}")
+        if self.both_incoming:
+            self.logger.info(f"Also watching {self.both_incoming} for files to copy to both directories")
+        
+        while True:
+            try:
+                found_files = self.process_both_incoming()  # Check Both_Incoming first
+                
+                # Iterate through each directory
+                for watch_dir in self.watch_dirs:
+                    self.logger.info(f"\nChecking {watch_dir} for new files...")
+                    for file in watch_dir.glob('*.[Jj][Pp][Gg]'):
+                        self.process_file(file)
+                        found_files = True
+                
+                # Only sleep if no files were found
+                if not found_files:
+                    time.sleep(3)
+                    
+            except KeyboardInterrupt:
+                self.logger.info("Stopping directory watch")
+                break
+            except Exception as e:
+                self.logger.error(f"Unexpected error: {e}")
 
+if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
     
-    logger.info(f"Watching directories: {', '.join(str(dir) for dir in WATCH_DIRS)}")
-    logger.info(f"Also watching {BOTH_INCOMING} for files to copy to both directories")
+    # Initialize and start the watcher
+    watcher = DirectoryWatcher(
+        watch_dirs=[
+            Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
+            Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
+        ],
+        both_incoming_dir=Path("/Users/rmccarty/Transfers/Both/Both_Incoming")
+    )
     
-    # Main loop to watch directories
-    while True:
-        watch_both_incoming()  # Check Both_Incoming first
-        try:
-            found_files = False
-            # Iterate through each directory
-            for watch_dir in WATCH_DIRS:
-                # Find all JPEG files in the current directory
-                print(f"\nChecking {watch_dir} for new files...")
-                for file in watch_dir.glob('*.[Jj][Pp][Gg]'):
-                    if "__LRE" not in file.name:  # Correctly check the file name
-                        found_files = True
-                        logger.info(f"Found file to process: {file}")
-                        
-                        # Check for zero-byte files
-                        if file.stat().st_size == 0:
-                            logger.warning(f"Skipping zero-byte file: {file}")
-                            continue
-                            
-                        # Try to open file exclusively first
-                        try:
-                            with open(file, 'r+b'):  # Binary mode for images
-                                pass  # File is not locked, proceed with processing
-                        except IOError:
-                            logger.info(f"File {file.name} is currently in use. Skipping.")
-                            continue
-                        
-                        # If we get here, file is not locked so process it
-                        processor = JPEGExifProcessor(str(file))
-                        try:
-                            new_path = processor.process_image()
-                            logger.info(f"Image processed successfully: {new_path}")
-                        except Exception as e:
-                            logger.error(f"Error processing image: {e}")
-
-            # Only sleep if no files were found
-            if not found_files:
-                time.sleep(3)
-                
-        except KeyboardInterrupt:
-            logger.info("Stopping directory watch")
-            break
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            time.sleep(3)  # Sleep before retrying
+    watcher.watch_directories()
