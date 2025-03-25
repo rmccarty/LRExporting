@@ -675,12 +675,12 @@ class VideoProcessor(MediaProcessor):
                 if title:
                     cmd.extend(['-title=' + title])
                 if keywords:
-                    # Use a single -keywords argument with comma-joined values for better compatibility
-                    cmd.extend([f'-keywords={",".join(keywords)}'])
-                    # Also set XMP:Subject and QuickTime:Keywords for maximum compatibility
+                    # Write keywords to both Keys and ItemList groups
+                    keyword_str = ",".join(keywords)
                     cmd.extend([
-                        f'-XMP:Subject={",".join(keywords)}',
-                        f'-QuickTime:Keywords={",".join(keywords)}'
+                        '-Keys:Keywords=' + keyword_str,
+                        '-ItemList:Keywords=' + keyword_str,
+                        '-ItemList:Subject=' + keyword_str
                     ])
                 if date_str:
                     # Set all date fields for maximum compatibility
