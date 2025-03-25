@@ -429,8 +429,39 @@ class VideoProcessor:
             return date_part
         return date_str
 
+    def get_new_filename(self, title):
+        """Generate new filename from title."""
+        if not title:
+            return None
+            
+        # Get the directory and filename
+        directory = os.path.dirname(self.file_path)
+        filename = os.path.basename(self.file_path)
+        
+        # Add __LRE suffix before the extension
+        base, ext = os.path.splitext(filename)
+        if not base.endswith('__LRE'):
+            new_filename = f"{base}__LRE{ext}"
+            return os.path.join(directory, new_filename)
+        return self.file_path
+
     def process_video(self):
-        """Process a video file."""
+        """Process a video file.
+        
+        CRITICAL: The order of operations must be strictly maintained:
+        1. Check if file has __LRE suffix (skip if present)
+        2. Read metadata from XMP
+        3. Write metadata to video
+        4. Verify metadata
+        5. Delete XMP file
+        6. Rename video file with __LRE suffix
+        
+        IMPORTANT: The XMP file MUST be deleted BEFORE renaming the video file with __LRE suffix.
+        This order is critical because the XMP file path is based on the original video filename.
+        
+        Returns:
+            bool: True if processing was successful, False otherwise.
+        """
         try:
             # 1. Check if file has __LRE suffix - skip if it does
             if '__LRE' in os.path.basename(self.file_path):
@@ -508,20 +539,20 @@ class VideoProcessor:
                 log_message("Metadata verification failed")
                 return False
             
-            # 5. Rename video file
-            base_name = os.path.splitext(os.path.basename(self.file_path))[0]
-            new_name = f"{base_name}__LRE{os.path.splitext(self.file_path)[1]}"
-            new_path = os.path.join(os.path.dirname(self.file_path), new_name)
-            os.rename(self.file_path, new_path)
-            log_message(f"Renamed video to: {new_name}")
-            
-            # 6. Delete XMP file
+            # 5. Delete XMP file
             xmp_path = os.path.splitext(self.file_path)[0] + ".xmp"
             if not os.path.exists(xmp_path):
                 xmp_path = self.file_path + ".xmp"
             if os.path.exists(xmp_path):
                 os.remove(xmp_path)
                 log_message(f"Removed XMP file: {os.path.basename(xmp_path)}")
+            
+            # 6. Rename video file
+            new_path = self.get_new_filename(xmp_title)
+            if new_path and new_path != self.file_path:
+                os.rename(self.file_path, new_path)
+                self.file_path = new_path
+                log_message(f"Renamed video to: {os.path.basename(new_path)}")
             
             return True
             
@@ -629,61 +660,79 @@ class VideoProcessor:
             log_message(f"Error verifying metadata: {e}")
             return False
 
-def get_new_filename(file_path, title):
-    """Generate new filename from title."""
-    directory = os.path.dirname(file_path)
-    ext = os.path.splitext(file_path)[1].lower()  # Preserve original extension
-    clean_title = title
-    for old, new in FILENAME_REPLACEMENTS.items():
-        clean_title = clean_title.replace(old, new)
-    new_name = f"{clean_title}{LRE_SUFFIX}{ext}"
-    return os.path.join(directory, new_name)
-
-def watch_directories():
-    """Watch directories for new video files."""
-    try:
-        while True:
-            for directory in WATCH_DIRS:
-                log_message(f"Checking {directory} for new video files...")
+class VideoWatcher:
+    """Class to watch directories for new video files."""
+    
+    def __init__(self, directories=None):
+        """Initialize with list of directories to watch."""
+        self.directories = directories or WATCH_DIRS
+        self.running = False
+        
+    def process_file(self, file_path):
+        """Process a single video file."""
+        try:
+            # Skip if already processed
+            if '__LRE' in os.path.basename(file_path):
+                return
                 
-                # Get all video files that have XMP files
-                for pattern in VIDEO_PATTERNS:
-                    # Handle both upper and lower case extensions
-                    for file_path in glob.glob(os.path.join(directory, f"*{pattern.lower()}")) + \
-                                   glob.glob(os.path.join(directory, f"*{pattern.upper()}")):
-                        try:
-                            # Skip if already processed
-                            if '__LRE' in os.path.basename(file_path):
-                                continue
-                                
-                            # Check for XMP file
-                            xmp_path = os.path.splitext(file_path)[0] + ".xmp"
-                            if not os.path.exists(xmp_path):
-                                xmp_path = file_path + ".xmp"
-                                if not os.path.exists(xmp_path):
-                                    continue  # Skip if no XMP file
-                            
-                            # Process new McCartys video
-                            log_message(f"Found new McCartys video: {os.path.basename(file_path)}")
-                            processor = VideoProcessor(file_path)
-                            processor.process_video()
-                            
-                        except Exception as e:
-                            log_message(f"Error processing {file_path}: {e}")
-                            continue
-                            
-            time.sleep(SLEEP_TIME)
+            # Check for XMP file
+            xmp_path = os.path.splitext(file_path)[0] + ".xmp"
+            if not os.path.exists(xmp_path):
+                xmp_path = file_path + ".xmp"
+                if not os.path.exists(xmp_path):
+                    return  # Skip if no XMP file
             
-    except KeyboardInterrupt:
-        log_message("Stopping video watch")
-    except Exception as e:
-        log_message(f"Error in watch_directories: {e}")
-        time.sleep(SLEEP_TIME)
+            # Process new McCartys video
+            log_message(f"Found new McCartys video: {os.path.basename(file_path)}")
+            processor = VideoProcessor(file_path)
+            processor.process_video()
+            
+        except Exception as e:
+            log_message(f"Error processing {file_path}: {e}")
+    
+    def watch(self):
+        """Start watching directories for new video files."""
+        self.running = True
+        try:
+            while self.running:
+                for directory in self.directories:
+                    log_message(f"Checking {directory} for new video files...")
+                    
+                    # Get all video files that have XMP files
+                    for pattern in VIDEO_PATTERNS:
+                        # Debug: print pattern being searched
+                        log_message(f"Searching for pattern: *{pattern}")
+                        
+                        # Debug: print full search path
+                        search_path = os.path.join(directory, f"*{pattern}")
+                        log_message(f"Search path: {search_path}")
+                        
+                        # Find matching files
+                        files = glob.glob(search_path)
+                        
+                        # Debug: print found files
+                        if files:
+                            log_message(f"Found files: {files}")
+                        else:
+                            log_message("No files found with this pattern")
+                        
+                        for file_path in files:
+                            self.process_file(file_path)
+                            
+                time.sleep(SLEEP_TIME)
+                
+        except KeyboardInterrupt:
+            log_message("Stopping video watch")
+            self.running = False
+    
+    def stop(self):
+        """Stop watching directories."""
+        self.running = False
 
 if __name__ == "__main__":
     # Configure logging
-    import logging
     logging.basicConfig(level=getattr(logging, LOG_LEVEL))
     
-    # Start watching the folders
-    watch_directories()
+    # Start watching directories
+    watcher = VideoWatcher()
+    watcher.watch()
