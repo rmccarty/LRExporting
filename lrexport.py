@@ -8,7 +8,6 @@ import sys
 from datetime import datetime
 import shutil
 import time
-from watch_both_incoming import watch_and_process
 
 class JPEGExifProcessor:
     """
@@ -188,11 +187,8 @@ class JPEGExifProcessor:
             keywords.append('Lightroom_Export')
             keywords.append(export_date_keyword)
             
-            # Create exiftool command to update keywords
-            cmd = ['exiftool', '-overwrite_original']
-            for keyword in keywords:
-                cmd.append(f'-keywords={keyword}')
-            cmd.append(str(self.input_path))
+            # Create exiftool command to update keywords - use a single -keywords argument
+            cmd = ['exiftool', '-overwrite_original', f'-keywords={",".join(keywords)}', str(self.input_path)]
             
             subprocess.run(cmd, check=True, capture_output=True)
             self.logger.info(f"Updated keywords with rating: {rating_keyword}")
@@ -225,12 +221,16 @@ class JPEGExifProcessor:
         
         # Get and transform all components
         components = [date_str]
-        title = self.get_exif_title()
+        
+        # Skip raw JSON or complex data in title, just use location info
         _, city, country = self.get_location_data()
         
         def clean_component(text):
             """Clean component for filename use"""
             if not text:
+                return ""
+            # Skip if text looks like JSON
+            if text.startswith('{') or text.startswith('['):
                 return ""
             # First replace slashes and backslashes with hyphens
             text = text.replace('/', '-').replace('\\', '-')
@@ -238,15 +238,18 @@ class JPEGExifProcessor:
             text = text.replace(' ', '_')
             while '__' in text:
                 text = text.replace('__', '_')
-            return text
+            # Limit component length
+            return text[:50]  # Limit each component to 50 chars
         
-        # Clean and add each component
-        if title:
-            components.append(clean_component(title))
+        # Clean and add each component if it's valid
         if city:
-            components.append(clean_component(city))
+            cleaned_city = clean_component(city)
+            if cleaned_city:
+                components.append(cleaned_city)
         if country:
-            components.append(clean_component(country))
+            cleaned_country = clean_component(country)
+            if cleaned_country:
+                components.append(cleaned_country)
             
         # Join with single underscore and ensure no double underscores
         base_name = '_'.join(components)
@@ -324,25 +327,53 @@ class JPEGExifProcessor:
         return self.rename_file()
 
 if __name__ == "__main__":
-    # Call the watch_and_process function before the existing logic
-    
+    # Define the directories to watch
+    WATCH_DIRS = [
+        Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
+        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
+    ]
+
+    BOTH_INCOMING = Path("/Users/rmccarty/Transfers/Both/Both_Incoming")
+
+    def watch_both_incoming():
+        """Check Both_Incoming directory and copy files to individual incoming directories."""
+        found_files = False
+        try:
+            # Iterate through all files in the Both_Incoming directory
+            for file in BOTH_INCOMING.glob('*'):
+                # Check if the file is open
+                try:
+                    with open(file, 'r+'):
+                        pass  # File is not open, proceed to copy
+                except IOError:
+                    print(f"File {file.name} is currently open. Skipping copy.", flush=True)
+                    continue  # Skip to the next file
+                
+                found_files = True
+                # Copy the file to all incoming directories
+                for incoming_dir in WATCH_DIRS:
+                    shutil.copy(file, incoming_dir / file.name)
+                    print(f"Copied {file.name} to {incoming_dir.name} directory.", flush=True)
+                
+                # Delete the original file
+                file.unlink()
+                print(f"Deleted {file.name} from Both_Incoming.", flush=True)
+        
+        except Exception as e:
+            print(f"Error: {e}", flush=True)
+        
+        return found_files
 
     # Configure logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     
-    # Set the directories to watch
-    WATCH_DIRS = [
-        Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming"),
-        Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
-        # Both_Incoming directory has been removed
-    ]
-    
     logger.info(f"Watching directories: {', '.join(str(dir) for dir in WATCH_DIRS)}")
+    logger.info(f"Also watching {BOTH_INCOMING} for files to copy to both directories")
     
-    # Existing logic to watch directories
+    # Main loop to watch directories
     while True:
-        watch_and_process()
+        watch_both_incoming()  # Check Both_Incoming first
         try:
             found_files = False
             # Iterate through each directory
@@ -354,6 +385,11 @@ if __name__ == "__main__":
                         found_files = True
                         logger.info(f"Found file to process: {file}")
                         
+                        # Check for zero-byte files
+                        if file.stat().st_size == 0:
+                            logger.warning(f"Skipping zero-byte file: {file}")
+                            continue
+                            
                         # Try to open file exclusively first
                         try:
                             with open(file, 'r+b'):  # Binary mode for images
