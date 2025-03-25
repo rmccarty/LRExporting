@@ -18,7 +18,7 @@ SLEEP_TIME = 10
 
 # File patterns
 JPEG_PATTERN = '*.[Jj][Pp][Gg]'
-VIDEO_PATTERN = '*.[mM][pP]4|*.[mM][oO][vV]|*.[mM]4[vV]'  # Case-insensitive using glob syntax
+VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v']  # Will handle case sensitivity in the watcher
 
 # XML/RDF Namespaces
 XML_NAMESPACES = {
