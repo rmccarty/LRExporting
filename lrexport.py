@@ -10,7 +10,7 @@ import shutil
 import time
 import xml.etree.ElementTree as ET
 from mutagen.mp4 import MP4
-import re
+import re  # Add at top of file with other imports
 import glob
 import os
 from abc import ABC, abstractmethod
@@ -58,7 +58,7 @@ class MediaProcessor(ABC):
         """
         try:
             self.logger.debug(f"Reading metadata from file: {self.file_path}")
-            cmd = ['exiftool', '-j', '-m', '-G', str(self.file_path)]
+            cmd = ['exiftool', '-j', '-m', '-G', str(self.file_path)]  # Keep -G flag for videos
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
@@ -86,7 +86,14 @@ class MediaProcessor(ABC):
         Returns:
             str: EXIF title if found, generated title if not
         """
-        title = self.exif_data.get('Title', '')
+        # Try different title fields with group prefixes
+        title = ''
+        for key in self.exif_data:
+            if key.endswith(':Title'):
+                title = self.exif_data[key]
+                if title:
+                    break
+        
         if not title:
             title = self.generate_title()
         return title
@@ -98,9 +105,18 @@ class MediaProcessor(ABC):
         Returns:
             tuple: (location, city, country)
         """
-        location = self.exif_data.get('Location', '')
-        city = self.exif_data.get('City', '')
-        country = self.exif_data.get('Country', '')
+        location = ''
+        city = ''
+        country = ''
+        
+        # Try different location fields with group prefixes
+        for key in self.exif_data:
+            if key.endswith(':Location') and not location:
+                location = self.exif_data[key]
+            elif key.endswith(':City') and not city:
+                city = self.exif_data[key]
+            elif key.endswith(':Country') and not country:
+                country = self.exif_data[key]
         
         return location, city, country
         
@@ -111,7 +127,12 @@ class MediaProcessor(ABC):
         Returns:
             str: Generated title from caption and location data, or empty string if none available
         """
-        caption = self.exif_data.get('Caption-Abstract', '')
+        caption = ''
+        for key in self.exif_data:
+            if key.endswith(':Caption-Abstract'):
+                caption = self.exif_data[key]
+                break
+        
         location, city, country = self.get_location_data()
         
         components = []
@@ -206,12 +227,23 @@ class MediaProcessor(ABC):
         # Skip if text looks like JSON
         if text.startswith('{') or text.startswith('['):
             return ""
-        # First replace slashes and backslashes with hyphens
-        text = text.replace('/', '-').replace('\\', '-')
-        # Replace spaces and multiple underscores with single underscore
+            
+        # Replace problematic characters with underscores
+        text = re.sub(r'[\\/:*?"<>|]', '_', text)
+        
+        # Replace spaces with underscores
         text = text.replace(' ', '_')
+        
+        # Remove or replace any other problematic characters
+        text = ''.join(c for c in text if c.isalnum() or c in '_-()[]')
+        
+        # Replace multiple underscores with single underscore
         while '__' in text:
             text = text.replace('__', '_')
+            
+        # Remove leading/trailing underscores
+        text = text.strip('_')
+        
         # Limit component length
         return text[:50]  # Limit each component to 50 chars
 
@@ -238,10 +270,10 @@ class MediaProcessor(ABC):
             if title:
                 title = self.clean_component(title)
                 if title:  # If title is still valid after cleaning
-                    return f"{date_str}_{title}__{LRE_SUFFIX}{self.file_path.suffix}"
+                    return f"{date_str}_{title}_{LRE_SUFFIX}{self.file_path.suffix}"
             
             # If no valid title, just use date
-            return f"{date_str}__{LRE_SUFFIX}{self.file_path.suffix}"
+            return f"{date_str}_{LRE_SUFFIX}{self.file_path.suffix}"
             
         except Exception as e:
             self.logger.error(f"Error generating filename: {e}")
@@ -733,7 +765,7 @@ class VideoProcessor(MediaProcessor):
                 
             # Read metadata back with -m flag to ignore file handler issues
             try:
-                cmd = ['exiftool', '-j', '-m', '-G', str(self.file_path)]
+                cmd = ['exiftool', '-j', '-m', str(self.file_path)]
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode == 0:
                     data = json.loads(result.stdout)
@@ -749,7 +781,7 @@ class VideoProcessor(MediaProcessor):
             # Verify metadata was written correctly
             try:
                 # Read back EXIF data
-                result = subprocess.run(['exiftool', '-json', '-G', str(self.file_path)], 
+                result = subprocess.run(['exiftool', '-json', str(self.file_path)], 
                                      capture_output=True, text=True, check=True)
                 self.exif_data = json.loads(result.stdout)[0]
                 
