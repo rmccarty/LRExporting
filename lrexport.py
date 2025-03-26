@@ -15,6 +15,7 @@ import glob
 import os
 from abc import ABC, abstractmethod
 import fcntl
+from PIL import Image
 
 from config import (
     WATCH_DIRS, 
@@ -27,7 +28,8 @@ from config import (
     VIDEO_PATTERN,
     MCCARTYS_PREFIX,
     MCCARTYS_REPLACEMENT,
-    LRE_SUFFIX
+    LRE_SUFFIX,
+    JPEG_QUALITY
 )
 
 class MediaProcessor(ABC):
@@ -381,6 +383,41 @@ class JPEGExifProcessor(MediaProcessor):
             self.logger.error(f"Error validating filename: {str(e)}")
             sys.exit(1)
             
+    def compress_image(self) -> bool:
+        """
+        Compress the JPEG image while preserving EXIF data.
+        Replaces the original file with the compressed version.
+        
+        Returns:
+            bool: True if compression successful, False otherwise
+        """
+        try:
+            self.logger.debug(f"Compressing image: {self.file_path}")
+            
+            # Create a temporary file for compression
+            temp_path = self.file_path.with_suffix('.tmp.jpg')
+            
+            # Open and compress
+            with Image.open(self.file_path) as img:
+                # Get original EXIF
+                exif = img.info.get('exif')
+                
+                # Save compressed version to temp file
+                img.save(temp_path, 'JPEG', quality=JPEG_QUALITY, exif=exif)
+            
+            # Replace original with compressed version
+            temp_path.replace(self.file_path)
+            
+            self.logger.debug(f"Successfully compressed image: {self.file_path}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error compressing image: {e}")
+            # Clean up temp file if it exists
+            if temp_path.exists():
+                temp_path.unlink()
+            return False
+            
     def get_metadata_components(self):
         """Get metadata components for JPEG files."""
         # Get date from EXIF
@@ -400,6 +437,43 @@ class JPEGExifProcessor(MediaProcessor):
         location, city, country = self.get_location_data()
         
         return date_str, title, location, city, country
+
+    def process_image(self) -> Path:
+        """
+        Main method to process an image - reads EXIF, updates keywords and title, and renames file.
+        
+        Returns:
+            Path: Path to the processed file
+        """
+        try:
+            # Skip if already processed
+            if self.file_path.stem.endswith(LRE_SUFFIX):
+                return self.file_path
+                
+            # Read EXIF data
+            self.read_exif()
+            
+            # Update keywords with rating and export tags
+            self.update_keywords_with_rating_and_export_tags()
+            
+            # Compress the image
+            if not self.compress_image():
+                self.logger.error("Failed to compress image, skipping further processing")
+                return self.file_path
+            
+            # Generate new filename and rename
+            new_name = self.generate_filename()
+            if not new_name:
+                return self.file_path
+                
+            new_path = self.file_path.parent / new_name
+            self.file_path.rename(new_path)
+            
+            return new_path
+            
+        except Exception as e:
+            self.logger.error(f"Error processing image: {e}")
+            return self.file_path
 
 class VideoProcessor(MediaProcessor):
     """A class to process video files and their metadata using exiftool."""
