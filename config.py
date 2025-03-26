@@ -30,52 +30,36 @@ XML_NAMESPACES = {
     'lr': 'http://ns.adobe.com/lightroom/1.0/'
 }
 
-# Exiftool configuration
-EXIFTOOL_BASE_ARGS = [
-    'exiftool',
-    '-overwrite_original',
-    '-handler=mdta'
-]
-
 # Metadata field mappings
 METADATA_FIELDS = {
-    'title': ['-Title', '-DisplayName', '-ItemList:Title'],
+    'title': ['-ItemList:Title', '-QuickTime:Title'],
     'date': [
         '-CreateDate',
         '-ModifyDate',
         '-TrackCreateDate',
         '-TrackModifyDate',
         '-MediaCreateDate',
-        '-MediaModifyDate'
+        '-MediaModifyDate',
+        '-QuickTime:CreateDate',
+        '-QuickTime:MediaCreateDate'
     ],
-    'location': ['-LocationName'],
-    'city': ['-City'],
-    'state': ['-State'],
-    'country': ['-Country'],
+    'keywords': ['-QuickTime:Keywords', '-XMP:Subject'],  # These are the fields that actually work
+    'location': ['-Location', '-XMP:Location', '-LocationName'],
+    'city': ['-City', '-XMP:City'],
+    'state': ['-State', '-XMP:State'],
+    'country': ['-Country', '-XMP:Country'],
     'gps': ['-GPSLatitude', '-GPSLongitude'],
-    'caption': ['-Description']
+    'caption': ['-ItemList:Description', '-Description']
 }
 
 # Verification fields to check
 VERIFY_FIELDS = [
-    '-DisplayName',
-    '-Title',
-    '-ItemList:Title',
-    '-Keywords',
-    '-Subject',
-    '-CreateDate',
-    '-ModifyDate',
-    '-TrackCreateDate',
-    '-TrackModifyDate',
-    '-MediaCreateDate',
-    '-MediaModifyDate',
-    '-LocationName',
-    '-City',
-    '-State',
-    '-Country',
-    '-GPSLatitude',
-    '-GPSLongitude',
-    '-Description'
+    'Title',
+    'Keywords',
+    'CreateDate',
+    'Location',
+    'City',
+    'Country'
 ]
 
 # File naming configuration
