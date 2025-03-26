@@ -94,9 +94,23 @@ class VideoProcessor(MediaProcessor):
     def get_metadata_from_xmp(self):
         """Get metadata from XMP file."""
         metadata = self.read_metadata_from_xmp()
-        if not metadata[0]:  # If no title found
+        title, keywords, date_str, caption, location_data = metadata
+        
+        # Log what metadata we found
+        if not any(metadata):
             self.logger.warning("No metadata found in XMP file")
-            return None
+        else:
+            if not title:
+                self.logger.info("No title found in XMP")
+            if not keywords:
+                self.logger.info("No keywords found in XMP")
+            if not date_str:
+                self.logger.info("No date found in XMP")
+            if not caption:
+                self.logger.info("No caption found in XMP")
+            if not any(location_data):
+                self.logger.info("No location data found in XMP")
+                
         return metadata
 
     def write_metadata_to_video(self, metadata: tuple) -> bool:
@@ -472,9 +486,17 @@ class VideoProcessor(MediaProcessor):
             
         # Read metadata from XMP
         metadata = self.get_metadata_from_xmp()
-        if not metadata:
+        if not any(metadata):  # If ALL metadata is None
             self.logger.warning("No metadata found in XMP file")
-            return self.file_path
+            # Just add __LRE to original filename
+            new_path = self.file_path.with_stem(f"{self.file_path.stem}{LRE_SUFFIX}")
+            try:
+                self.file_path.rename(new_path)
+                self.logger.info(f"Renamed file to: {new_path}")
+                return new_path
+            except OSError as e:
+                self.logger.error(f"Error renaming file: {e}")
+                return self.file_path
             
         # Write metadata to video
         if not self.write_metadata_to_video(metadata):
@@ -496,5 +518,5 @@ class VideoProcessor(MediaProcessor):
             self.logger.error(f"Error deleting XMP file: {e}")
             return self.file_path
             
-        # Rename the file
+        # Rename the file with metadata-based name
         return self.rename_file()
