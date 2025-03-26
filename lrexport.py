@@ -13,10 +13,10 @@ from mutagen.mp4 import MP4
 import re  # Add at top of file with other imports
 import glob
 import os
-from abc import ABC, abstractmethod
 import fcntl
 from PIL import Image
 from datetime import timedelta
+from abc import ABC, abstractmethod
 
 from config import (
     WATCH_DIRS, 
@@ -35,35 +35,6 @@ from config import (
     TRANSFER_PATHS,
     MIN_FILE_AGE
 )
-
-class BaseWatcher(ABC):
-    """Base class for watching directories for media files."""
-    
-    # Class-level sequence counter (1-9999)
-    _sequence = 0
-    
-    @classmethod
-    def _get_next_sequence(cls) -> str:
-        """Get next sequence number as 4-digit string."""
-        cls._sequence = (cls._sequence % 9999) + 1  # Roll over to 1 after 9999
-        return f"{cls._sequence:04d}"  # Format as 4 digits with leading zeros
-    
-    def __init__(self, directories=None):
-        """
-        Initialize the watcher.
-        
-        Args:
-            directories: List of directories to watch. If None, uses WATCH_DIRS
-        """
-        self.directories = [Path(d) for d in (directories or WATCH_DIRS)]
-        self.running = False
-        self.sleep_time = SLEEP_TIME
-        self.logger = logging.getLogger(__name__)
-    
-    @abstractmethod
-    def process_file(self, file_path: Path):
-        """Process a single media file. Must be implemented by subclasses."""
-        pass
 
 class MediaProcessor(ABC):
     """Base class for processing media files (JPEG, Video) with exiftool."""
@@ -1528,11 +1499,14 @@ class Transfer:
             self.logger.error(f"Error transferring file {file_path}: {e}")
             return False
 
-class TransferWatcher(BaseWatcher):
+class TransferWatcher:
     """Watches for _LRE files and transfers them to their destination directories."""
     
     def __init__(self, directories=None):
-        super().__init__(directories)
+        self.directories = [Path(d) for d in (directories or WATCH_DIRS)]
+        self.running = False
+        self.sleep_time = SLEEP_TIME
+        self.logger = logging.getLogger(__name__)
         self.transfer = Transfer()
         
     def process_file(self, file_path: Path) -> bool:
@@ -1565,10 +1539,19 @@ class TransferWatcher(BaseWatcher):
         except Exception as e:
             self.logger.error(f"Error checking directory {directory}: {e}")
 
-class DirectoryWatcher(BaseWatcher):
+class DirectoryWatcher:
     """
     A class to watch directories for new JPEG files and process them.
     """
+    
+    # Class-level sequence counter (1-9999)
+    _sequence = 0
+    
+    @classmethod
+    def _get_next_sequence(cls) -> str:
+        """Get next sequence number as 4-digit string."""
+        cls._sequence = (cls._sequence % 9999) + 1  # Roll over to 1 after 9999
+        return f"{cls._sequence:04d}"  # Format as 4 digits with leading zeros
     
     def __init__(self, watch_dirs, both_incoming_dir=None):
         """
@@ -1578,8 +1561,11 @@ class DirectoryWatcher(BaseWatcher):
             watch_dirs: List of Path objects for directories to watch
             both_incoming_dir: Optional Path object for a shared incoming directory
         """
-        super().__init__(watch_dirs)
+        self.directories = [Path(d) for d in watch_dirs]
         self.both_incoming = Path(both_incoming_dir) if both_incoming_dir else None
+        self.running = False
+        self.sleep_time = SLEEP_TIME
+        self.logger = logging.getLogger(__name__)
     
     def process_both_incoming(self):
         """Check Both_Incoming directory and copy files to individual incoming directories."""
@@ -1644,8 +1630,31 @@ class DirectoryWatcher(BaseWatcher):
         for file in directory.glob("*.jpg"):
             self.process_file(file)
 
-class VideoWatcher(BaseWatcher):
-    """A class to watch directories for video files."""
+class VideoWatcher:
+    """
+    A class to watch directories for video files.
+    """
+    
+    # Class-level sequence counter (1-9999)
+    _sequence = 0
+    
+    @classmethod
+    def _get_next_sequence(cls) -> str:
+        """Get next sequence number as 4-digit string."""
+        cls._sequence = (cls._sequence % 9999) + 1  # Roll over to 1 after 9999
+        return f"{cls._sequence:04d}"  # Format as 4 digits with leading zeros
+    
+    def __init__(self, directories=None):
+        """
+        Initialize the video watcher.
+        
+        Args:
+            directories: List of Path objects for directories to watch
+        """
+        self.directories = [Path(d) for d in (directories or WATCH_DIRS)]
+        self.running = False
+        self.sleep_time = SLEEP_TIME
+        self.logger = logging.getLogger(__name__)
     
     def process_file(self, file_path):
         """Process a single video file."""
@@ -1719,6 +1728,6 @@ if __name__ == "__main__":
             
     except KeyboardInterrupt:
         logging.info("Stopping watchers")
-        jpeg_watcher.stop()
-        video_watcher.stop()
-        transfer_watcher.stop()
+        jpeg_watcher.running = False
+        video_watcher.running = False
+        transfer_watcher.running = False
