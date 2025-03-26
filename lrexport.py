@@ -29,7 +29,8 @@ from config import (
     MCCARTYS_PREFIX,
     MCCARTYS_REPLACEMENT,
     LRE_SUFFIX,
-    JPEG_QUALITY
+    JPEG_QUALITY,
+    JPEG_COMPRESS
 )
 
 class MediaProcessor(ABC):
@@ -385,8 +386,8 @@ class JPEGExifProcessor(MediaProcessor):
             
     def compress_image(self) -> bool:
         """
-        Compress the JPEG image while preserving EXIF data.
-        Replaces the original file with the compressed version.
+        Compress the JPEG image while preserving metadata.
+        Uses Pillow for compression and exiftool to preserve metadata.
         
         Returns:
             bool: True if compression successful, False otherwise
@@ -397,14 +398,17 @@ class JPEGExifProcessor(MediaProcessor):
             # Create a temporary file for compression
             temp_path = self.file_path.with_suffix('.tmp.jpg')
             
-            # Open and compress
+            # Compress with Pillow
             with Image.open(self.file_path) as img:
-                # Get original EXIF
-                exif = img.info.get('exif')
-                
-                # Save compressed version to temp file
-                img.save(temp_path, 'JPEG', quality=JPEG_QUALITY, exif=exif)
+                img.save(temp_path, 'JPEG', quality=JPEG_QUALITY)
             
+            # Copy metadata from original to compressed version
+            cmd = ['exiftool', '-overwrite_original', '-tagsFromFile', str(self.file_path), str(temp_path)]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                self.logger.error(f"Error preserving metadata: {result.stderr}")
+                return False
+                
             # Replace original with compressed version
             temp_path.replace(self.file_path)
             
@@ -456,11 +460,6 @@ class JPEGExifProcessor(MediaProcessor):
             # Update keywords with rating and export tags
             self.update_keywords_with_rating_and_export_tags()
             
-            # Compress the image
-            if not self.compress_image():
-                self.logger.error("Failed to compress image, skipping further processing")
-                return self.file_path
-            
             # Generate new filename and rename
             new_name = self.generate_filename()
             if not new_name:
@@ -468,8 +467,15 @@ class JPEGExifProcessor(MediaProcessor):
                 
             new_path = self.file_path.parent / new_name
             self.file_path.rename(new_path)
+            self.file_path = new_path  # Update file_path to point to renamed file
             
-            return new_path
+            # Only compress if enabled in config
+            if JPEG_COMPRESS:
+                if not self.compress_image():
+                    self.logger.error("Failed to compress image")
+                    # Continue even if compression fails - we've already renamed
+            
+            return self.file_path
             
         except Exception as e:
             self.logger.error(f"Error processing image: {e}")

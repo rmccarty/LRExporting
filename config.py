@@ -20,7 +20,8 @@ SLEEP_TIME = 10
 JPEG_PATTERN = '*.[Jj][Pp][Gg]'
 VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v']  # Will handle case sensitivity in the watcher
 
-# JPEG compression quality (1-100)
+# JPEG compression settings
+JPEG_COMPRESS = True  # Set to True to enable compression
 JPEG_QUALITY = 85  # Default quality, good balance of size and quality
 
 # XML/RDF Namespaces
