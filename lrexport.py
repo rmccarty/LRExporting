@@ -16,6 +16,7 @@ import os
 from abc import ABC, abstractmethod
 import fcntl
 from PIL import Image
+from datetime import timedelta
 
 from config import (
     WATCH_DIRS, 
@@ -30,22 +31,55 @@ from config import (
     MCCARTYS_REPLACEMENT,
     LRE_SUFFIX,
     JPEG_QUALITY,
-    JPEG_COMPRESS
+    JPEG_COMPRESS,
+    TRANSFER_PATHS,
+    MIN_FILE_AGE
 )
+
+class BaseWatcher(ABC):
+    """Base class for watching directories for media files."""
+    
+    # Class-level sequence counter (1-9999)
+    _sequence = 0
+    
+    @classmethod
+    def _get_next_sequence(cls) -> str:
+        """Get next sequence number as 4-digit string."""
+        cls._sequence = (cls._sequence % 9999) + 1  # Roll over to 1 after 9999
+        return f"{cls._sequence:04d}"  # Format as 4 digits with leading zeros
+    
+    def __init__(self, directories=None):
+        """
+        Initialize the watcher.
+        
+        Args:
+            directories: List of directories to watch. If None, uses WATCH_DIRS
+        """
+        self.directories = [Path(d) for d in (directories or WATCH_DIRS)]
+        self.running = False
+        self.sleep_time = SLEEP_TIME
+        self.logger = logging.getLogger(__name__)
+    
+    @abstractmethod
+    def process_file(self, file_path: Path):
+        """Process a single media file. Must be implemented by subclasses."""
+        pass
 
 class MediaProcessor(ABC):
     """Base class for processing media files (JPEG, Video) with exiftool."""
     
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, sequence: str = None):
         """
         Initialize the media processor.
         
         Args:
             file_path (str): Path to input media file
+            sequence (str): Optional sequence number for filename
         """
         self.file_path = Path(file_path)
         self.logger = logging.getLogger(__name__)
         self.exif_data = {}  # Initialize exif_data
+        self.sequence = sequence  # Store sequence for filename generation
         
         # Verify exiftool is available
         if not shutil.which('exiftool'):
@@ -273,10 +307,17 @@ class MediaProcessor(ABC):
             if title:
                 title = self.clean_component(title)
                 if title:  # If title is still valid after cleaning
-                    return f"{date_str}_{title}_{LRE_SUFFIX}{self.file_path.suffix}"
+                    base_name = f"{date_str}_{title}"
+                else:
+                    base_name = date_str
+            else:
+                base_name = date_str
             
-            # If no valid title, just use date
-            return f"{date_str}_{LRE_SUFFIX}{self.file_path.suffix}"
+            # Add sequence number if provided
+            if self.sequence:
+                base_name = f"{base_name}_{self.sequence}"
+                
+            return f"{base_name}__LRE{self.file_path.suffix}"
             
         except Exception as e:
             self.logger.error(f"Error generating filename: {e}")
@@ -344,7 +385,7 @@ class JPEGExifProcessor(MediaProcessor):
     A class to process JPEG images and their EXIF data using exiftool.
     """
     
-    def __init__(self, input_path: str, output_path: str = None):
+    def __init__(self, input_path: str, output_path: str = None, sequence: str = None):
         """
         Initialize the JPEG processor with input and output paths.
         Validates file type and username requirements.
@@ -352,11 +393,9 @@ class JPEGExifProcessor(MediaProcessor):
         Args:
             input_path (str): Path to input JPEG file
             output_path (str): Optional path for output file. If None, will use input directory
-            
-        Raises:
-            SystemExit: If file is not JPEG
+            sequence (str): Optional sequence number for filename
         """
-        super().__init__(input_path)
+        super().__init__(input_path, sequence=sequence)
         self.input_path = Path(input_path)
         self.output_path = (Path(output_path) if output_path 
                           else self.input_path.parent)
@@ -484,9 +523,9 @@ class JPEGExifProcessor(MediaProcessor):
 class VideoProcessor(MediaProcessor):
     """A class to process video files and their metadata using exiftool."""
     
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, sequence: str = None):
         """Initialize with video file path."""
-        super().__init__(file_path)
+        super().__init__(file_path, sequence=sequence)
         
         # Validate file extension
         ext = Path(file_path).suffix.lower()
@@ -616,105 +655,33 @@ class VideoProcessor(MediaProcessor):
     def get_new_filename(self, title):
         """Generate new filename from title."""
         try:
-            # Read EXIF data first
-            self.read_exif()
+            # Get metadata components
+            date_str, title, location, city, country = self.get_metadata_components()
             
-            # Get date from metadata
-            date = None
-            for field in METADATA_FIELDS['date']:
-                clean_field = field.replace('-', '').split(':')[-1]
-                for key in self.exif_data:
-                    if key.endswith(clean_field):
-                        date = self.exif_data[key]
-                        if date:
-                            # Convert to YYYY-MM-DD format
-                            try:
-                                # Handle both date-only and datetime formats
-                                if ' ' in date:
-                                    date = date.split()[0]  # Get just the date part
-                                date = date.replace(':', '-')  # Convert : to - in date
-                                # Validate it's a proper date
-                                datetime.strptime(date, '%Y-%m-%d')
-                                break
-                            except ValueError:
-                                self.logger.warning(f"Invalid date format: {date}")
-                                date = None
-                                continue
-                if date:
-                    break
-                    
-            if not date:
-                self.logger.warning("Could not find date in metadata")
+            if not date_str:
+                self.logger.error("Could not get date for filename")
                 return None
                 
-            # Clean and validate title
+            # Clean title if present
             if title:
-                # Remove any invalid characters and limit length
                 title = self.clean_component(title)
                 if title:  # If title is still valid after cleaning
-                    return f"{date}_{title}__{LRE_SUFFIX}{self.file_path.suffix}"
+                    base_name = f"{date_str}_{title}"
+                else:
+                    base_name = date_str
+            else:
+                base_name = date_str
             
-            # If no valid title, just use date
-            return f"{date}__{LRE_SUFFIX}{self.file_path.suffix}"
+            # Add sequence number if provided
+            if self.sequence:
+                base_name = f"{base_name}_{self.sequence}"
                 
+            return f"{base_name}__LRE{self.file_path.suffix}"
+            
         except Exception as e:
-            self.logger.error(f"Error generating new filename: {e}")
+            self.logger.error(f"Error generating filename: {e}")
             return None
 
-    def get_date_from_exiftool(self, xmp_path):
-        """Get DateTimeOriginal from XMP using exiftool."""
-        try:
-            result = subprocess.run(
-                ['exiftool', '-json', '-DateTimeOriginal', xmp_path],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            metadata = json.loads(result.stdout)
-            if metadata and isinstance(metadata, list) and len(metadata) > 0:
-                date = metadata[0].get('DateTimeOriginal')
-                if date:
-                    self.logger.info(f"Found date: {date}")
-                    return date
-            return None
-            
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Error getting date from XMP: {e}")
-            return None
-            
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Error parsing exiftool output: {e}")
-            return None
-            
-    def with_exclusive_access(self, file_path, timeout=5):
-        """
-        Try to get exclusive access to a file using flock.
-        
-        Args:
-            file_path: Path to the file to lock
-            timeout: Maximum time to wait for lock in seconds
-            
-        Returns:
-            bool: True if lock was acquired, False if timeout
-        """
-        try:
-            start_time = time.time()
-            while True:
-                try:
-                    with open(file_path, 'rb') as f:
-                        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                        return True
-                except (IOError, OSError) as e:
-                    if time.time() - start_time > timeout:
-                        self.logger.warning(f"Timeout waiting for exclusive access to {file_path}")
-                        return False
-                    time.sleep(0.1)
-        except Exception as e:
-            self.logger.error(f"Error trying to get exclusive access to {file_path}: {e}")
-            return False
-            
     def process_video(self):
         """
         Process a video file.
@@ -1119,6 +1086,242 @@ class VideoProcessor(MediaProcessor):
             self.logger.error(f"Error reading XMP file: {e}")
             return None
 
+    def get_date_from_exiftool(self, xmp_path):
+        """Get DateTimeOriginal from XMP using exiftool."""
+        try:
+            result = subprocess.run(
+                ['exiftool', '-json', '-DateTimeOriginal', xmp_path],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            metadata = json.loads(result.stdout)
+            if metadata and isinstance(metadata, list) and len(metadata) > 0:
+                date = metadata[0].get('DateTimeOriginal')
+                if date:
+                    self.logger.info(f"Found date: {date}")
+                    return date
+            return None
+            
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error getting date from XMP: {e}")
+            return None
+            
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error parsing exiftool output: {e}")
+            return None
+            
+    def with_exclusive_access(self, file_path, timeout=5):
+        """
+        Try to get exclusive access to a file using flock.
+        
+        Args:
+            file_path: Path to the file to lock
+            timeout: Maximum time to wait for lock in seconds
+            
+        Returns:
+            bool: True if lock was acquired, False if timeout
+        """
+        try:
+            start_time = time.time()
+            while True:
+                try:
+                    with open(file_path, 'rb') as f:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                        return True
+                except (IOError, OSError) as e:
+                    if time.time() - start_time > timeout:
+                        self.logger.warning(f"Timeout waiting for exclusive access to {file_path}")
+                        return False
+                    time.sleep(0.1)
+        except Exception as e:
+            self.logger.error(f"Error trying to get exclusive access to {file_path}: {e}")
+            return False
+            
+    def process_video(self):
+        """
+        Process a video file.
+        
+        CRITICAL: The order of operations must be strictly maintained:
+        1. Check if file has __LRE suffix (skip if present)
+        2. Read metadata from XMP
+        3. Write metadata to video
+        4. Verify metadata
+        5. Delete XMP file
+        6. Rename video file with __LRE suffix
+        
+        IMPORTANT: The XMP file MUST be deleted BEFORE renaming the video file with __LRE suffix.
+        This order is critical because the XMP file path is based on the original video filename.
+        
+        Returns:
+            bool: True if processing was successful, False otherwise.
+        """
+        try:
+            # Skip if already processed
+            if self.file_path.stem.endswith(LRE_SUFFIX):
+                self.logger.info(f"Skipping already processed file: {self.file_path}")
+                return True
+
+            # Get metadata from XMP
+            xmp_metadata = self.get_metadata_from_xmp()
+            if xmp_metadata is None:
+                self.logger.warning("No XMP metadata found")
+                return False
+                
+            # Write metadata to video file
+            title, keywords, date_str, caption, location_data = xmp_metadata
+            
+            # Get location components
+            location, city, country = location_data if isinstance(location_data, tuple) else (None, None, None)
+            
+            # Log metadata values for debugging
+            self.logger.info("\n==================================================")
+            self.logger.info("Final metadata values:")
+            self.logger.info(f"Title: '{title}'")
+            self.logger.info(f"Keywords: {keywords}")
+            self.logger.info(f"Caption: '{caption}'")
+            self.logger.info(f"Location: '{location}'")
+            self.logger.info(f"City: '{city}'")
+            self.logger.info(f"Country: '{country}'")
+            
+            # Write metadata with overwrite_original flag
+            cmd = ['exiftool', '-overwrite_original', '-api', 'QuickTimeUTF8=1']
+            
+            if title:
+                cmd.extend([
+                    '-Title=' + title,
+                    '-QuickTime:Title=' + title,
+                    '-XMP:Title=' + title,
+                    '-ItemList:Title=' + title
+                ])
+            if keywords:
+                # Clean keywords and remove duplicates while preserving order
+                clean_keywords = []
+                seen = set()
+                for k in keywords:
+                    k = k.strip()
+                    if k and k not in seen:
+                        clean_keywords.append(k)
+                        seen.add(k)
+                
+                # Join keywords with comma for ItemList fields
+                keyword_str = ",".join(clean_keywords)
+                # Log what we're writing
+                self.logger.info(f"\nWriting keywords: {keyword_str}")
+                cmd.extend([
+                    '-QuickTime:Keywords=' + keyword_str,
+                    '-XMP:Subject=' + keyword_str
+                ])
+            else:
+                # Clear any existing keywords
+                cmd.extend([
+                    '-QuickTime:Keywords=',
+                    '-XMP:Subject='
+                ])
+            if date_str:
+                cmd.extend([
+                    '-CreateDate=' + date_str,
+                    '-ModifyDate=' + date_str,
+                    '-TrackCreateDate=' + date_str,
+                    '-TrackModifyDate=' + date_str,
+                    '-MediaCreateDate=' + date_str,
+                    '-MediaModifyDate=' + date_str,
+                    '-QuickTime:CreateDate=' + date_str,
+                    '-QuickTime:MediaCreateDate=' + date_str,
+                    '-XMP:CreateDate=' + date_str
+                ])
+            if caption:
+                cmd.extend([
+                    '-Description=' + caption,
+                    '-Caption-Abstract=' + caption,
+                    '-XMP:Description=' + caption,
+                    '-ItemList:Description=' + caption
+                ])
+            if location:
+                cmd.extend([
+                    '-Location=' + location,
+                    '-XMP:Location=' + location,
+                    '-LocationName=' + location
+                ])
+            if city:
+                cmd.extend([
+                    '-City=' + city,
+                    '-XMP:City=' + city
+                ])
+            if country:
+                cmd.extend([
+                    '-Country=' + country,
+                    '-XMP:Country=' + country
+                ])
+                
+            cmd.append(str(self.file_path))
+            
+            # Log the full command for debugging
+            self.logger.info(f"\nFull exiftool command: {' '.join(cmd)}")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                self.logger.info("Metadata written successfully")
+            else:
+                self.logger.error(f"Error writing metadata: {result.stderr}")
+                return False
+                
+            # Read metadata back with -m flag to ignore file handler issues
+            try:
+                cmd = ['exiftool', '-j', '-m', str(self.file_path)]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode == 0:
+                    data = json.loads(result.stdout)
+                    if data:
+                        self.exif_data = data[0]
+                else:
+                    self.logger.error(f"Error reading metadata: {result.stderr}")
+                    return False
+            except Exception as e:
+                self.logger.warning(f"Could not read EXIF data: {e}")
+                return False
+                
+            # Verify metadata was written correctly
+            try:
+                # Read back EXIF data
+                result = subprocess.run(['exiftool', '-json', str(self.file_path)], 
+                                     capture_output=True, text=True, check=True)
+                self.exif_data = json.loads(result.stdout)[0]
+                
+                # Log raw EXIF data for debugging
+                self.logger.info("\nRaw EXIF data for keyword fields:")
+                for key in self.exif_data:
+                    if any(field.lower() in key.lower() for field in ['Keywords', 'Subject']):
+                        self.logger.info(f"{key}: {self.exif_data[key]}")
+                
+                if not self.verify_metadata(title, keywords, date_str, caption, location):
+                    self.logger.error("Metadata verification failed")
+                    return False
+            except subprocess.CalledProcessError as e:
+                self.logger.error(f"Error reading metadata: {e.stderr}")
+                return False
+            except Exception as e:
+                self.logger.warning(f"Could not read EXIF data: {e}")
+                return False
+                
+            # Delete XMP file BEFORE renaming video
+            xmp_path = self.file_path.with_suffix('.xmp')
+            if xmp_path.exists():
+                xmp_path.unlink()
+                self.logger.info(f"Deleted XMP file: {xmp_path}")
+                
+            # Use the new rename_file method (which will use cached EXIF data)
+            new_path = self.rename_file()
+            self.logger.info(f"Renamed to: {new_path}")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error processing video: {str(e)}")
+            return False
+
     def get_metadata_components(self):
         """Get metadata components for video files."""
         # Read EXIF data first
@@ -1213,88 +1416,154 @@ class VideoProcessor(MediaProcessor):
             
             return date_str, title, location, city, country
 
-class BaseWatcher:
-    """Base class for watching directories for media files."""
+class Transfer:
+    """
+    Handles safe transfer of processed files to their destination directories.
+    Ensures files are not active/being written to before moving them.
+    """
     
-    def __init__(self, directories=None):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
+    def _can_access_file(self, file_path: Path, timeout: int = 5) -> bool:
         """
-        Initialize the watcher.
+        Try to get exclusive access to a file using flock.
         
         Args:
-            directories: List of directories to watch. If None, uses WATCH_DIRS
-        """
-        self.directories = [Path(d) for d in (directories or WATCH_DIRS)]
-        self.running = False
-        self.sleep_time = SLEEP_TIME
-        self.logger = logging.getLogger(__name__)
-    
-    def process_file(self, file_path):
-        """Process a single media file. Must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement process_file")
-    
-    def watch(self):
-        """Start watching directories for new files."""
-        self.running = True
-        try:
-            while self.running:
-                for directory in self.directories:
-                    self.logger.info(f"Checking {directory} for new files...")
-                    self.check_directory(directory)
-                time.sleep(self.sleep_time)
-                
-        except KeyboardInterrupt:
-            self.logger.info("Stopping watch")
-            self.running = False
-    
-    def check_directory(self, directory):
-        """Check a directory for new files. Must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement check_directory")
-    
-    def stop(self):
-        """Stop watching directories."""
-        self.running = False
-
-class VideoWatcher(BaseWatcher):
-    """A class to watch directories for video files."""
-    
-    def process_file(self, file_path):
-        """Process a single video file."""
-        try:
-            # Check for XMP file
-            xmp_path = os.path.splitext(file_path)[0] + ".xmp"
-            if not os.path.exists(xmp_path):
-                xmp_path = file_path + ".xmp"
-                if not os.path.exists(xmp_path):
-                    return  # Skip if no XMP file
+            file_path: Path to the file to check
+            timeout: Maximum time to wait for lock in seconds
             
-            # Process video
-            self.logger.info(f"Found new video: {os.path.basename(file_path)}")
-            processor = VideoProcessor(file_path)
-            processor.process_video()
+        Returns:
+            bool: True if exclusive access was obtained, False otherwise
+        """
+        try:
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                try:
+                    with open(file_path, 'rb') as f:
+                        # Try non-blocking exclusive lock
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        # If we get here, we got the lock
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                        return True
+                except (IOError, OSError):
+                    # File is locked or inaccessible
+                    time.sleep(0.1)
+            return False
+        except Exception as e:
+            self.logger.error(f"Error checking file access: {e}")
+            return False
+            
+    def _is_file_old_enough(self, file_path: Path) -> bool:
+        """
+        Check if file's last modification time is at least MIN_FILE_AGE seconds old.
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            bool: True if file is old enough, False otherwise
+        """
+        try:
+            mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+            age_threshold = datetime.now() - timedelta(seconds=MIN_FILE_AGE)
+            return mtime <= age_threshold
+        except Exception as e:
+            self.logger.error(f"Error checking file age: {e}")
+            return False
+            
+    def transfer_file(self, file_path: Path) -> bool:
+        """
+        Safely transfer a file to its destination directory if conditions are met:
+        1. File ends with _LRE
+        2. Source directory has a configured destination
+        3. File is at least MIN_FILE_AGE seconds old
+        4. File can be opened with exclusive access
+        
+        Args:
+            file_path: Path to the file to transfer
+            
+        Returns:
+            bool: True if transfer was successful, False otherwise
+        """
+        try:
+            if not file_path.exists():
+                self.logger.error(f"File does not exist: {file_path}")
+                return False
+                
+            # Check if this is a processed file
+            if not file_path.name.endswith('__LRE' + file_path.suffix):
+                self.logger.debug(f"Not a processed file: {file_path}")
+                return False
+                
+            # Check if we have a destination for this source directory
+            source_dir = file_path.parent
+            if source_dir not in TRANSFER_PATHS:
+                self.logger.error(f"No transfer path configured for: {source_dir}")
+                return False
+                
+            # Check if file is old enough
+            if not self._is_file_old_enough(file_path):
+                self.logger.debug(f"File too new to transfer: {file_path}")
+                return False
+                
+            # Check if we can get exclusive access
+            if not self._can_access_file(file_path):
+                self.logger.debug(f"Cannot get exclusive access to file: {file_path}")
+                return False
+                
+            # All checks passed, perform the transfer
+            dest_dir = TRANSFER_PATHS[source_dir]
+            dest_path = dest_dir / file_path.name
+            
+            # Create destination directory if it doesn't exist
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Move the file
+            file_path.rename(dest_path)
+            self.logger.info(f"Transferred {file_path.name} to {dest_dir}")
+            return True
             
         except Exception as e:
-            self.logger.error(f"Error processing {file_path}: {e}")
+            self.logger.error(f"Error transferring file {file_path}: {e}")
+            return False
+
+class TransferWatcher(BaseWatcher):
+    """Watches for _LRE files and transfers them to their destination directories."""
     
-    def check_directory(self, directory):
-        """Check a directory for new video files."""
-        directory = Path(directory)
+    def __init__(self, directories=None):
+        super().__init__(directories)
+        self.transfer = Transfer()
+        
+    def process_file(self, file_path: Path) -> bool:
+        """
+        Process a single file by attempting to transfer it.
+        
+        Args:
+            file_path: Path to the file to process
+            
+        Returns:
+            bool: True if transfer was successful or not needed, False if error
+        """
+        return self.transfer.transfer_file(file_path)
+        
+    def check_directory(self, directory: Path):
+        """
+        Check a directory for _LRE files ready to be transferred.
+        
+        Args:
+            directory: Directory to check
+        """
         if not directory.exists():
+            self.logger.warning(f"Directory does not exist: {directory}")
             return
             
-        self.logger.info(f"\nChecking {directory} for new video files...")
-        video_files = []
-        # Handle both upper and lower case extensions
-        for pattern in VIDEO_PATTERN:
-            video_files.extend(directory.glob(pattern.lower()))
-            video_files.extend(directory.glob(pattern.upper()))
-        
-        if video_files:
-            self.logger.info(f"Found files: {[str(f) for f in video_files]}")
-            
-        for file_path in video_files:
-            self.logger.info(f"Found new video: {file_path.name}")
-            processor = VideoProcessor(str(file_path))
-            processor.process_video()
+        try:
+            for file_path in directory.glob('*__LRE.*'):
+                self.process_file(file_path)
+                
+        except Exception as e:
+            self.logger.error(f"Error checking directory {directory}: {e}")
 
 class DirectoryWatcher(BaseWatcher):
     """
@@ -1357,7 +1626,8 @@ class DirectoryWatcher(BaseWatcher):
             return
             
         # Process the file
-        processor = JPEGExifProcessor(str(file))
+        sequence = self._get_next_sequence()
+        processor = JPEGExifProcessor(str(file), sequence=sequence)
         try:
             new_path = processor.process_image()
             self.logger.info(f"Image processed successfully: {new_path}")
@@ -1374,6 +1644,50 @@ class DirectoryWatcher(BaseWatcher):
         for file in directory.glob("*.jpg"):
             self.process_file(file)
 
+class VideoWatcher(BaseWatcher):
+    """A class to watch directories for video files."""
+    
+    def process_file(self, file_path):
+        """Process a single video file."""
+        try:
+            # Check for XMP file
+            xmp_path = os.path.splitext(file_path)[0] + ".xmp"
+            if not os.path.exists(xmp_path):
+                xmp_path = file_path + ".xmp"
+                if not os.path.exists(xmp_path):
+                    return  # Skip if no XMP file
+            
+            # Process video
+            self.logger.info(f"Found new video: {os.path.basename(file_path)}")
+            sequence = self._get_next_sequence()
+            processor = VideoProcessor(file_path, sequence=sequence)
+            processor.process_video()
+            
+        except Exception as e:
+            self.logger.error(f"Error processing {file_path}: {e}")
+    
+    def check_directory(self, directory):
+        """Check a directory for new video files."""
+        directory = Path(directory)
+        if not directory.exists():
+            return
+            
+        self.logger.info(f"\nChecking {directory} for new video files...")
+        video_files = []
+        # Handle both upper and lower case extensions
+        for pattern in VIDEO_PATTERN:
+            video_files.extend(directory.glob(pattern.lower()))
+            video_files.extend(directory.glob(pattern.upper()))
+        
+        if video_files:
+            self.logger.info(f"Found files: {[str(f) for f in video_files]}")
+            
+        for file_path in video_files:
+            self.logger.info(f"Found new video: {file_path.name}")
+            sequence = self._get_next_sequence()
+            processor = VideoProcessor(str(file_path), sequence=sequence)
+            processor.process_video()
+
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(level=getattr(logging, LOG_LEVEL))
@@ -1384,6 +1698,7 @@ if __name__ == "__main__":
         both_incoming_dir=BOTH_INCOMING
     )
     video_watcher = VideoWatcher(directories=WATCH_DIRS)
+    transfer_watcher = TransferWatcher(directories=WATCH_DIRS)
     
     try:
         # Start both watchers
@@ -1397,6 +1712,8 @@ if __name__ == "__main__":
                 jpeg_watcher.check_directory(directory)
                 # Check for videos
                 video_watcher.check_directory(directory)
+                # Check for transfers
+                transfer_watcher.check_directory(directory)
             
             time.sleep(SLEEP_TIME)
             
@@ -1404,3 +1721,4 @@ if __name__ == "__main__":
         logging.info("Stopping watchers")
         jpeg_watcher.stop()
         video_watcher.stop()
+        transfer_watcher.stop()
