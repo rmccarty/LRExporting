@@ -52,36 +52,42 @@ class JPEGExifProcessor(MediaProcessor):
             
     def compress_image(self) -> bool:
         """
-        Compress the JPEG image while preserving metadata.
+        Compress JPEG image while preserving metadata.
+        
         Uses Pillow for compression and exiftool to preserve metadata.
         
         Returns:
-            bool: True if compression successful, False otherwise
+            bool: True if successful, False otherwise
         """
-        if not JPEG_COMPRESS:
-            return True
-            
         try:
-            # Open image with Pillow
+            # Create temporary file for compressed image
+            temp_path = self.file_path.with_stem(self.file_path.stem + '_temp')
+            
+            # Open and compress image
             with Image.open(self.file_path) as img:
-                # Create temporary filename
-                temp_path = self.file_path.parent / f"temp_{self.file_path.name}"
-                
-                # Save with compression
+                # Convert to RGB if needed (some JPEGs can be RGBA)
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                    
+                # Save compressed image to temporary file
                 img.save(temp_path, 'JPEG', quality=JPEG_QUALITY, optimize=True)
                 
-                # Copy metadata from original to compressed file
-                cmd = ['exiftool', '-overwrite_original', '-TagsFromFile', str(self.file_path), str(temp_path)]
-                subprocess.run(cmd, check=True, capture_output=True)
+            # Copy metadata from original to compressed file
+            if not self.exiftool.copy_metadata(self.file_path, temp_path):
+                self.logger.error("Failed to copy metadata to compressed file")
+                if temp_path.exists():
+                    temp_path.unlink()
+                return False
                 
-                # Replace original with compressed version
-                temp_path.replace(self.file_path)
-                
-                self.logger.info(f"Compressed image saved to: {self.file_path}")
-                return True
-                
+            # Replace original with compressed file
+            temp_path.replace(self.file_path)
+            self.logger.info(f"Compressed image saved to: {self.file_path}")
+            return True
+            
         except Exception as e:
             self.logger.error(f"Error compressing image: {e}")
+            if temp_path.exists():
+                temp_path.unlink()
             return False
             
     def get_metadata_components(self):

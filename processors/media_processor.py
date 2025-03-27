@@ -11,6 +11,7 @@ from datetime import datetime
 import re
 
 from config import LRE_SUFFIX
+from utils.exiftool import ExifTool
 
 class MediaProcessor(ABC):
     """Base class for processing media files (JPEG, Video) with exiftool."""
@@ -27,11 +28,7 @@ class MediaProcessor(ABC):
         self.logger = logging.getLogger(__name__)
         self.exif_data = {}  # Initialize exif_data
         self.sequence = sequence  # Store sequence for filename generation
-        
-        # Verify exiftool is available
-        if not shutil.which('exiftool'):
-            self.logger.error("exiftool is not installed or not in PATH")
-            sys.exit(1)
+        self.exiftool = ExifTool()
             
     def read_exif(self):
         """
@@ -40,28 +37,9 @@ class MediaProcessor(ABC):
         Returns:
             dict: Dictionary containing the EXIF data
         """
-        try:
-            self.logger.debug(f"Reading metadata from file: {self.file_path}")
-            cmd = ['exiftool', '-j', '-m', '-G', str(self.file_path)]  # Keep -G flag for videos
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                self.logger.error(f"Error reading EXIF data: {result.stderr}")
-                return {}
-                
-            data = json.loads(result.stdout)
-            if not data:
-                return {}
-                
-            self.exif_data = data[0]  # Store as instance variable
-            return self.exif_data
-            
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Error reading EXIF data: {e}")
-            return {}
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Error parsing EXIF data: {e}")
-            return {}
+        self.logger.debug(f"Reading metadata from file: {self.file_path}")
+        self.exif_data = self.exiftool.read_all_metadata(self.file_path)
+        return self.exif_data
         
     def get_exif_title(self) -> str:
         """
@@ -183,17 +161,17 @@ class MediaProcessor(ABC):
             keywords.append('Lightroom_Export')
             keywords.append(export_date_keyword)
             
-            # Create exiftool command to update keywords - use a single -keywords argument
-            cmd = ['exiftool', '-overwrite_original', f'-keywords={",".join(keywords)}', str(self.file_path)]
-            
-            subprocess.run(cmd, check=True, capture_output=True)
+            # Update keywords using exiftool wrapper
+            if not self.exiftool.update_keywords(self.file_path, keywords):
+                raise RuntimeError("Failed to update keywords")
+                
             self.logger.info(f"Updated keywords with rating: {rating_keyword}")
             if 'Export_Claudia' in keywords:
                 self.logger.info("Added Export_Claudia keyword")
             self.logger.info(f"Added export keywords: Lightroom_Export, {export_date_keyword}")
             
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Error updating keywords: {e.stderr}")
+        except Exception as e:
+            self.logger.error(f"Error updating keywords: {e}")
             raise
             
     def clean_component(self, text):

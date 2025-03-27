@@ -19,6 +19,7 @@ from config import (
     LRE_SUFFIX
 )
 from processors.media_processor import MediaProcessor
+from utils.exiftool import ExifTool  # Import the new ExifTool class
 
 class VideoProcessor(MediaProcessor):
     """A class to process video files and their metadata using exiftool."""
@@ -33,6 +34,9 @@ class VideoProcessor(MediaProcessor):
         if ext not in valid_extensions:
             self.logger.error(f"File must be video format matching {VIDEO_PATTERN}. Found: {ext}")
             sys.exit(1)
+            
+        # Initialize the ExifTool class
+        self.exiftool = ExifTool()
             
     def read_metadata_from_xmp(self) -> tuple:
         """
@@ -63,27 +67,7 @@ class VideoProcessor(MediaProcessor):
             location, city, country = self.get_location_from_rdf(root)
             
             # Get date from exiftool for consistency
-            try:
-                exiftool_args = [
-                    'exiftool',
-                    '-s',
-                    '-d', '%Y:%m:%d %H:%M:%S',  # Specify consistent date format
-                    '-DateTimeOriginal',
-                    str(xmp_path)
-                ]
-                result = subprocess.run(exiftool_args, capture_output=True, text=True, check=True)
-                if result.stdout:
-                    date_line = result.stdout.strip()
-                    if ': ' in date_line:
-                        date_str = date_line.split(': ')[1].strip()
-                        self.logger.debug(f"Found DateTimeOriginal from exiftool: {date_str}")
-                    else:
-                        date_str = None
-                else:
-                    date_str = None
-            except Exception as e:
-                self.logger.error(f"Error getting date from exiftool: {e}")
-                date_str = None
+            date_str = self.exiftool.read_date_from_xmp(xmp_path)
                 
             return title, keywords, date_str, caption, (location, city, country)
             
@@ -124,40 +108,28 @@ class VideoProcessor(MediaProcessor):
             bool: True if successful, False otherwise
         """
         try:
-            # Build exiftool command with metadata fields
-            cmd = ['exiftool', '-overwrite_original']
-            
-            # Add each metadata field
+            # Prepare metadata fields
             title, keywords, date_str, caption, location_data = metadata
-            if title:
-                cmd.append(f'-Title={title}')
-            if keywords:
-                cmd.append(f'-Subject={",".join(keywords)}')
-            if date_str:
-                cmd.append(f'-DateTimeOriginal={date_str}')
-            if caption:
-                cmd.append(f'-Description={caption}')
+            fields = {
+                'Title': title,
+                'Subject': keywords,
+                'DateTimeOriginal': date_str,
+                'Description': caption,
+            }
+            
             if location_data:
                 location, city, country = location_data
-                if location:
-                    cmd.append(f'-Location={location}')
-                if city:
-                    cmd.append(f'-City={city}')
-                if country:
-                    cmd.append(f'-Country={country}')
-                    
-            cmd.append(str(self.file_path))
-            
-            # Run exiftool command
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                self.logger.error(f"Error writing metadata: {result.stderr}")
-                return False
+                fields.update({
+                    'Location': location,
+                    'City': city,
+                    'Country': country
+                })
                 
-            return True
+            # Write metadata using exiftool wrapper
+            return self.exiftool.write_metadata(self.file_path, fields)
             
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Error running exiftool: {e}")
+        except Exception as e:
+            self.logger.error(f"Error writing metadata: {e}")
             return False
             
     def verify_metadata(self, expected_metadata: tuple) -> bool:
