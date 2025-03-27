@@ -13,20 +13,28 @@ class VideoWatcher(BaseWatcher):
     A class to watch directories for video files.
     """
     
+    def _has_xmp_file(self, file_path: Path) -> bool:
+        """Check if a video file has an associated XMP file."""
+        # Check for .xmp extension
+        xmp_path = file_path.with_suffix('.xmp')
+        if xmp_path.exists():
+            return True
+            
+        # Check for .MOV.xmp or .mp4.xmp pattern
+        xmp_path = Path(str(file_path) + '.xmp')
+        return xmp_path.exists()
+    
     def process_file(self, file_path):
         """Process a single video file."""
         try:
-            # Check for XMP file
-            xmp_path = os.path.splitext(file_path)[0] + ".xmp"
-            if not os.path.exists(xmp_path):
-                xmp_path = file_path + ".xmp"
-                if not os.path.exists(xmp_path):
-                    return  # Skip if no XMP file
+            file_path = Path(file_path)
+            if not self._has_xmp_file(file_path):
+                return  # Skip if no XMP file
             
             # Process video
-            self.logger.info(f"Found new video: {os.path.basename(file_path)}")
+            self.logger.info(f"Found new video: {file_path.name}")
             sequence = self._get_next_sequence()
-            processor = VideoProcessor(file_path, sequence=sequence)
+            processor = VideoProcessor(str(file_path), sequence=sequence)
             processor.process_video()
             
         except Exception as e:
@@ -49,6 +57,10 @@ class VideoWatcher(BaseWatcher):
             self.logger.info(f"Found files: {[str(f) for f in video_files]}")
             
         for file_path in video_files:
+            # Skip if no XMP file
+            if not self._has_xmp_file(file_path):
+                continue
+                
             self.logger.info(f"Found new video: {file_path.name}")
             sequence = self._get_next_sequence()
             processor = VideoProcessor(str(file_path), sequence=sequence)

@@ -11,7 +11,7 @@ BOTH_INCOMING = Path("/Users/rmccarty/Transfers/Both/Both_Incoming")
 WATCH_DIRS = [RON_INCOMING, CLAUDIA_INCOMING]
 
 # Logging configuration
-LOG_LEVEL = "INFO"
+LOG_LEVEL = "DEBUG"  # Temporarily set to DEBUG for more info
 
 # Sleep time when no files are found (in seconds)
 SLEEP_TIME = 10
@@ -31,7 +31,8 @@ XML_NAMESPACES = {
     'Iptc4xmpCore': 'http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/',
     'photoshop': 'http://ns.adobe.com/photoshop/1.0/',
     'exif': 'http://ns.adobe.com/exif/1.0/',
-    'lr': 'http://ns.adobe.com/lightroom/1.0/'
+    'lr': 'http://ns.adobe.com/lightroom/1.0/',
+    'xml': 'http://www.w3.org/XML/1998/namespace'  # Add XML namespace for xml:lang
 }
 
 # Metadata field mappings

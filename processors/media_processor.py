@@ -234,10 +234,13 @@ class MediaProcessor(ABC):
         if title:
             parts.append(title)
             
-        # Add location components if available
-        for component in [location, city, country]:
-            if component and component not in parts:  # Avoid duplicates
-                parts.append(component)
+        # Only add location components that aren't already part of the title
+        if location and location.lower() not in title.lower():
+            parts.append(location)
+        if city and city.lower() not in title.lower() and city.lower() not in (location or '').lower():
+            parts.append(city)
+        if country and country.lower() not in title.lower() and country.lower() not in (location or '').lower():
+            parts.append(country)
                 
         # Add sequence if provided
         if self.sequence:

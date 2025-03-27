@@ -234,13 +234,39 @@ class VideoProcessor(MediaProcessor):
         """Extract title from RDF data."""
         try:
             ns = XML_NAMESPACES
-            title_path = f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
-            title_elem = rdf.find(title_path)
-            if title_elem is not None:
-                self.logger.debug(f"Found title: {title_elem.text}")
+            self.logger.debug("Searching for title in RDF...")
+            
+            # First try the simple dc:title/rdf:Alt/rdf:li path
+            title_elem = rdf.find(f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li')
+            if title_elem is not None and title_elem.text:
+                self.logger.debug(f"Found title in dc:title: {title_elem.text}")
                 return title_elem.text
+                
+            # If that fails, try finding any rdf:li element under dc:title
+            for elem in rdf.findall(f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}li'):
+                if elem.text:
+                    self.logger.debug(f"Found title in dc:title/li: {elem.text}")
+                    return elem.text
+                    
+            # Try as attribute in Description
+            for desc in rdf.iter('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'):
+                # Try Iptc4xmpCore:Location
+                location = desc.get('{http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/}Location')
+                if location:
+                    self.logger.debug(f"Using Location as title: {location}")
+                    return location
+                    
+            self.logger.debug("No title found in any expected location")
+            
         except Exception as e:
             self.logger.error(f"Error getting title from RDF: {e}")
+            self.logger.debug("Full error:", exc_info=True)
+            try:
+                import xml.etree.ElementTree as ET
+                self.logger.debug("XML content:")
+                self.logger.debug(ET.tostring(rdf, encoding='unicode'))
+            except Exception as e2:
+                self.logger.debug(f"Could not print XML: {e2}")
         return None
     
     def get_caption_from_rdf(self, rdf):
@@ -366,94 +392,38 @@ class VideoProcessor(MediaProcessor):
         Returns:
             tuple: (date_str, title, location, city, country)
         """
-        # Try to get metadata from XMP first
-        metadata = self.get_metadata_from_xmp()
-        if metadata:
-            title, keywords, date_str, caption, location_data = metadata
-            
-            # Get location components from location_data tuple
-            location, city, country = location_data if isinstance(location_data, tuple) else (None, None, None)
-            
-            # Format date
-            if date_str:
-                try:
-                    # Handle both date-only and datetime formats
-                    if ' ' in date_str:
-                        date_str = date_str.split()[0]  # Get just the date part
-                    date_str = date_str.replace(':', '-')  # Convert : to - in date
-                    # Validate it's a proper date
-                    datetime.strptime(date_str, '%Y-%m-%d')
-                except ValueError:
-                    self.logger.warning(f"Invalid date format: {date_str}")
-                    date_str = datetime.now().strftime('%Y-%m-%d')
-            else:
+        # Get date from stored metadata
+        date_str = self.exif_data.get('CreateDate')
+        if date_str:
+            try:
+                # Handle both date-only and datetime formats
+                if ' ' in date_str:
+                    date_str = date_str.split()[0]  # Get just the date part
+                date_str = date_str.replace(':', '-')  # Convert : to - in date
+                # Validate it's a proper date
+                datetime.strptime(date_str, '%Y-%m-%d')
+            except (ValueError, TypeError):
+                self.logger.warning(f"Invalid date format: {date_str}")
                 date_str = datetime.now().strftime('%Y-%m-%d')
-                
-            return date_str, title, location, city, country
-            
         else:
-            # Fallback to video file metadata
-            date_str = None
-            for field in METADATA_FIELDS['date']:
-                clean_field = field.replace('-', '').split(':')[-1]
-                for key in self.exif_data:
-                    if key.endswith(clean_field):
-                        date_str = self.exif_data[key]
-                        if date_str:
-                            try:
-                                # Handle both date-only and datetime formats
-                                if ' ' in date_str:
-                                    date_str = date_str.split()[0]  # Get just the date part
-                                date_str = date_str.replace(':', '-')  # Convert : to - in date
-                                # Validate it's a proper date
-                                datetime.strptime(date_str, '%Y-%m-%d')
-                                break
-                            except ValueError:
-                                self.logger.warning(f"Invalid date format: {date_str}")
-                                date_str = None
-                                continue
-                if date_str:
-                    break
+            date_str = datetime.now().strftime('%Y-%m-%d')
             
-            if not date_str:
-                date_str = datetime.now().strftime('%Y-%m-%d')
+        # Get title from stored metadata
+        title = self.exif_data.get('Title')
+        if title:
+            self.logger.debug(f"Using title from stored metadata: {title}")
             
-            # Get title from metadata
-            title = None
-            for field in METADATA_FIELDS['title']:
-                clean_field = field.replace('-', '').split(':')[-1]
-                for key in self.exif_data:
-                    if key.endswith(clean_field):
-                        title = self.exif_data[key]
-                        if title:
-                            break
-                if title:
-                    break
-            
-            # Get location data
-            location = None
+        # Get location data from stored metadata
+        location_data = self.exif_data.get('Location', (None, None, None))
+        if isinstance(location_data, tuple):
+            location, city, country = location_data
+        else:
+            location = location_data
             city = None
             country = None
-            for field_type in ['location', 'city', 'country']:
-                for field in METADATA_FIELDS[field_type]:
-                    clean_field = field.replace('-', '').split(':')[-1]
-                    for key in self.exif_data:
-                        if key.endswith(clean_field):
-                            value = self.exif_data[key]
-                            if value:
-                                if field_type == 'location':
-                                    location = value
-                                elif field_type == 'city':
-                                    city = value
-                                elif field_type == 'country':
-                                    country = value
-                                break
-                    if (field_type == 'location' and location) or \
-                       (field_type == 'city' and city) or \
-                       (field_type == 'country' and country):
-                        break
             
-            return date_str, title, location, city, country
+        self.logger.debug(f"Metadata components: date={date_str}, title={title}, location={location}, city={city}, country={country}")
+        return date_str, title, location, city, country
             
     def process_video(self) -> Path:
         """
@@ -462,37 +432,36 @@ class VideoProcessor(MediaProcessor):
         Returns:
             Path: Path to the processed file
         """
-        # Skip if already processed
+        # 1. Skip if already processed
         if self.file_path.stem.endswith(LRE_SUFFIX):
             self.logger.info(f"Skipping already processed file: {self.file_path}")
             return self.file_path
             
-        # Read metadata from XMP
+        # 2. Read metadata from XMP and store it
         metadata = self.get_metadata_from_xmp()
-        if not any(metadata):  # If ALL metadata is None
-            self.logger.warning("No metadata found in XMP file")
-            self.logger.info("No metadata found, using default filename")
-            # Just add __LRE to original filename
-            new_path = self.file_path.with_stem(f"{self.file_path.stem}{LRE_SUFFIX}")
-            try:
-                self.file_path.rename(new_path)
-                self.logger.info(f"Renamed file to: {new_path}")
-                return new_path
-            except OSError as e:
-                self.logger.error(f"Error renaming file: {e}")
+        title, keywords, date_str, caption, location_data = metadata
+            
+        # 3. Write metadata to video if any exists
+        if any(metadata):
+            if not self.write_metadata_to_video(metadata):
+                self.logger.error("Failed to write metadata to video")
                 return self.file_path
-            
-        # Write metadata to video
-        if not self.write_metadata_to_video(metadata):
-            self.logger.error("Failed to write metadata to video")
-            return self.file_path
-            
-        # Verify metadata was written correctly
-        if not self.verify_metadata(metadata):
-            self.logger.error("Metadata verification failed")
-            return self.file_path
-            
-        # Delete XMP file after successful metadata transfer
+                
+            # 4. Verify metadata was written correctly
+            if not self.verify_metadata(metadata):
+                self.logger.error("Metadata verification failed")
+                return self.file_path
+                
+            # Store metadata for filename generation
+            self.exif_data = {
+                'Title': title,
+                'Keywords': keywords,
+                'CreateDate': date_str,
+                'Caption-Abstract': caption,
+                'Location': location_data
+            }
+                
+        # 5. Delete XMP file
         xmp_path = self.file_path.with_suffix('.xmp')
         try:
             if xmp_path.exists():
@@ -500,7 +469,7 @@ class VideoProcessor(MediaProcessor):
                 self.logger.info(f"Deleted XMP file: {xmp_path}")
         except OSError as e:
             self.logger.error(f"Error deleting XMP file: {e}")
-            return self.file_path
             
-        # Rename the file with metadata-based name
-        return self.rename_file()
+        # 6. Rename the file using stored metadata
+        new_path = self.rename_file()
+        return new_path
