@@ -192,12 +192,23 @@ class VideoProcessor(MediaProcessor):
                 if not expected:
                     continue
                     
-                # Look for field in current metadata
+                # Look for field in current metadata, checking both with and without namespace
                 found = False
                 for key, value in current_metadata.items():
-                    if key.endswith(':' + field) and value == expected:
-                        found = True
-                        break
+                    # Check if key ends with the field name (handles namespaces like QuickTime:Title or XMP:Subject)
+                    if key.endswith(':' + field) or key == field:
+                        # For keywords/subject, handle both list and string formats
+                        if field == 'Subject' and isinstance(expected, list):
+                            if isinstance(value, list) and set(value) == set(expected):
+                                found = True
+                                break
+                            elif value == ','.join(expected):
+                                found = True
+                                break
+                        # For other fields, direct comparison
+                        elif value == expected:
+                            found = True
+                            break
                         
                 if not found:
                     self.logger.error(f"Metadata verification failed for {field}")
@@ -488,6 +499,7 @@ class VideoProcessor(MediaProcessor):
         metadata = self.get_metadata_from_xmp()
         if not any(metadata):  # If ALL metadata is None
             self.logger.warning("No metadata found in XMP file")
+            self.logger.info("No metadata found, using default filename")
             # Just add __LRE to original filename
             new_path = self.file_path.with_stem(f"{self.file_path.stem}{LRE_SUFFIX}")
             try:

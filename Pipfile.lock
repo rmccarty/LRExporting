@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "2efeafe70a57ff01f425d635917d6f8c3564c974bc1fbccb2225a95d0114a945"
+            "sha256": "d5fa608d7f1557b0c9db94b3972aa94afa49cdd644d143e2bbc31fd2b019fb33"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -580,6 +580,15 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==3.2.3"
+        },
+        "photokit": {
+            "hashes": [
+                "sha256:bd0f054f7e5c9dc7351aa146cdcf557ca1c0b5bbceea90e9588c9fa15989444b",
+                "sha256:c8779e2cb5ceca0ac4794f9418b22682c6818483c1e329461ebbbe78643a2a6e"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.9'",
+            "version": "==0.2.1"
         },
         "photoscript": {
             "hashes": [
