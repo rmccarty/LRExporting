@@ -34,7 +34,7 @@ class DateNormalizer:
         
     def _is_valid_date_string(self, date_str: str | None) -> bool:
         """Check if date string is valid."""
-        return bool(date_str is not None and isinstance(date_str, str))
+        return bool(date_str and isinstance(date_str, str) and len(date_str) > 0)
         
     def _is_valid_time_format(self, time_str: str) -> bool:
         """Check if time string is in valid format."""
