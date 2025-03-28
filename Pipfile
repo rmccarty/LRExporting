@@ -8,8 +8,10 @@ osxphotos = "*"
 mutagen = "*"
 python-xmp-toolkit = "*"
 pillow = "*"
+coverage = "*"
 
 [dev-packages]
+radon = "*"
 
 [requires]
 python_version = "3.12"

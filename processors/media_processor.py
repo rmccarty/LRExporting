@@ -16,19 +16,20 @@ from utils.exiftool import ExifTool
 class MediaProcessor(ABC):
     """Base class for processing media files (JPEG, Video) with exiftool."""
     
-    def __init__(self, file_path: str, sequence: str = None):
+    def __init__(self, file_path: str, exiftool: ExifTool = None, sequence: str = None):
         """
         Initialize the media processor.
         
         Args:
             file_path (str): Path to input media file
-            sequence (str): Optional sequence number for filename
+            exiftool (ExifTool, optional): ExifTool instance to use
+            sequence (str, optional): Optional sequence number for filename
         """
         self.file_path = Path(file_path)
         self.logger = logging.getLogger(__name__)
         self.exif_data = {}  # Initialize exif_data
         self.sequence = sequence  # Store sequence for filename generation
-        self.exiftool = ExifTool()
+        self.exiftool = exiftool or ExifTool()
             
     def read_exif(self):
         """
@@ -41,6 +42,14 @@ class MediaProcessor(ABC):
         self.exif_data = self.exiftool.read_all_metadata(self.file_path)
         return self.exif_data
         
+    def _get_exif_field_with_group(self, field: str) -> str:
+        """Get EXIF field value checking different group prefixes."""
+        for group in ['XMP:', 'IPTC:', '']:
+            value = self.exif_data.get(f'{group}{field}', '')
+            if value:
+                return value
+        return ''
+
     def get_exif_title(self) -> str:
         """
         Extract title from EXIF data or generate if not found.
@@ -48,58 +57,31 @@ class MediaProcessor(ABC):
         Returns:
             str: EXIF title if found, generated title if not
         """
-        # Try different title fields with group prefixes
-        title = ''
-        for key in self.exif_data:
-            if key.endswith(':Title'):
-                title = self.exif_data[key]
-                if title:
-                    break
-        
+        title = self._get_exif_field_with_group('Title')
         if not title:
             title = self.generate_title()
         return title
         
-    def get_location_data(self) -> tuple:
-        """
-        Extract location information from EXIF data.
-        
-        Returns:
-            tuple: (location, city, country)
-        """
-        location = ''
-        city = ''
-        country = ''
-        
-        # Try different location fields with group prefixes
-        for key in self.exif_data:
-            if key.endswith(':Location') and not location:
-                location = self.exif_data[key]
-            elif key.endswith(':City') and not city:
-                city = self.exif_data[key]
-            elif key.endswith(':Country') and not country:
-                country = self.exif_data[key]
-        
+    def get_location_data(self):
+        """Get location data from EXIF metadata."""
+        location = self._get_exif_field_with_group('Location')
+        city = self._get_exif_field_with_group('City')
+        country = self._get_exif_field_with_group('Country')
         return location, city, country
         
+    def _join_location_parts(self, parts: list) -> str:
+        """Join non-empty location parts with spaces."""
+        return ' '.join(part for part in parts if part)
+
     def generate_title(self) -> str:
         """
-        Generate title using location information if available.
+        Generate a title from location information if no title exists.
         
         Returns:
-            str: Generated title from location data, or empty string if none available
+            str: Generated title from location or empty string
         """
         location, city, country = self.get_location_data()
-        
-        components = []
-        if location:
-            components.append(location)
-        if city:
-            components.append(city)
-        if country:
-            components.append(country)
-            
-        return ' '.join(components) if components else ''
+        return self._join_location_parts([location, city, country])
         
     def get_image_rating(self) -> int:
         """
@@ -129,128 +111,132 @@ class MediaProcessor(ABC):
         stars = rating - 1
         return f"{stars}-star"
         
-    def update_keywords_with_rating_and_export_tags(self) -> None:
-        """
-        Update image keywords to include rating information using exiftool.
-        Also adds Export_Claudia keyword for claudia_ files and Lightroom export keywords.
-        """
-        try:
-            # Get current rating and translate to keyword
-            rating = self.get_image_rating()
-            rating_keyword = self.translate_rating_to_keyword(rating)
-            
-            # Get today's date for export keyword
-            today = datetime.now().strftime('%Y_%m_%d')
-            export_date_keyword = f"Lightroom_Export_on_{today}"
-            
-            # Get existing keywords
-            current_keywords = self.exif_data.get('Keywords', [])
-            if isinstance(current_keywords, str):
-                current_keywords = [current_keywords]
-                
-            # Remove existing star ratings and add new one
-            keywords = [k for k in current_keywords if not k.endswith('-star')]
-            keywords.append(rating_keyword)
-            
-            # Add Export_Claudia keyword for claudia_ files if not present
-            if (self.file_path.stem.lower().startswith('claudia_') and 
-                'Export_Claudia' not in keywords):
-                keywords.append('Export_Claudia')
-            
-            # Add Lightroom export keywords
-            keywords.append('Lightroom_Export')
-            keywords.append(export_date_keyword)
-            
-            # Update keywords using exiftool wrapper
-            if not self.exiftool.update_keywords(self.file_path, keywords):
-                raise RuntimeError("Failed to update keywords")
-                
-            self.logger.info(f"Updated keywords with rating: {rating_keyword}")
-            if 'Export_Claudia' in keywords:
-                self.logger.info("Added Export_Claudia keyword")
-            self.logger.info(f"Added export keywords: Lightroom_Export, {export_date_keyword}")
-            
-        except Exception as e:
-            self.logger.error(f"Error updating keywords: {e}")
-            raise
-            
-    def clean_component(self, text):
-        """Clean component for filename use"""
-        if not text:
-            return ""
-        # Skip if text looks like JSON
-        if text.startswith('{') or text.startswith('['):
-            return ""
-            
-        # Replace problematic characters with underscores
-        text = re.sub(r'[\\/:*?"<>|]', '_', text)
-        
-        # Replace spaces with underscores
-        text = text.replace(' ', '_')
-        
-        # Remove or replace any other problematic characters
-        text = ''.join(c for c in text if c.isalnum() or c in '_-()[]')
-        
-        # Replace multiple underscores with single underscore
-        while '__' in text:
-            text = text.replace('__', '_')
-            
-        # Remove leading/trailing underscores
-        text = text.strip('_')
-        
-        # Limit component length
-        return text[:50]  # Limit each component to 50 chars
+    def _is_json_like(self, text: str) -> bool:
+        """Check if text looks like JSON."""
+        return text.startswith('{') or text.startswith('[')
 
-    @abstractmethod
-    def get_metadata_components(self):
-        """
-        Get metadata components for filename. Each subclass should implement this.
-        Returns:
-            tuple: (date_str, title, location, city, country)
-        """
-        pass
+    def _truncate_if_needed(self, text: str, max_length: int = 100) -> str:
+        """Truncate text if it exceeds max_length."""
+        return text[:max_length] if len(text) > max_length else text
+
+    def clean_component(self, component: str) -> str:
+        """Clean a filename component."""
+        if not component or self._is_json_like(component):
+            return ''
+            
+        # Replace invalid characters with underscores
+        cleaned = re.sub(r'[^\w\s-]', '_', component)
+        # Replace whitespace with underscores
+        cleaned = re.sub(r'\s+', '_', cleaned)
+        # Remove consecutive underscores
+        cleaned = re.sub(r'_+', '_', cleaned)
+        # Strip leading/trailing underscores
+        cleaned = cleaned.strip('_')
+        
+        return self._truncate_if_needed(cleaned)
+
+    def _is_text_in_reference(self, text: str, reference: str) -> bool:
+        """Check if text appears in reference string."""
+        return text.lower() in (reference or '').lower()
+
+    def _is_component_unique(self, component: str, existing_text: str, reference: str = '') -> bool:
+        """Check if a component is unique and not already included."""
+        if not component:
+            return False
+        return (component.lower() not in existing_text.lower() and 
+                not self._is_text_in_reference(component, reference))
+
+    def _get_base_keywords(self) -> list:
+        """Get base keywords including existing and rating."""
+        keywords = self.exif_data.get('Keywords', [])
+        if isinstance(keywords, str):
+            keywords = [keywords]
+        rating_keyword = self.translate_rating_to_keyword(self.get_image_rating())
+        return list(set(keywords + [rating_keyword]))
+
+    def _get_export_keywords(self) -> list:
+        """Get export-related keywords."""
+        keywords = ['Lightroom_Export']
+        
+        # Add date-specific export tag
+        today = datetime.now().strftime('%Y_%m_%d')
+        keywords.append(f'Lightroom_Export_on_{today}')
+        
+        # Add Claudia tag if needed
+        if 'claudia_' in self.file_path.name.lower():
+            keywords.append('Export_Claudia')
+            
+        return keywords
+
+    def update_keywords_with_rating_and_export_tags(self):
+        """Update image keywords with rating and export tags."""
+        # Get all keywords
+        keywords = self._get_base_keywords()
+        keywords.extend(self._get_export_keywords())
+        
+        # Update keywords in file
+        if not self.exiftool.update_keywords(self.file_path, keywords):
+            self.logger.error("Error updating keywords: Failed to update keywords")
+            raise RuntimeError("Failed to update keywords")
+            
+    def _clean_location_component(self, component: str) -> str:
+        """Clean a single location component."""
+        return self.clean_component(component)
+
+    def _build_base_components(self) -> tuple:
+        """Get and clean base filename components."""
+        date_str, title, _, _, _ = self.get_metadata_components()
+        if not date_str:
+            self.logger.error("No date found for file")
+            return None, None
+        title = self.clean_component(title)
+        return date_str, title
+
+    def _build_location_components(self, existing_text: str) -> list:
+        """Get and clean location components, skipping if in existing text."""
+        _, _, location, city, country = self.get_metadata_components()
+        components = []
+        
+        # Clean all components first
+        location = self._clean_location_component(location)
+        city = self._clean_location_component(city)
+        country = self._clean_location_component(country)
+        
+        # Add unique components in order
+        if self._is_component_unique(location, existing_text):
+            components.append(location)
+        if self._is_component_unique(city, existing_text, location):
+            components.append(city)
+        if self._is_component_unique(country, existing_text, location):
+            components.append(country)
+            
+        return components
+
+    def _build_filename_with_sequence(self, parts: list) -> str:
+        """Build filename with sequence number if provided."""
+        if self.sequence:
+            parts.append(self.sequence)
+        return '_'.join(parts) + '__LRE'
 
     def generate_filename(self):
         """Generate new filename based on metadata."""
-        # Get metadata components
-        date_str, title, location, city, country = self.get_metadata_components()
-        
-        # Clean components
-        title = self.clean_component(title)
-        location = self.clean_component(location)
-        city = self.clean_component(city)
-        country = self.clean_component(country)
-        
-        # Build filename parts
-        parts = []
-        
-        # Date is required
+        # Get base components
+        date_str, title = self._build_base_components()
         if not date_str:
-            self.logger.error("No date found for file")
             return None
-        parts.append(date_str)
-        
-        # Add title if available
+            
+        # Build parts list
+        parts = [date_str]
         if title:
             parts.append(title)
             
-        # Only add location components that aren't already part of the title
-        if location and location.lower() not in title.lower():
-            parts.append(location)
-        if city and city.lower() not in title.lower() and city.lower() not in (location or '').lower():
-            parts.append(city)
-        if country and country.lower() not in title.lower() and country.lower() not in (location or '').lower():
-            parts.append(country)
+        # Add location components
+        existing_text = '_'.join(parts)
+        location_parts = self._build_location_components(existing_text)
+        parts.extend(location_parts)
                 
-        # Add sequence if provided
-        if self.sequence:
-            parts.append(self.sequence)
-                
-        # Join parts with underscores and add __LRE suffix
-        base = '_'.join(parts)
-        base = base + '__LRE'
-        
-        # Add original extension
+        # Build final filename
+        base = self._build_filename_with_sequence(parts)
         return base + self.file_path.suffix.lower()
 
     def rename_file(self):
@@ -267,3 +253,12 @@ class MediaProcessor(ABC):
         except Exception as e:
             self.logger.error(f"Error renaming file: {e}")
             return None
+
+    @abstractmethod
+    def get_metadata_components(self):
+        """
+        Get metadata components for filename. Each subclass should implement this.
+        Returns:
+            tuple: (date_str, title, location, city, country)
+        """
+        pass

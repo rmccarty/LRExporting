@@ -1,0 +1,647 @@
+  #!/usr/bin/env python3
+  
+> from pathlib import Path
+> import subprocess
+> import logging
+> import sys
+> import os
+> import xml.etree.ElementTree as ET
+> import re
+> from datetime import datetime
+  
+> from config import (
+>     XML_NAMESPACES,
+>     METADATA_FIELDS,
+>     VERIFY_FIELDS,
+>     VIDEO_PATTERN,
+>     MCCARTYS_PREFIX,
+>     MCCARTYS_REPLACEMENT,
+>     LRE_SUFFIX
+> )
+> from processors.media_processor import MediaProcessor
+> from utils.exiftool import ExifTool  # Import the new ExifTool class
+  
+> class VideoProcessor(MediaProcessor):
+>     """A class to process video files and their metadata using exiftool."""
+      
+>     def __init__(self, file_path: str, sequence: str = None):
+>         """Initialize with video file path."""
+>         super().__init__(file_path, sequence=sequence)
+          
+          # Validate file extension
+>         ext = Path(file_path).suffix.lower()
+>         valid_extensions = [pattern.lower().replace('*', '') for pattern in VIDEO_PATTERN]
+>         if ext not in valid_extensions:
+!             self.logger.error(f"File must be video format matching {VIDEO_PATTERN}. Found: {ext}")
+!             sys.exit(1)
+              
+          # Initialize the ExifTool class
+>         self.exiftool = ExifTool()
+              
+>     def read_metadata_from_xmp(self) -> tuple:
+>         """
+>         Read metadata from XMP sidecar file.
+          
+>         Returns:
+>             tuple: (title, keywords, date_str, caption, location_data)
+>         """
+>         xmp_path = self.file_path.with_suffix('.xmp')
+>         if not xmp_path.exists():
+>             self.logger.warning(f"No XMP sidecar file found: {xmp_path}")
+>             return None, None, None, None, (None, None, None)
+              
+>         try:
+>             tree = ET.parse(xmp_path)
+>             root = tree.getroot()
+              
+              # Get title
+>             title = self.get_title_from_rdf(root)
+              
+              # Get keywords
+>             keywords = self.get_keywords_from_rdf(root)
+              
+              # Get caption
+>             caption = self.get_caption_from_rdf(root)
+              
+              # Get location data
+>             location, city, country = self.get_location_from_rdf(root)
+              
+              # Get date from exiftool for consistency
+>             date_str = self.exiftool.read_date_from_xmp(xmp_path)
+                  
+>             return title, keywords, date_str, caption, (location, city, country)
+              
+>         except ET.ParseError as e:
+>             self.logger.error(f"Error parsing XMP file: {e}")
+>             return None, None, None, None, (None, None, None)
+              
+>     def get_keywords_from_rdf(self, rdf):
+>         """Extract keywords from RDF data."""
+>         try:
+>             ns = XML_NAMESPACES
+>             keywords = []
+              
+              # Try hierarchical subjects first
+>             subject_path = f'.//{{{ns["lr"]}}}hierarchicalSubject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
+>             for elem in rdf.findall(subject_path):
+>                 if elem.text:
+>                     keywords.append(elem.text)
+                      
+              # If no hierarchical subjects, try flat subject list
+>             if not keywords:
+>                 subject_path = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
+>                 for elem in rdf.findall(subject_path):
+>                     if elem.text:
+>                         keywords.append(elem.text)
+              
+>             if keywords:
+>                 self.logger.debug(f"Found keywords: {keywords}")
+>                 return keywords
+                  
+>             return None
+              
+!         except Exception as e:
+!             self.logger.error(f"Error getting keywords from RDF: {e}")
+!             return None
+              
+>     def get_location_from_rdf(self, rdf):
+>         """Extract location data from RDF."""
+>         try:
+>             ns = XML_NAMESPACES
+              # First try IPTC Core fields
+>             for desc in rdf.iter('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'):
+                  # Try Iptc4xmpCore fields
+>                 location = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}Location')
+>                 city = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}City')
+>                 country = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}CountryName')
+                  
+>                 location_text = location.text if location is not None else None
+>                 city_text = city.text if city is not None else None
+>                 country_text = country.text if country is not None else None
+                  
+                  # Return first instance of location data found
+>                 if any([location_text, city_text, country_text]):
+>                     self.logger.debug(f"Found location data: {location_text} ({city_text}, {country_text})")
+>                     return location_text, city_text, country_text
+                      
+              # Try photoshop namespace as fallback
+>             for desc in rdf.iter('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'):
+>                 city = desc.get('{http://ns.adobe.com/photoshop/1.0/}City')
+>                 country = desc.get('{http://ns.adobe.com/photoshop/1.0/}Country')
+>                 state = desc.get('{http://ns.adobe.com/photoshop/1.0/}State')
+                  
+                  # Construct location string
+>                 location_parts = []
+>                 if city:
+!                     location_parts.append(city)
+>                 if state:
+!                     location_parts.append(state)
+>                 if country:
+!                     location_parts.append(country)
+                      
+>                 location = ", ".join(location_parts) if location_parts else None
+                  
+                  # Return first instance of location data found
+>                 if city or country:
+!                     self.logger.debug(f"Found location data: {location} ({city}, {country})")
+!                     return location, city, country
+                      
+!         except Exception as e:
+!             self.logger.error(f"Error extracting location from RDF: {e}")
+              
+>         return None, None, None
+          
+>     def get_metadata_from_xmp(self):
+>         """Get metadata from XMP file."""
+>         metadata = self.read_metadata_from_xmp()
+>         title, keywords, date_str, caption, location_data = metadata
+          
+          # Log what metadata we found
+>         if all(x is None or (isinstance(x, (list, tuple)) and not any(x)) for x in metadata):
+>             self.logger.warning("No metadata found in XMP file")
+>         else:
+>             if not title:
+!                 self.logger.info("No title found in XMP")
+>             if not keywords:
+>                 self.logger.info("No keywords found in XMP")
+>             if not date_str:
+>                 self.logger.info("No date found in XMP")
+>             if not caption:
+>                 self.logger.info("No caption found in XMP")
+>             if not any(location_data):
+>                 self.logger.info("No location data found in XMP")
+                  
+>         return metadata
+  
+>     def write_metadata_to_video(self, metadata: tuple) -> bool:
+>         """
+>         Write metadata to video file using exiftool.
+          
+>         Args:
+>             metadata (tuple): Tuple containing metadata to write
+              
+>         Returns:
+>             bool: True if successful, False otherwise
+>         """
+!         try:
+              # Prepare metadata fields
+!             title, keywords, date_str, caption, location_data = metadata
+!             fields = {
+!                 'Title': title,
+!                 'Subject': keywords,
+!                 'DateTimeOriginal': date_str,
+!                 'Description': caption,
+!             }
+              
+!             if location_data:
+!                 location, city, country = location_data
+!                 fields.update({
+!                     'Location': location,
+!                     'City': city,
+!                     'Country': country
+!                 })
+                  
+              # Write metadata using exiftool wrapper
+!             return self.exiftool.write_metadata(self.file_path, fields)
+              
+!         except Exception as e:
+!             self.logger.error(f"Error writing metadata: {e}")
+!             return False
+              
+>     def _build_expected_fields(self, expected_metadata: tuple) -> dict:
+>         """
+>         Build a dictionary of expected fields from metadata tuple.
+          
+>         Args:
+>             expected_metadata (tuple): Tuple containing expected metadata values
+              
+>         Returns:
+>             dict: Dictionary of expected field values
+>         """
+>         title, keywords, date_str, caption, location_data = expected_metadata
+>         location, city, country = location_data if location_data else (None, None, None)
+          
+>         return {
+>             'Title': title,
+>             'Subject': keywords,
+>             'DateTimeOriginal': date_str,
+>             'Description': caption,
+>             'Location': location,
+>             'City': city,
+>             'Country': country
+>         }
+          
+>     def _verify_subject_field(self, expected: list, current: str | list) -> bool:
+>         """
+>         Verify that Subject/keywords match.
+          
+>         Args:
+>             expected (list): Expected keywords
+>             current (str | list): Current keywords value
+              
+>         Returns:
+>             bool: True if keywords match, False otherwise
+>         """
+>         if not current:
+!             return False
+              
+          # Convert string keywords to list
+>         if isinstance(current, str):
+>             current = [current]
+              
+          # Compare keywords as sets to ignore order
+>         return set(expected) == set(current)
+          
+>     def _verify_field(self, field: str, expected: str | list, current: str | list) -> bool:
+>         """
+>         Verify that a field matches its expected value.
+          
+>         Args:
+>             field (str): Field name
+>             expected (str | list): Expected value
+>             current (str | list): Current value
+              
+>         Returns:
+>             bool: True if values match, False otherwise
+>         """
+>         if not current:
+>             self.logger.error(f"Metadata verification failed for {field}\nExpected: {expected}\nNot found")
+>             return False
+              
+          # Handle different field types
+>         if field == 'Subject':
+>             if not self._verify_subject_field(expected, current):
+!                 self.logger.error(f"Metadata verification failed for {field}\nExpected: {expected}\nGot: {current}")
+!                 return False
+>         elif field == 'DateTimeOriginal':
+>             if not self.dates_match(expected, current):
+>                 self.logger.error(f"Metadata verification failed for {field}\nExpected: {expected}\nGot: {current}")
+>                 return False
+>         else:
+>             if expected != current:
+>                 self.logger.error(f"Metadata verification failed for {field}\nExpected: {expected}\nGot: {current}")
+>                 return False
+                  
+>         return True
+          
+>     def _get_current_metadata(self) -> dict | None:
+>         """
+>         Get current metadata, handling errors.
+          
+>         Returns:
+>             dict | None: Current metadata or None if error
+>         """
+>         try:
+>             current = self.read_exif()
+>             if not current:
+>                 self.logger.error("Failed to read current metadata")
+>                 return None
+>             return current
+>         except Exception as e:
+>             self.logger.error(f"Error reading metadata: {e}")
+>             return None
+              
+>     def _verify_all_fields(self, expected_fields: dict, current: dict) -> bool:
+>         """
+>         Verify all expected fields against current metadata.
+          
+>         Args:
+>             expected_fields (dict): Dictionary of expected field values
+>             current (dict): Current metadata values
+              
+>         Returns:
+>             bool: True if all fields match, False otherwise
+>         """
+>         for field, expected in expected_fields.items():
+>             if not expected:
+>                 continue
+                  
+>             if not self._verify_field(field, expected, current.get(field)):
+>                 return False
+                  
+>         return True
+          
+>     def verify_metadata(self, expected_metadata: tuple) -> bool:
+>         """
+>         Verify that metadata was written correctly.
+          
+>         Args:
+>             expected_metadata (tuple): Tuple containing expected metadata values
+              
+>         Returns:
+>             bool: True if verification passes, False otherwise
+>         """
+          # Get current metadata
+>         current = self._get_current_metadata()
+>         if not current:
+>             return False
+              
+          # Build expected fields dictionary
+>         expected_fields = self._build_expected_fields(expected_metadata)
+          
+          # Verify all fields
+>         return self._verify_all_fields(expected_fields, current)
+              
+>     def _normalize_timezone(self, tz_part: str) -> str:
+>         """
+>         Normalize timezone format to +/-HHMM.
+          
+>         Args:
+>             tz_part (str): Timezone part of the date string
+              
+>         Returns:
+>             str: Normalized timezone string
+>         """
+>         if not tz_part or not isinstance(tz_part, str):
+!             return ''
+              
+          # Already in correct format (-0500)
+>         if len(tz_part) == 5 and tz_part[0] in ('+', '-'):
+>             return tz_part
+              
+          # Convert -5 to -0500
+>         try:
+              # Remove any non-numeric characters except + and -
+>             clean_tz = ''.join(c for c in tz_part if c.isdigit() or c in '+-')
+>             if not clean_tz or clean_tz in '+-':
+>                 return ''
+                  
+              # Handle case where sign is missing
+>             if clean_tz[0] not in '+-':
+>                 clean_tz = '+' + clean_tz
+                  
+              # Extract sign and number
+>             sign = clean_tz[0]
+>             hours = int(clean_tz[1:])
+              
+              # If we had to clean non-numeric characters, return empty
+>             if len(tz_part.replace('+', '').replace('-', '')) != len(str(hours)):
+>                 return ''
+                  
+>             if hours > 23:  # Invalid timezone
+!                 return ''
+                  
+>             return f"{sign}{hours:02d}00"
+!         except (ValueError, IndexError):
+!             return ''
+          
+>     def _normalize_date_parts(self, date_str: str) -> tuple[str, str, str] | None:
+>         """
+>         Split and normalize date parts.
+          
+>         Args:
+>             date_str (str): Date string to normalize
+              
+>         Returns:
+>             tuple[str, str, str] | None: Tuple of (date_part, time_part, tz_part) or None if invalid
+>         """
+>         if not date_str or not isinstance(date_str, str):
+>             return None
+              
+          # Handle timezone attached to time (e.g. "12:00:00-0500")
+>         parts = date_str.split()
+>         if len(parts) < 2:
+>             return None
+              
+          # Handle date and time parts
+>         date_part = parts[0].replace('-', ':')  # Convert YYYY-MM-DD to YYYY:MM:DD
+>         time_part = parts[1]
+          
+          # Handle timezone attached to time
+>         tz_part = ''
+>         if any(c in time_part for c in '+-'):
+>             for i, c in enumerate(time_part):
+>                 if c in '+-':
+>                     tz_part = time_part[i:]
+>                     time_part = time_part[:i]
+>                     break
+>         elif len(parts) > 2:
+>             tz_part = parts[2]
+              
+          # Validate time format (HH:MM:SS)
+>         if not time_part.replace(':', '').isdigit():
+>             return None
+              
+>         return date_part, time_part, tz_part
+          
+>     def normalize_date(self, date_str: str) -> str | None:
+>         """
+>         Normalize date format to YYYY:MM:DD HH:MM:SS format that exiftool expects.
+          
+>         Args:
+>             date_str (str): Date string to normalize
+              
+>         Returns:
+>             str | None: Normalized date string or None if invalid
+>         """
+>         if not date_str or not isinstance(date_str, str):
+>             return None
+              
+>         try:
+              # Split and normalize parts
+>             parts = self._normalize_date_parts(date_str)
+>             if not parts:
+>                 return None
+                  
+>             date_part, time_part, tz_part = parts
+              
+              # Validate date format (YYYY:MM:DD)
+>             if not date_part.replace(':', '').isdigit():
+!                 return None
+                  
+              # Build result with timezone if present
+>             result = f"{date_part} {time_part}"
+>             if tz_part:
+>                 normalized_tz = self._normalize_timezone(tz_part)
+>                 if normalized_tz:
+>                     result += normalized_tz
+                  
+>             return result
+              
+!         except Exception as e:
+!             self.logger.error(f"Error normalizing date {date_str}: {e}")
+!             return None
+  
+>     def dates_match(self, date1, date2):
+>         """
+>         Compare two dates, handling various formats.
+          
+>         Args:
+>             date1: First date string
+>             date2: Second date string
+              
+>         Returns:
+>             bool: True if dates match, False otherwise
+>         """
+>         try:
+>             if not date1 or not date2:
+>                 return False
+                  
+              # Convert to common format YYYY:MM:DD HH:MM:SS
+>             def normalize_date(date_str):
+                  # Split into parts
+>                 parts = date_str.split()
+>                 if len(parts) < 2:
+>                     return None
+                      
+                  # Get date and time parts
+>                 date_part = parts[0].replace('-', ':')
+>                 time_part = parts[1].split('.')[0]  # Remove subseconds
+                  
+                  # Remove timezone if present
+>                 time_part = time_part.split('-')[0].split('+')[0]
+                  
+>                 return f"{date_part} {time_part}"
+                  
+>             norm1 = normalize_date(date1)
+>             norm2 = normalize_date(date2)
+              
+>             if not norm1 or not norm2:
+>                 return False
+                  
+>             return norm1 == norm2
+              
+!         except Exception as e:
+!             self.logger.error(f"Error comparing dates {date1} and {date2}: {e}")
+!             return False
+  
+>     def get_title_from_rdf(self, rdf):
+>         """Extract title from RDF data."""
+>         try:
+>             ns = XML_NAMESPACES
+>             self.logger.debug("Searching for title in RDF...")
+              
+              # First try the simple dc:title/rdf:Alt/rdf:li path
+>             title_elem = rdf.find(f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li')
+>             if title_elem is not None and title_elem.text:
+>                 self.logger.debug(f"Found title in dc:title: {title_elem.text}")
+>                 return title_elem.text
+                  
+              # If that fails, try finding any rdf:li element under dc:title
+>             for elem in rdf.findall(f'.//{{{ns["dc"]}}}title/{{{ns["rdf"]}}}li'):
+!                 if elem.text:
+!                     self.logger.debug(f"Found title in dc:title/li: {elem.text}")
+!                     return elem.text
+                      
+              # Try as attribute in Description
+>             for desc in rdf.iter('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'):
+                  # Try Iptc4xmpCore:Location
+>                 location = desc.get('{http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/}Location')
+>                 if location:
+>                     self.logger.debug(f"Using Location as title: {location}")
+>                     return location
+                      
+>             self.logger.debug("No title found in any expected location")
+              
+!         except Exception as e:
+!             self.logger.error(f"Error getting title from RDF: {e}")
+!             self.logger.debug("Full error:", exc_info=True)
+!             try:
+!                 import xml.etree.ElementTree as ET
+!                 self.logger.debug("XML content:")
+!                 self.logger.debug(ET.tostring(rdf, encoding='unicode'))
+!             except Exception as e2:
+!                 self.logger.debug(f"Could not print XML: {e2}")
+>         return None
+      
+>     def get_caption_from_rdf(self, rdf):
+>         """Extract caption from RDF data."""
+>         try:
+>             ns = XML_NAMESPACES
+>             caption_path = f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
+>             caption_elem = rdf.find(caption_path)
+>             if caption_elem is not None:
+>                 self.logger.debug(f"Found caption: {caption_elem.text}")
+>                 return caption_elem.text
+!         except Exception as e:
+!             self.logger.error(f"Error getting caption from RDF: {e}")
+>         return None
+      
+>     def get_metadata_components(self):
+>         """
+>         Get metadata components for video files.
+          
+>         Returns:
+>             tuple: (date_str, title, location, city, country)
+>         """
+          # Get date from stored metadata
+!         date_str = self.exif_data.get('CreateDate')
+!         if date_str:
+!             try:
+                  # Handle both date-only and datetime formats
+!                 if ' ' in date_str:
+!                     date_str = date_str.split()[0]  # Get just the date part
+!                 date_str = date_str.replace(':', '-')  # Convert : to - in date
+                  # Validate it's a proper date
+!                 datetime.strptime(date_str, '%Y-%m-%d')
+!             except (ValueError, TypeError):
+!                 self.logger.warning(f"Invalid date format: {date_str}")
+!                 date_str = datetime.now().strftime('%Y-%m-%d')
+!         else:
+!             date_str = datetime.now().strftime('%Y-%m-%d')
+              
+          # Get title from stored metadata
+!         title = self.exif_data.get('Title')
+!         if title:
+!             self.logger.debug(f"Using title from stored metadata: {title}")
+              
+          # Get location data from stored metadata
+!         location_data = self.exif_data.get('Location', (None, None, None))
+!         if isinstance(location_data, tuple):
+!             location, city, country = location_data
+!         else:
+!             location = location_data
+!             city = None
+!             country = None
+              
+!         self.logger.debug(f"Metadata components: date={date_str}, title={title}, location={location}, city={city}, country={country}")
+!         return date_str, title, location, city, country
+              
+>     def process_video(self) -> Path:
+>         """
+>         Main method to process a video file - reads XMP metadata and writes to video.
+          
+>         Returns:
+>             Path: Path to the processed file
+>         """
+          # 1. Skip if already processed
+>         if self.file_path.stem.endswith(LRE_SUFFIX):
+>             self.logger.info(f"Skipping already processed file: {self.file_path}")
+>             return self.file_path
+              
+          # 2. Read metadata from XMP and store it
+>         metadata = self.get_metadata_from_xmp()
+>         title, keywords, date_str, caption, location_data = metadata
+              
+          # 3. Write metadata to video if any metadata exists
+>         if any(x is not None for x in (title, keywords, date_str, caption) + location_data):
+>             if not self.write_metadata_to_video(metadata):
+!                 self.logger.error("Failed to write metadata to video")
+!                 return self.file_path
+                  
+              # 4. Verify metadata was written correctly
+>             if not self.verify_metadata(metadata):
+!                 self.logger.error("Metadata verification failed")
+!                 return self.file_path
+                  
+              # Store metadata for filename generation
+>             self.exif_data = {
+>                 'Title': title,
+>                 'Keywords': keywords,
+>                 'CreateDate': date_str,
+>                 'Caption-Abstract': caption,
+>                 'Location': location_data
+>             }
+                  
+          # 5. Delete XMP file
+>         xmp_path = self.file_path.with_suffix('.xmp')
+>         try:
+>             if xmp_path.exists():
+>                 os.remove(xmp_path)
+>                 self.logger.info(f"Deleted XMP file: {xmp_path}")
+!         except OSError as e:
+!             self.logger.error(f"Error deleting XMP file: {e}")
+              
+          # 6. Rename the file using stored metadata
+>         new_path = self.rename_file()
+>         return new_path
