@@ -234,63 +234,6 @@ class VideoProcessor(MediaProcessor):
             if not value:
                 self.logger.info(f"No {field_name} found in XMP")
                 
-    def _normalize_date_parts(self, date_str: str) -> tuple[str, str, str] | None:
-        """
-        Split and normalize date parts.
-        
-        Args:
-            date_str (str): Date string to normalize
-            
-        Returns:
-            tuple[str, str, str] | None: Tuple of (date_part, time_part, tz_part) or None if invalid
-        """
-        if not self._is_valid_date_string(date_str):
-            return None
-            
-        parts = date_str.split()
-        if len(parts) < 2:
-            return None
-            
-        date_part = self._normalize_date_component(parts[0])
-        time_part, tz_part = self._extract_time_and_timezone(parts)
-        
-        if not self._is_valid_time_format(time_part):
-            return None
-            
-        return date_part, time_part, tz_part
-        
-    def _is_valid_date_string(self, date_str: str) -> bool:
-        """Check if date string is valid."""
-        return bool(date_str and isinstance(date_str, str))
-        
-    def _normalize_date_component(self, date_part: str) -> str:
-        """Normalize date component to YYYY:MM:DD format."""
-        return date_part.replace('-', ':')
-        
-    def _extract_time_and_timezone(self, parts: list[str]) -> tuple[str, str]:
-        """Extract time and timezone components from date parts."""
-        time_part = parts[1]
-        tz_part = ''
-        
-        # Handle timezone attached to time
-        if any(c in time_part for c in '+-'):
-            time_part, tz_part = self._split_time_and_timezone(time_part)
-        elif len(parts) > 2:
-            tz_part = parts[2]
-            
-        return time_part, tz_part
-        
-    def _split_time_and_timezone(self, time_str: str) -> tuple[str, str]:
-        """Split time string into time and timezone parts."""
-        for i, c in enumerate(time_str):
-            if c in '+-':
-                return time_str[:i], time_str[i:]
-        return time_str, ''
-        
-    def _is_valid_time_format(self, time_str: str) -> bool:
-        """Check if time string is in valid format."""
-        return time_str.replace(':', '').isdigit()
-
     def normalize_date(self, date_str: str) -> str | None:
         """
         Normalize date format to YYYY:MM:DD HH:MM:SS format that exiftool expects.
@@ -304,7 +247,7 @@ class VideoProcessor(MediaProcessor):
         try:
             return self.date_normalizer.normalize(date_str)
         except Exception as e:
-            self.logger.error(f"Error normalizing date {date_str}: {e}")
+            self.logger.error(f"Error normalizing date: {e}")
             return None
             
     def dates_match(self, date1, date2):
