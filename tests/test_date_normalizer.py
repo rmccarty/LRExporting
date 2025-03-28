@@ -248,5 +248,34 @@ class TestDateNormalizer(unittest.TestCase):
                 result = self.normalizer._split_time_and_timezone(time_str)
                 self.assertEqual(result, expected)
                 
+    def test_when_validating_date_format_with_valid_input_then_returns_true(self):
+        """Should return True for valid YYYY:MM:DD format."""
+        valid_dates = [
+            '2024:01:01',
+            '2024:12:31',
+            '2024:02:29'
+        ]
+        for date_str in valid_dates:
+            with self.subTest(date_str=date_str):
+                result = self.normalizer._is_valid_date_format(date_str)
+                self.assertTrue(result)
+
+    def test_when_validating_date_format_with_invalid_input_then_returns_false(self):
+        """Should return False for invalid YYYY:MM:DD format."""
+        invalid_dates = [
+            '2024-01-01',  # wrong separator
+            '2024:1:1',    # missing leading zeros
+            '2024:13:01',  # invalid month
+            '2024:01:32',  # invalid day
+            'abcd:ef:gh',  # non-numeric
+            '20240101',    # no separators
+            '',           # empty string
+            None          # None value
+        ]
+        for date_str in invalid_dates:
+            with self.subTest(date_str=date_str):
+                result = self.normalizer._is_valid_date_format(date_str)
+                self.assertFalse(result)
+                
 if __name__ == '__main__':
     unittest.main()

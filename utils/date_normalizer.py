@@ -36,6 +36,34 @@ class DateNormalizer:
         """Check if date string is valid."""
         return bool(date_str and isinstance(date_str, str) and len(date_str) > 0)
         
+    def _is_valid_date_format(self, date_str: str) -> bool:
+        """Check if date string is in valid YYYY:MM:DD format."""
+        if not self._is_valid_date_string(date_str):
+            return False
+            
+        # Split into components
+        parts = date_str.split(':')
+        if len(parts) != 3:
+            return False
+            
+        # Verify each part is numeric and has correct length
+        year, month, day = parts
+        if not (len(year) == 4 and len(month) == 2 and len(day) == 2):
+            return False
+            
+        try:
+            year_val = int(year)
+            month_val = int(month)
+            day_val = int(day)
+            
+            # Basic validation of values
+            if not (1 <= month_val <= 12 and 1 <= day_val <= 31):
+                return False
+                
+            return True
+        except ValueError:
+            return False
+            
     def _is_valid_time_format(self, time_str: str) -> bool:
         """Check if time string is in valid format."""
         return time_str.replace(':', '').isdigit()
