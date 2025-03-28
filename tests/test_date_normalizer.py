@@ -216,5 +216,37 @@ class TestDateNormalizer(unittest.TestCase):
                     time_part, tz_part = self.normalizer._extract_time_and_timezone(parts)
                     self.assertEqual(tz_part, '')
                 
+    def test_when_splitting_time_and_timezone_then_handles_all_formats(self):
+        """Should split time and timezone correctly for all formats."""
+        test_cases = [
+            # Basic time with timezone
+            ('12:00:00+0500', ('12:00:00', '+0500')),
+            ('12:00:00-0500', ('12:00:00', '-0500')),
+            # Time with non-normalized timezone
+            ('12:00:00+5', ('12:00:00', '+5')),
+            ('12:00:00-5', ('12:00:00', '-5')),
+            # Time with no timezone
+            ('12:00:00', ('12:00:00', '')),
+            # Empty string
+            ('', ('', '')),
+        ]
+        for time_str, expected in test_cases:
+            with self.subTest(time_str=time_str):
+                result = self.normalizer._split_time_and_timezone(time_str)
+                self.assertEqual(result, expected)
+                
+    def test_when_splitting_time_and_timezone_with_multiple_signs_then_uses_first(self):
+        """Should use first + or - sign when splitting time and timezone."""
+        test_cases = [
+            ('12:00:00+05-00', ('12:00:00', '+05-00')),
+            ('12:00:00-05+00', ('12:00:00', '-05+00')),
+            ('12:00:00++0500', ('12:00:00', '++0500')),
+            ('12:00:00--0500', ('12:00:00', '--0500')),
+        ]
+        for time_str, expected in test_cases:
+            with self.subTest(time_str=time_str):
+                result = self.normalizer._split_time_and_timezone(time_str)
+                self.assertEqual(result, expected)
+                
 if __name__ == '__main__':
     unittest.main()
