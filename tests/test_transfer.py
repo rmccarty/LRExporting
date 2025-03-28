@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import fcntl
 import time
 
-from transfers.transfer import Transfer
+from transfers.transfer import Transfer, ValidationResult
 from config import MIN_FILE_AGE, TRANSFER_PATHS
 
 class TestTransfer(unittest.TestCase):
@@ -151,5 +151,92 @@ class TestTransfer(unittest.TestCase):
             self.assertFalse(result)
             self.assertTrue(any("Test error" in record.message for record in log.records))
 
+    def test_when_validating_file_exists_then_returns_result(self):
+        """Should return appropriate ValidationResult for file existence check."""
+        # Test file exists
+        with patch.object(Path, 'exists', return_value=True):
+            result = self.transfer._validate_file_exists(self.test_file)
+            self.assertTrue(result.is_valid)
+            self.assertEqual(result.message, "")
+            
+        # Test file doesn't exist
+        with patch.object(Path, 'exists', return_value=False):
+            result = self.transfer._validate_file_exists(self.test_file)
+            self.assertFalse(result.is_valid)
+            self.assertEqual(result.level, "error")
+            self.assertIn("File does not exist", result.message)
+            
+    def test_when_validating_file_format_then_returns_result(self):
+        """Should return appropriate ValidationResult for file format check."""
+        # Test valid LRE file with configured destination
+        result = self.transfer._validate_file_format(self.test_file)
+        self.assertTrue(result.is_valid)
+        self.assertEqual(result.message, "")
+        
+        # Test non-LRE file
+        non_lre_file = Path('/test/source/file.jpg')
+        result = self.transfer._validate_file_format(non_lre_file)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.level, "debug")
+        self.assertIn("Not a processed file", result.message)
+        
+        # Test unconfigured destination
+        unconfigured_file = Path('/unconfigured/dir/file__LRE.jpg')
+        result = self.transfer._validate_file_format(unconfigured_file)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(result.message, "")  # Message handled by _has_configured_destination
+        
+    def test_when_validating_file_state_then_returns_result(self):
+        """Should return appropriate ValidationResult for file state check."""
+        # Test valid state (old enough and accessible)
+        with patch.object(Path, 'stat') as mock_stat, \
+             patch('builtins.open', MagicMock()), \
+             patch('fcntl.flock'):
+            mock_stat.return_value.st_mtime = time.time() - (MIN_FILE_AGE + 10)
+            result = self.transfer._validate_file_state(self.test_file)
+            self.assertTrue(result.is_valid)
+            self.assertEqual(result.message, "")
+            
+        # Test too new
+        with patch.object(Path, 'stat') as mock_stat:
+            mock_stat.return_value.st_mtime = time.time()
+            result = self.transfer._validate_file_state(self.test_file)
+            self.assertFalse(result.is_valid)
+            self.assertEqual(result.level, "debug")
+            self.assertIn("File too new", result.message)
+            
+        # Test can't access
+        with patch.object(Path, 'stat') as mock_stat, \
+             patch('builtins.open', side_effect=IOError):
+            mock_stat.return_value.st_mtime = time.time() - (MIN_FILE_AGE + 10)
+            result = self.transfer._validate_file_state(self.test_file)
+            self.assertFalse(result.is_valid)
+            self.assertEqual(result.level, "debug")
+            self.assertIn("Cannot get exclusive access", result.message)
+            
+    def test_when_logging_validation_result_then_uses_correct_level(self):
+        """Should log validation results at the correct level."""
+        # Test error level
+        error_result = ValidationResult(False, "Error message", "error")
+        with self.assertLogs(level='ERROR') as log:
+            self.transfer._log_validation_result(error_result)
+            self.assertEqual(len(log.records), 1)
+            self.assertEqual(log.records[0].message, "Error message")
+            
+        # Test debug level
+        debug_result = ValidationResult(False, "Debug message", "debug")
+        with self.assertLogs(level='DEBUG') as log:
+            self.transfer._log_validation_result(debug_result)
+            self.assertEqual(len(log.records), 1)
+            self.assertEqual(log.records[0].message, "Debug message")
+            
+        # Test no message
+        empty_result = ValidationResult(True)
+        with patch.object(self.transfer.logger, 'debug') as mock_debug, \
+             patch.object(self.transfer.logger, 'error') as mock_error:
+            self.transfer._log_validation_result(empty_result)
+            mock_debug.assert_not_called()
+            mock_error.assert_not_called()
+            
 if __name__ == '__main__':
     unittest.main()
