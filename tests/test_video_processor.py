@@ -9,7 +9,7 @@ import os
 import logging
 from io import StringIO
 import types
-
+from utils.exiftool import ExifTool
 from processors.video_processor import VideoProcessor
 from config import XML_NAMESPACES, VIDEO_PATTERN, LRE_SUFFIX, METADATA_FIELDS
 
@@ -232,7 +232,7 @@ class TestDateHandling(TestVideoProcessor):
         test_cases = [
             # (input, expected)
             ('2024-01-01 12:00:00', ('2024:01:01', '12:00:00', '')),
-            ('2024-01-01 12:00:00 -0500', ('2024:01:01', '12:00:00', '-0500')),
+            ('2024-01-01 12:00:00-0500', ('2024:01:01', '12:00:00', '-0500')),
             ('2024:01:01 12:00:00', ('2024:01:01', '12:00:00', '')),
             ('2024:01:01 12:00:00 +5', ('2024:01:01', '12:00:00', '+5')),
         ]
@@ -945,6 +945,276 @@ class TestMetadataVerificationIntegration(TestVideoProcessor):
             metadata = ("Test Title", None, "2024:03:27 20:00:00", None, None)
             result = processor.verify_metadata(metadata)
             self.assertTrue(result, f"Failed to match date format: {date_variations}")
+
+class TestFilenameGeneration(TestVideoProcessor):
+    """Test cases for video filename generation."""
+    
+    def setUp(self):
+        """Set up test environment."""
+        super().setUp()
+        self.processor.metadata_for_filename = {}
+        
+    def test_when_date_has_colons_then_converts_to_underscores(self):
+        """Should convert date format from YYYY:MM:DD to YYYY_MM_DD in filename."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': '2025:03:27 15:18:07',
+            'Title': 'test_title',
+            'Location': 'Texas',
+            'City': 'Rowlett',
+            'Country': 'United States'
+        }
+        
+        # Execute
+        date_str, title, location, city, country = self.processor.get_metadata_components()
+        
+        # Verify
+        self.assertEqual(date_str, '2025_03_27')
+        
+    def test_when_date_has_timezone_then_ignores_timezone(self):
+        """Should ignore timezone in date when generating filename."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': '2025:03:27 15:18:07-05:00',
+            'Title': 'test_title'
+        }
+        
+        # Execute
+        date_str, title, location, city, country = self.processor.get_metadata_components()
+        
+        # Verify
+        self.assertEqual(date_str, '2025_03_27')
+        
+    def test_when_sequence_provided_then_adds_sequence_with_underscore(self):
+        """Should add sequence number with underscore prefix."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': '2025:03:27 15:18:07',
+            'Title': 'test_title'
+        }
+        self.processor.sequence = '0001'
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        self.assertTrue('_0001__LRE' in result)
+        
+    def test_full_filename_generation_with_all_components(self):
+        """Should generate correct filename with all components."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': '2025:03:27 15:18:07',
+            'Title': 'test title',
+            'Location': 'Texas',
+            'City': 'Rowlett',
+            'Country': 'United States'
+        }
+        self.processor.sequence = '0001'
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        expected = '2025_03_27_test_title_Texas_Rowlett_United_States_0001__LRE.mp4'
+        self.assertEqual(result, expected)
+        
+    def test_when_metadata_has_spaces_then_converts_to_underscores(self):
+        """Should convert spaces in metadata to underscores in filename."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': '2025:03:27 15:18:07',
+            'Title': 'My Test Title',
+            'Location': 'New York',
+            'City': 'New York City',
+            'Country': 'United States'
+        }
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        self.assertIn('My_Test_Title', result)
+        self.assertIn('New_York_City', result)
+        self.assertIn('United_States', result)
+
+    def test_when_date_is_invalid_then_skips_date_in_filename(self):
+        """Should handle invalid date formats by skipping date in filename."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': 'invalid-date',
+            'Title': 'test_title'
+        }
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        self.assertNotIn('invalid-date', result)
+        self.assertIn('test_title', result)
+        
+    def test_when_metadata_is_none_then_returns_original_name_with_lre(self):
+        """Should return original filename with LRE suffix when metadata is None."""
+        # Setup
+        self.processor.metadata_for_filename = None
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        expected = self.test_file.stem + '__LRE.mp4'
+        self.assertEqual(result, expected)
+        
+    def test_when_metadata_is_empty_then_returns_original_name_with_lre(self):
+        """Should return original filename with LRE suffix when metadata is empty."""
+        # Setup
+        self.processor.metadata_for_filename = {}
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        expected = self.test_file.stem + '__LRE.mp4'
+        self.assertEqual(result, expected)
+        
+    def test_when_metadata_has_special_chars_then_sanitizes_filename(self):
+        """Should sanitize special characters from metadata in filename."""
+        # Setup
+        self.processor.metadata_for_filename = {
+            'CreateDate': '2025:03:27 15:18:07',
+            'Title': 'Test: Special/Chars?!',
+            'Location': 'Test & Location',
+            'City': 'City/Name',
+            'Country': 'Country\\Name'
+        }
+        
+        # Execute
+        result = self.processor.generate_filename()
+        
+        # Verify
+        self.assertIn('Test_Special_Chars', result)
+        self.assertIn('Test_Location', result)
+        self.assertIn('City_Name', result)
+        self.assertIn('Country_Name', result)
+        self.assertNotIn('/', result)
+        self.assertNotIn('\\', result)
+        self.assertNotIn(':', result)
+        self.assertNotIn('?', result)
+        self.assertNotIn('!', result)
+        self.assertNotIn('&', result)
+
+class TestMetadataVerification(unittest.TestCase):
+    """Tests for metadata verification functionality."""
+    
+    def setUp(self):
+        self.test_file = Path('/test/path/test.mov')
+        self.mock_exiftool = MagicMock()
+        self.mock_exiftool.read_exif = MagicMock()
+        self.processor = VideoProcessor(str(self.test_file))
+        self.processor.exiftool = self.mock_exiftool
+        
+    def test_when_verifying_metadata_then_checks_all_fields(self):
+        """Should verify all metadata fields are written correctly."""
+        # Setup
+        written_metadata = (
+            'Test Video',  # title
+            ['test', 'video'],  # keywords
+            '2025:03:27 22:59:37',  # date_str
+            'Test Description',  # caption
+            ('Test Location', 'Test City', 'Test Country')  # location_data
+        )
+        exif_data = {
+            'Title': 'Test Video',
+            'Description': 'Test Description',
+            'Keywords': ['test', 'video'],
+            'Location': 'Test Location',
+            'City': 'Test City',
+            'Country': 'Test Country',
+            'CreateDate': '2025:03:27 22:59:37'
+        }
+        self.processor.read_exif = MagicMock(return_value=exif_data)
+        
+        # Execute
+        result = self.processor.verify_metadata(written_metadata)
+        
+        # Verify
+        self.assertTrue(result)
+        self.processor.read_exif.assert_called_once()
+        
+    def test_when_verifying_metadata_with_missing_fields_then_returns_false(self):
+        """Should return False when written metadata is missing fields."""
+        # Setup
+        written_metadata = (
+            'Test Video',  # title
+            ['test', 'video'],  # keywords
+            '2025:03:27 22:59:37',  # date_str
+            'Test Description',  # caption
+            ('Test Location', 'Test City', 'Test Country')  # location_data
+        )
+        exif_data = {
+            'Title': 'Test Video',
+            'Description': 'Test Description',
+            # Keywords missing
+            'Location': 'Test Location',
+            'City': 'Test City',
+            'Country': 'Test Country',
+            'CreateDate': '2025:03:27 22:59:37'
+        }
+        self.processor.read_exif = MagicMock(return_value=exif_data)
+        
+        # Execute
+        result = self.processor.verify_metadata(written_metadata)
+        
+        # Verify
+        self.assertFalse(result)
+        self.processor.read_exif.assert_called_once()
+        
+    def test_when_verifying_metadata_with_different_values_then_returns_false(self):
+        """Should return False when read metadata differs from written metadata."""
+        # Setup
+        written_metadata = (
+            'Test Video',  # title
+            ['test', 'video'],  # keywords
+            '2025:03:27 22:59:37',  # date_str
+            'Test Description',  # caption
+            ('Test Location', 'Test City', 'Test Country')  # location_data
+        )
+        exif_data = {
+            'Title': 'Different Title',  # Different value
+            'Description': 'Test Description',
+            'Keywords': ['test', 'video'],
+            'Location': 'Test Location',
+            'City': 'Test City',
+            'Country': 'Test Country',
+            'CreateDate': '2025:03:27 22:59:37'
+        }
+        self.processor.read_exif = MagicMock(return_value=exif_data)
+        
+        # Execute
+        result = self.processor.verify_metadata(written_metadata)
+        
+        # Verify
+        self.assertFalse(result)
+        self.processor.read_exif.assert_called_once()
+        
+    def test_when_verifying_metadata_with_read_error_then_returns_false(self):
+        """Should return False when metadata read fails."""
+        # Setup
+        written_metadata = (
+            'Test Video',  # title
+            ['test', 'video'],  # keywords
+            '2025:03:27 22:59:37',  # date_str
+            'Test Description',  # caption
+            ('Test Location', 'Test City', 'Test Country')  # location_data
+        )
+        self.processor.read_exif = MagicMock(return_value={})  # Empty dict indicates read error
+        
+        # Execute
+        result = self.processor.verify_metadata(written_metadata)
+        
+        # Verify
+        self.assertFalse(result)
+        self.processor.read_exif.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

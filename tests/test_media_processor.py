@@ -48,13 +48,21 @@ class TestGenerateFilename(unittest.TestCase):
         result = self.processor.generate_filename()
         self.assertEqual(result, expected)
 
-    def test_when_no_date_then_returns_none(self):
-        """Should return None when no date is available"""
+    def test_when_no_date_then_uses_title_only(self):
+        """Should use only title when no date is available"""
         self.processor.exif_data = {
             'Title': 'Sunset View'
         }
         result = self.processor.generate_filename()
-        self.assertIsNone(result)
+        expected = 'Sunset_View__LRE.mov'
+        self.assertEqual(result, expected)
+
+    def test_when_no_metadata_then_uses_original_name(self):
+        """Should use original filename with LRE suffix when no metadata is available"""
+        self.processor.exif_data = {}
+        result = self.processor.generate_filename()
+        expected = 'test__LRE.mov'
+        self.assertEqual(result, expected)
 
     def test_when_location_in_title_then_skips_duplicate(self):
         """Should skip location if it's already part of the title"""
@@ -101,8 +109,8 @@ class TestGenerateFilename(unittest.TestCase):
         """Should skip components that look like JSON"""
         self.processor.exif_data = {
             'DateTimeOriginal': '2025_03_26',
-            'Title': '{"title": "Bad Title"}',
-            'Location': '[1, 2, 3]',
+            'Title': '{"key": "value"}',
+            'Location': '[1,2,3]',
             'City': 'Miami',
             'Country': 'USA'
         }
@@ -279,26 +287,32 @@ class TestFileOperations(unittest.TestCase):
     @patch('pathlib.Path.rename')
     def test_when_renaming_file_then_returns_new_path(self, mock_rename):
         """Should return new path when rename succeeds."""
-        self.processor.exif_data = {'DateTimeOriginal': '2025_03_26'}
+        self.processor.exif_data = {
+            'DateTimeOriginal': '2025_03_26',
+            'Title': 'Test'
+        }
         new_path = self.processor.rename_file()
         self.assertIsNotNone(new_path)
         mock_rename.assert_called_once()
 
     @patch('pathlib.Path.rename')
-    def test_when_rename_fails_then_returns_none(self, mock_rename):
-        """Should return None when rename fails."""
-        mock_rename.side_effect = OSError("Permission denied")
-        self.processor.exif_data = {'DateTimeOriginal': '2025_03_26'}
+    def test_when_rename_fails_then_returns_original_path(self, mock_rename):
+        """Should return original path when rename fails."""
+        mock_rename.side_effect = OSError("Failed to rename")
+        self.processor.exif_data = {
+            'DateTimeOriginal': '2025_03_26',
+            'Title': 'Test'
+        }
         new_path = self.processor.rename_file()
-        self.assertIsNone(new_path)
+        self.assertEqual(new_path, self.test_file)
 
     @patch('pathlib.Path.rename')
-    def test_when_filename_generation_fails_then_returns_none(self, mock_rename):
-        """Should return None when filename generation fails."""
-        self.processor.exif_data = {}  # No date, will cause generate_filename to return None
+    def test_when_no_metadata_then_renames_with_lre_suffix(self, mock_rename):
+        """Should rename file with just LRE suffix when no metadata."""
+        self.processor.exif_data = {}
         new_path = self.processor.rename_file()
-        self.assertIsNone(new_path)
-        mock_rename.assert_not_called()
+        expected = self.test_file.parent / 'test__LRE.mov'
+        mock_rename.assert_called_once_with(expected)
 
 if __name__ == '__main__':
     unittest.main()

@@ -186,10 +186,9 @@ class MediaProcessor(ABC):
     def _build_base_components(self) -> tuple:
         """Get and clean base filename components."""
         date_str, title, _, _, _ = self.get_metadata_components()
-        if not date_str:
-            self.logger.error("No date found for file")
+        if not date_str and not title:
+            self.logger.info("No valid metadata components found for filename")
             return None, None
-        title = self.clean_component(title)
         return date_str, title
 
     def _build_location_components(self, existing_text: str) -> list:
@@ -214,46 +213,49 @@ class MediaProcessor(ABC):
 
     def _build_filename_with_sequence(self, parts: list) -> str:
         """Build filename with sequence number if provided."""
-        base = '_'.join(parts)
+        base = '_'.join(filter(None, parts))  # Filter out empty parts
         if self.sequence:
             base = f"{base}_{self.sequence}"
         return base + '__LRE'
 
-    def generate_filename(self):
+    def generate_filename(self) -> str:
         """Generate new filename based on metadata."""
         # Get base components
         date_str, title = self._build_base_components()
-        if not date_str:
-            return None
+        if date_str is None and title is None:
+            # If no valid metadata, just add LRE suffix to original name
+            return f"{self.file_path.stem}__LRE{self.file_path.suffix}"
             
-        # Build parts list
-        parts = [date_str]
+        # Start with date if available
+        parts = []
+        if date_str:
+            parts.append(date_str)
+            
+        # Add title if available
         if title:
-            parts.append(title)
+            parts.append(self.clean_component(title))
             
         # Add location components
         existing_text = '_'.join(parts)
-        location_parts = self._build_location_components(existing_text)
-        parts.extend(location_parts)
-                
-        # Build final filename
-        base = self._build_filename_with_sequence(parts)
-        return base + self.file_path.suffix.lower()
+        parts.extend(self._build_location_components(existing_text))
+            
+        # Build filename with sequence and LRE suffix
+        return self._build_filename_with_sequence(parts) + self.file_path.suffix.lower()
 
     def rename_file(self):
         """Rename file with LRE suffix."""
-        new_name = self.generate_filename()
-        if not new_name:
-            return None
-            
-        new_path = self.file_path.parent / new_name
         try:
+            new_name = self.generate_filename()
+            if not new_name:
+                return self.file_path
+                
+            new_path = self.file_path.parent / new_name
             self.file_path.rename(new_path)
             self.logger.info(f"Renamed file to: {new_name}")
             return new_path
         except Exception as e:
-            self.logger.error(f"Error renaming file: {e}")
-            return None
+            self.logger.error(f"Failed to rename file: {e}")
+            return self.file_path
 
     @abstractmethod
     def get_metadata_components(self):

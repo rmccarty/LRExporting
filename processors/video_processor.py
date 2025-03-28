@@ -829,7 +829,7 @@ class VideoProcessor(MediaProcessor):
         Returns:
             tuple: (date_str, title, location, city, country)
         """
-        if not hasattr(self, 'metadata_for_filename'):
+        if not hasattr(self, 'metadata_for_filename') or self.metadata_for_filename is None:
             self.logger.error("No metadata available for filename")
             return None, None, None, None, None
             
@@ -846,9 +846,14 @@ class VideoProcessor(MediaProcessor):
             # Convert YYYY:MM:DD to YYYY_MM_DD
             try:
                 date_parts = date_str.split()[0].split(':')  # Split on space to get date part, then split on colons
-                date_str = '_'.join(date_parts)  # Join with underscores
+                if len(date_parts) == 3:  # Only convert if it's a valid date format
+                    date_str = '_'.join(date_parts)  # Join with underscores
+                else:
+                    self.logger.warning(f"Invalid date format: {date_str}")
+                    date_str = None
             except Exception as e:
                 self.logger.error(f"Error formatting date: {e}")
+                date_str = None
 
         title = self.metadata_for_filename.get('Title', '')
         location = self.metadata_for_filename.get('Location', '')
