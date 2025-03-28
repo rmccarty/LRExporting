@@ -114,3 +114,47 @@ class DateNormalizer:
     def _extract_valid_timezone_chars(self, tz_part: str) -> str:
         """Extract only valid timezone characters (digits, +, -)."""
         return ''.join(c for c in tz_part if c.isdigit() or c in '+-')
+        
+    def _extract_time_and_timezone(self, parts: list[str]) -> tuple[str, str]:
+        """Extract time and timezone components from date parts."""
+        time_part = parts[1]
+        tz_part = ''
+        
+        # Handle timezone attached to time
+        if any(c in time_part for c in '+-'):
+            time_part, tz_part = self._split_time_and_timezone(time_part)
+        elif len(parts) > 2:
+            tz_part = parts[2]
+            
+        return time_part, tz_part
+        
+    def _split_time_and_timezone(self, time_str: str) -> tuple[str, str]:
+        """Split time string into time and timezone parts."""
+        for i, c in enumerate(time_str):
+            if c in '+-':
+                return time_str[:i], time_str[i:]
+        return time_str, ''
+        
+    def _normalize_date_parts(self, date_str: str) -> tuple[str, str, str] | None:
+        """Split and normalize date parts.
+        
+        Args:
+            date_str (str): Date string to normalize
+            
+        Returns:
+            tuple[str, str, str] | None: Tuple of (date_part, time_part, tz_part) or None if invalid
+        """
+        if not self._is_valid_date_string(date_str):
+            return None
+            
+        parts = date_str.split()
+        if len(parts) < 2:
+            return None
+            
+        date_part = self._normalize_date_component(parts[0])
+        time_part, tz_part = self._extract_time_and_timezone(parts)
+        
+        if not self._is_valid_time_format(time_part):
+            return None
+            
+        return date_part, time_part, tz_part

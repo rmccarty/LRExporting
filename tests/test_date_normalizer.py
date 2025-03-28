@@ -151,5 +151,70 @@ class TestDateNormalizer(unittest.TestCase):
                 result = self.normalizer._clean_timezone_string(input_tz)
                 self.assertEqual(result, expected)
 
+    def test_when_normalizing_date_parts_then_handles_all_formats(self):
+        """Should handle all date part formats correctly."""
+        test_cases = [
+            # (input, expected)
+            ('2024-01-01 12:00:00', ('2024:01:01', '12:00:00', '')),
+            ('2024-01-01 12:00:00-0500', ('2024:01:01', '12:00:00', '-0500')),
+            ('2024:01:01 12:00:00', ('2024:01:01', '12:00:00', '')),
+            ('2024:01:01 12:00:00 +5', ('2024:01:01', '12:00:00', '+5')),
+        ]
+        for input_date, expected in test_cases:
+            with self.subTest(input_date=input_date):
+                result = self.normalizer._normalize_date_parts(input_date)
+                self.assertEqual(result, expected)
+                
+    def test_when_normalizing_invalid_date_parts_then_returns_none(self):
+        """Should return None for invalid date parts."""
+        invalid_dates = [
+            None,  # None input
+            '',  # Empty string
+            '2024-01-01',  # Missing time
+            'invalid',  # Invalid format
+            '2024-01-01 ',  # Missing time
+        ]
+        for date_str in invalid_dates:
+            with self.subTest(date_str=date_str):
+                self.assertIsNone(self.normalizer._normalize_date_parts(date_str))
+                
+    def test_when_extracting_time_and_timezone_then_handles_all_formats(self):
+        """Should handle all time and timezone formats correctly."""
+        test_cases = [
+            # Basic time without timezone
+            (['2024:01:01', '12:00:00'], ('12:00:00', '')),
+            # Time with separate timezone
+            (['2024:01:01', '12:00:00', '+0500'], ('12:00:00', '+0500')),
+            # Time with attached timezone
+            (['2024:01:01', '12:00:00+0500'], ('12:00:00', '+0500')),
+            (['2024:01:01', '12:00:00-0500'], ('12:00:00', '-0500')),
+            # Time with non-normalized timezone
+            (['2024:01:01', '12:00:00', '+5'], ('12:00:00', '+5')),
+            # Time with UTC timezone
+            (['2024:01:01', '12:00:00', 'UTC'], ('12:00:00', 'UTC')),
+        ]
+        for parts, expected in test_cases:
+            with self.subTest(parts=parts):
+                result = self.normalizer._extract_time_and_timezone(parts)
+                self.assertEqual(result, expected)
+                
+    def test_when_extracting_time_and_timezone_with_invalid_input_then_returns_empty_timezone(self):
+        """Should return empty timezone string for invalid inputs."""
+        test_cases = [
+            # Missing time part
+            ['2024:01:01'],
+            # Empty time part
+            ['2024:01:01', ''],
+            # Invalid time format
+            ['2024:01:01', 'invalid'],
+            # Time without timezone
+            ['2024:01:01', '12:00:00'],
+        ]
+        for parts in test_cases:
+            with self.subTest(parts=parts):
+                if len(parts) > 1:
+                    time_part, tz_part = self.normalizer._extract_time_and_timezone(parts)
+                    self.assertEqual(tz_part, '')
+                
 if __name__ == '__main__':
     unittest.main()
