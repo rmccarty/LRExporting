@@ -20,6 +20,7 @@ from config import (
 )
 from processors.media_processor import MediaProcessor
 from utils.exiftool import ExifTool  # Import the new ExifTool class
+from utils.date_normalizer import DateNormalizer  # Import DateNormalizer
 
 class VideoProcessor(MediaProcessor):
     """A class to process video files and their metadata using exiftool."""
@@ -42,6 +43,8 @@ class VideoProcessor(MediaProcessor):
             
         # Initialize the ExifTool class
         self.exiftool = ExifTool()
+        # Initialize the DateNormalizer class
+        self.date_normalizer = DateNormalizer()
             
     def read_metadata_from_xmp(self) -> tuple:
         """
@@ -298,117 +301,12 @@ class VideoProcessor(MediaProcessor):
         Returns:
             str | None: Normalized date string or None if invalid
         """
-        if not self._is_valid_date_string(date_str):
-            return None
-            
         try:
-            parts = self._normalize_date_parts(date_str)
-            if not parts:
-                return None
-                
-            date_part, time_part, tz_part = parts
-            
-            if not self._is_valid_date_format(date_part):
-                return None
-                
-            result = self._build_date_string(date_part, time_part, tz_part)
-            return result
-            
+            return self.date_normalizer.normalize(date_str)
         except Exception as e:
             self.logger.error(f"Error normalizing date {date_str}: {e}")
             return None
             
-    def _is_valid_date_format(self, date_str: str) -> bool:
-        """Check if date string is in valid YYYY:MM:DD format."""
-        return date_str.replace(':', '').isdigit()
-        
-    def _build_date_string(self, date_part: str, time_part: str, tz_part: str) -> str:
-        """Build the final date string with optional timezone."""
-        if not date_part or not time_part:
-            return ''
-            
-        result = f"{date_part} {time_part}"
-        if tz_part:
-            normalized_tz = self._normalize_timezone(tz_part)
-            if normalized_tz:
-                result += normalized_tz
-        return result
-        
-    def _normalize_timezone(self, tz_part: str) -> str:
-        """
-        Normalize timezone format to +/-HHMM.
-        
-        Args:
-            tz_part (str): Timezone part of the date string
-            
-        Returns:
-            str: Normalized timezone string
-        """
-        if not self._is_valid_timezone_input(tz_part):
-            return ''
-            
-        # Already in correct format (-0500)
-        if self._is_normalized_timezone_format(tz_part):
-            return tz_part
-            
-        # Convert -5 to -0500
-        try:
-            clean_tz = self._clean_timezone_string(tz_part)
-            if not clean_tz:
-                return ''
-                
-            # Extract sign and number
-            sign = clean_tz[0]
-            hours = int(clean_tz[1:])
-            
-            if not self._is_valid_timezone_hours(hours, tz_part):
-                return ''
-                
-            return f"{sign}{hours:02d}00"
-        except (ValueError, IndexError):
-            return ''
-            
-    def _is_valid_timezone_input(self, tz_part: str) -> bool:
-        """Check if timezone input is valid."""
-        return bool(tz_part and isinstance(tz_part, str))
-        
-    def _is_normalized_timezone_format(self, tz_part: str) -> bool:
-        """Check if timezone is already in normalized format."""
-        return len(tz_part) == 5 and tz_part[0] in ('+', '-')
-        
-    def _clean_timezone_string(self, tz_part: str) -> str:
-        """Clean timezone string to contain only valid characters."""
-        clean_tz = self._extract_valid_timezone_chars(tz_part)
-        if not self._is_valid_timezone_chars(clean_tz):
-            return ''
-            
-        return self._ensure_timezone_sign(clean_tz)
-        
-    def _extract_valid_timezone_chars(self, tz_part: str) -> str:
-        """Extract only valid timezone characters (digits, +, -)."""
-        return ''.join(c for c in tz_part if c.isdigit() or c in '+-')
-        
-    def _is_valid_timezone_chars(self, tz_str: str) -> bool:
-        """Check if timezone string contains valid characters."""
-        return bool(tz_str and tz_str not in '+-')
-        
-    def _ensure_timezone_sign(self, tz_str: str) -> str:
-        """Ensure timezone string has a sign prefix."""
-        if tz_str[0] not in '+-':
-            return '+' + tz_str
-        return tz_str
-        
-    def _is_valid_timezone_hours(self, hours: int, original_tz: str) -> bool:
-        """Check if timezone hours are valid."""
-        if hours > 23:  # Invalid timezone
-            return False
-            
-        # If we had to clean non-numeric characters, return False
-        if len(original_tz.replace('+', '').replace('-', '')) != len(str(hours)):
-            return False
-            
-        return True
-        
     def dates_match(self, date1, date2):
         """
         Compare two dates, handling various formats.
@@ -424,30 +322,10 @@ class VideoProcessor(MediaProcessor):
             if not date1 or not date2:
                 return False
                 
-            # Convert to common format YYYY:MM:DD HH:MM:SS
-            def normalize_date(date_str):
-                # Split into parts
-                parts = date_str.split()
-                if len(parts) < 2:
-                    return None
-                    
-                # Get date and time parts
-                date_part = parts[0].replace('-', ':')
-                time_part = parts[1].split('.')[0]  # Remove subseconds
-                
-                # Remove timezone if present
-                time_part = time_part.split('-')[0].split('+')[0]
-                
-                return f"{date_part} {time_part}"
-                
-            norm1 = normalize_date(date1)
-            norm2 = normalize_date(date2)
+            norm1 = self.date_normalizer.normalize(date1)
+            norm2 = self.date_normalizer.normalize(date2)
             
-            if not norm1 or not norm2:
-                return False
-                
             return norm1 == norm2
-            
         except Exception as e:
             self.logger.error(f"Error comparing dates {date1} and {date2}: {e}")
             return False
