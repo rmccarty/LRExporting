@@ -5,8 +5,18 @@ import logging
 import time
 import fcntl
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 
 from config import MIN_FILE_AGE, TRANSFER_PATHS
+
+@dataclass
+class ValidationResult:
+    """
+    Holds the result of a file validation check.
+    """
+    is_valid: bool
+    message: str = ""
+    level: str = "debug"  # debug, error
 
 class Transfer:
     """
@@ -64,6 +74,147 @@ class Transfer:
             self.logger.error(f"Error checking file age: {e}")
             return False
             
+    def _is_processed_file(self, file_path: Path) -> bool:
+        """
+        Check if the file has the __LRE suffix indicating it's been processed.
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            bool: True if file has __LRE suffix, False otherwise
+        """
+        return file_path.name.endswith('__LRE' + file_path.suffix)
+        
+    def _has_configured_destination(self, source_dir: Path) -> bool:
+        """
+        Check if the source directory has a configured destination.
+        
+        Args:
+            source_dir: Source directory to check
+            
+        Returns:
+            bool: True if directory has configured destination, False otherwise
+        """
+        if source_dir not in TRANSFER_PATHS:
+            self.logger.error(f"No transfer path configured for: {source_dir}")
+            return False
+        return True
+        
+    def _validate_file_exists(self, file_path: Path) -> ValidationResult:
+        """
+        Check if the file exists.
+        
+        Args:
+            file_path: Path to validate
+            
+        Returns:
+            ValidationResult: Validation result with status and message
+        """
+        if not file_path.exists():
+            return ValidationResult(False, f"File does not exist: {file_path}", "error")
+        return ValidationResult(True)
+        
+    def _validate_file_format(self, file_path: Path) -> ValidationResult:
+        """
+        Check if the file has the correct format and destination.
+        
+        Args:
+            file_path: Path to validate
+            
+        Returns:
+            ValidationResult: Validation result with status and message
+        """
+        if not self._is_processed_file(file_path):
+            return ValidationResult(False, f"Not a processed file: {file_path}")
+            
+        if not self._has_configured_destination(file_path.parent):
+            # _has_configured_destination already logs error
+            return ValidationResult(False)
+            
+        return ValidationResult(True)
+        
+    def _validate_file_state(self, file_path: Path) -> ValidationResult:
+        """
+        Check if the file state allows for transfer (age and accessibility).
+        
+        Args:
+            file_path: Path to validate
+            
+        Returns:
+            ValidationResult: Validation result with status and message
+        """
+        if not self._is_file_old_enough(file_path):
+            return ValidationResult(False, f"File too new to transfer: {file_path}")
+            
+        if not self._can_access_file(file_path):
+            return ValidationResult(False, f"Cannot get exclusive access to file: {file_path}")
+            
+        return ValidationResult(True)
+        
+    def _log_validation_result(self, result: ValidationResult) -> None:
+        """
+        Log validation result with appropriate level.
+        
+        Args:
+            result: ValidationResult to log
+        """
+        if not result.message:
+            return
+            
+        if result.level == "error":
+            self.logger.error(result.message)
+        else:
+            self.logger.debug(result.message)
+            
+    def _validate_file_for_transfer(self, file_path: Path) -> bool:
+        """
+        Validate that a file meets all requirements for transfer.
+        
+        Args:
+            file_path: Path to the file to validate
+            
+        Returns:
+            bool: True if file is valid for transfer, False otherwise
+        """
+        validations = [
+            self._validate_file_exists(file_path),
+            self._validate_file_format(file_path),
+            self._validate_file_state(file_path)
+        ]
+        
+        for result in validations:
+            if not result.is_valid:
+                self._log_validation_result(result)
+                return False
+                
+        return True
+        
+    def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
+        """
+        Perform the actual file transfer operation.
+        
+        Args:
+            file_path: Path to the file to transfer
+            dest_dir: Destination directory
+            
+        Returns:
+            bool: True if transfer successful, False otherwise
+        """
+        try:
+            # Create destination directory if it doesn't exist
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Move the file
+            dest_path = dest_dir / file_path.name
+            file_path.rename(dest_path)
+            self.logger.info(f"Transferred {file_path.name} to {dest_dir}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error transferring file {file_path}: {e}")
+            return False
+            
     def transfer_file(self, file_path: Path) -> bool:
         """
         Safely transfer a file to its destination directory if conditions are met:
@@ -79,42 +230,11 @@ class Transfer:
             bool: True if transfer was successful, False otherwise
         """
         try:
-            if not file_path.exists():
-                self.logger.error(f"File does not exist: {file_path}")
+            if not self._validate_file_for_transfer(file_path):
                 return False
                 
-            # Check if this is a processed file
-            if not file_path.name.endswith('__LRE' + file_path.suffix):
-                self.logger.debug(f"Not a processed file: {file_path}")
-                return False
-                
-            # Check if we have a destination for this source directory
-            source_dir = file_path.parent
-            if source_dir not in TRANSFER_PATHS:
-                self.logger.error(f"No transfer path configured for: {source_dir}")
-                return False
-                
-            # Check if file is old enough
-            if not self._is_file_old_enough(file_path):
-                self.logger.debug(f"File too new to transfer: {file_path}")
-                return False
-                
-            # Check if we can get exclusive access
-            if not self._can_access_file(file_path):
-                self.logger.debug(f"Cannot get exclusive access to file: {file_path}")
-                return False
-                
-            # All checks passed, perform the transfer
-            dest_dir = TRANSFER_PATHS[source_dir]
-            dest_path = dest_dir / file_path.name
-            
-            # Create destination directory if it doesn't exist
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Move the file
-            file_path.rename(dest_path)
-            self.logger.info(f"Transferred {file_path.name} to {dest_dir}")
-            return True
+            dest_dir = TRANSFER_PATHS[file_path.parent]
+            return self._perform_transfer(file_path, dest_dir)
             
         except Exception as e:
             self.logger.error(f"Error transferring file {file_path}: {e}")
