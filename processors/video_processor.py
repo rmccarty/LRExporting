@@ -37,9 +37,9 @@ class VideoProcessor(MediaProcessor):
             sys.exit(1)
             
         # Check for XMP sidecar file
-        xmp_path = Path(file_path).with_suffix('.xmp')
-        if not xmp_path.exists():
-            self.logger.warning(f"No XMP sidecar file found: {xmp_path}")
+        self.xmp_file = Path(file_path).with_suffix('.xmp')
+        if not self.xmp_file.exists():
+            self.logger.warning(f"No XMP sidecar file found: {self.xmp_file}")
             
         # Initialize the ExifTool class
         self.exiftool = ExifTool()
@@ -47,41 +47,36 @@ class VideoProcessor(MediaProcessor):
         self.date_normalizer = DateNormalizer()
             
     def read_metadata_from_xmp(self) -> tuple:
-        """
-        Read metadata from XMP sidecar file.
-        
-        Returns:
-            tuple: (title, keywords, date_str, caption, location_data)
-        """
-        xmp_path = self.file_path.with_suffix('.xmp')
-        if not xmp_path.exists():
-            self.logger.warning(f"No XMP sidecar file found: {xmp_path}")
-            return None, None, None, None, (None, None, None)
+        """Read metadata from XMP sidecar file."""
+        if not self.xmp_file.exists():
+            self.logger.warning(f"No XMP sidecar file found: {self.xmp_file}")
+            return (None, None, None, None, (None, None, None))
             
         try:
-            tree = ET.parse(xmp_path)
+            tree = ET.parse(str(self.xmp_file))
             root = tree.getroot()
             
-            # Get title
-            title = self.get_title_from_rdf(root)
-            
-            # Get keywords
-            keywords = self.get_keywords_from_rdf(root)
-            
-            # Get caption
-            caption = self.get_caption_from_rdf(root)
-            
-            # Get location data
-            location, city, country = self.get_location_from_rdf(root)
-            
-            # Get date from exiftool for consistency
-            date_str = self.exiftool.read_date_from_xmp(xmp_path)
+            # Find the Description element that contains our metadata
+            description = root.find('.//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description')
+            if description is None:
+                self.logger.warning("No Description element found in XMP")
+                return (None, None, None, None, (None, None, None))
                 
-            return title, keywords, date_str, caption, (location, city, country)
+            # Extract metadata fields
+            title = self.get_title_from_rdf(description)
+            keywords = self.get_keywords_from_rdf(description)
+            date_str = self.exiftool.read_date_from_xmp(self.xmp_file)
+            caption = self.get_caption_from_rdf(description)
+            location = self.get_location_from_rdf(description)
+            
+            return (title, keywords, date_str, caption, location)
             
         except ET.ParseError as e:
-            self.logger.error(f"Error parsing XMP file: {e}")
-            return None, None, None, None, (None, None, None)
+            self.logger.error(f"Error parsing XMP file: {str(e)}")
+            return (None, None, None, None, (None, None, None))
+        except Exception as e:
+            self.logger.error(f"Error reading XMP metadata: {str(e)}")
+            return (None, None, None, None, (None, None, None))
             
     def _get_keywords_from_hierarchical(self, rdf) -> list[str] | None:
         """Get keywords from hierarchical subjects."""
@@ -283,7 +278,15 @@ class VideoProcessor(MediaProcessor):
         """Prepare date metadata fields."""
         if not date_str:
             return {}
-        return {field: date_str for field in METADATA_FIELDS['date']}
+            
+        # Use the original date string if normalization fails
+        normalized_date = self.normalize_date(date_str)
+        if not normalized_date:
+            self.logger.error(f"Invalid date format: {date_str}")
+            # Return the original date string for the fields
+            return {field: date_str for field in METADATA_FIELDS['date']}
+            
+        return {field: normalized_date for field in METADATA_FIELDS['date']}
         
     def _prepare_caption_fields(self, caption: str | None) -> dict:
         """Prepare caption metadata fields."""
@@ -573,13 +576,12 @@ class VideoProcessor(MediaProcessor):
     def _cleanup_and_rename(self) -> Path:
         """Clean up XMP file and rename video with LRE suffix."""
         # Delete XMP file first (order is critical)
-        xmp_path = self.file_path.with_suffix('.xmp')
-        self.logger.debug(f"Checking for XMP file at: {xmp_path}")
-        if xmp_path.exists():
+        self.logger.debug(f"Checking for XMP file at: {self.xmp_file}")
+        if self.xmp_file.exists():
             try:
                 self.logger.info("Deleting XMP file before renaming video (critical order)")
-                xmp_path.unlink()
-                self.logger.debug(f"Successfully deleted XMP file: {xmp_path}")
+                self.xmp_file.unlink()
+                self.logger.debug(f"Successfully deleted XMP file: {self.xmp_file}")
             except Exception as e:
                 self.logger.error(f"Failed to delete XMP file: {e}")
                 self.logger.error("Cannot proceed with renaming without deleting XMP first")

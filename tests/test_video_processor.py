@@ -20,9 +20,9 @@ class TestVideoProcessor(unittest.TestCase):
         """Set up test environment."""
         self.test_file = Path('/test/video.mp4')
         self.test_xmp = self.test_file.with_suffix('.xmp')
-        self.processor = VideoProcessor(str(self.test_file))
         
-        # Mock logger to prevent actual logging during tests
+        # Create a fresh processor instance to ensure clean logger mock
+        self.processor = VideoProcessor(str(self.test_file))
         self.processor.logger = Mock()
         
         # Mock methods that make external calls
@@ -265,7 +265,7 @@ class TestXMPProcessing(TestVideoProcessor):
             result = self.processor.get_metadata_from_xmp()
             self.assertEqual(result, (None, None, None, None, (None, None, None)))
             self.processor.logger.warning.assert_called_once()
-            
+
     def test_when_getting_metadata_from_xmp_with_partial_metadata_then_logs_info(self):
         """Should log info messages for missing metadata fields."""
         with patch.object(self.processor, 'read_metadata_from_xmp') as mock_read:
@@ -1109,6 +1109,102 @@ class TestMetadataVerification(unittest.TestCase):
         # Verify
         self.assertFalse(result)
         self.processor.read_exif.assert_called_once()
+
+class TestXMPErrorHandling(TestVideoProcessor):
+    """Tests for error handling in XMP processing."""
+    
+    def test_when_xml_parsing_fails_then_logs_error(self):
+        """Should log error and return None when XML parsing fails."""
+        # Create processor instance with a mock logger
+        processor = VideoProcessor('/test/video.mp4')
+        processor.logger = Mock()
+        
+        # Mock xmp_file to exist
+        mock_xmp = Mock()
+        mock_xmp.exists.return_value = True
+        mock_xmp.__str__ = Mock(return_value='/test/video.xmp')
+        processor.xmp_file = mock_xmp
+        
+        # Mock ET.parse to raise an exception with specific message
+        error_msg = "XML parse error"
+        with patch('xml.etree.ElementTree.parse', side_effect=ET.ParseError(error_msg)):
+            result = processor.read_metadata_from_xmp()
+            
+            self.assertEqual(result, (None, None, None, None, (None, None, None)))
+            processor.logger.error.assert_called_once_with(f"Error parsing XMP file: {error_msg}")
+            
+    def test_when_keyword_extraction_fails_then_logs_error(self):
+        """Should log error and return None when keyword extraction fails."""
+        # Create processor instance with a mock logger
+        processor = VideoProcessor('/test/video.mp4')
+        processor.logger = Mock()
+        
+        # Create malformed RDF that will cause an error
+        malformed_rdf = ET.Element('Description')
+        malformed_rdf.set('xmlns:rdf', XML_NAMESPACES['rdf'])
+        malformed_rdf.set('xmlns:lr', XML_NAMESPACES['lr'])
+        
+        # Add invalid keyword structure
+        keywords = ET.SubElement(malformed_rdf, '{%s}hierarchicalSubject' % XML_NAMESPACES['lr'])
+        bag = ET.SubElement(keywords, '{%s}Bag' % XML_NAMESPACES['rdf'])
+        ET.SubElement(bag, '{%s}li' % XML_NAMESPACES['rdf'])  # Empty li element
+        
+        with self.assertRaises(Exception):
+            result = processor.get_keywords_from_rdf(malformed_rdf)
+            self.assertIsNone(result)
+            processor.logger.error.assert_called()
+            
+    def test_when_location_extraction_fails_then_logs_error(self):
+        """Should log error and return None when location extraction fails."""
+        # Create processor instance with a mock logger
+        processor = VideoProcessor('/test/video.mp4')
+        processor.logger = Mock()
+        
+        # Create malformed RDF that will cause an error
+        malformed_rdf = ET.Element('Description')
+        malformed_rdf.set('xmlns:rdf', XML_NAMESPACES['rdf'])
+        malformed_rdf.set('xmlns:Iptc4xmpCore', XML_NAMESPACES['Iptc4xmpCore'])
+        
+        # Add invalid location structure
+        location = ET.SubElement(malformed_rdf, '{%s}Location' % XML_NAMESPACES['Iptc4xmpCore'])
+        bag = ET.SubElement(location, '{%s}Bag' % XML_NAMESPACES['rdf'])
+        ET.SubElement(bag, '{%s}li' % XML_NAMESPACES['rdf'])  # Empty li element
+        
+        with self.assertRaises(Exception):
+            result = processor.get_location_from_rdf(malformed_rdf)
+            self.assertEqual(result, (None, None, None))
+            processor.logger.error.assert_called()
+            
+    def test_when_date_normalization_fails_then_logs_error(self):
+        """Should log error and return None when date normalization fails."""
+        # Create processor instance with a mock logger
+        processor = VideoProcessor('/test/video.mp4')
+        processor.logger = Mock()
+        
+        # Mock date_normalizer to raise an exception
+        processor.date_normalizer = Mock()
+        processor.date_normalizer.normalize.side_effect = ValueError("Invalid date")
+        
+        # Test with invalid date
+        result = processor.normalize_date("invalid_date")
+        
+        self.assertIsNone(result)
+        processor.logger.error.assert_called()
+        
+    def test_when_metadata_field_preparation_fails_then_logs_error(self):
+        """Should log error and handle gracefully when metadata field preparation fails."""
+        # Create processor instance with a mock logger
+        processor = VideoProcessor('/test/video.mp4')
+        processor.logger = Mock()
+        
+        # Test with invalid date
+        date_str = "invalid_date"
+        result = processor._prepare_date_fields(date_str)
+        
+        # Should return original date string in fields
+        expected = {field: date_str for field in METADATA_FIELDS['date']}
+        self.assertEqual(result, expected)
+        processor.logger.error.assert_called_once_with(f"Invalid date format: {date_str}")
 
 if __name__ == '__main__':
     unittest.main()
