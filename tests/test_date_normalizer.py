@@ -95,5 +95,61 @@ class TestDateNormalizer(unittest.TestCase):
                 result = self.normalizer._normalize_date_component(input_date)
                 self.assertEqual(result, expected)
 
+    def test_when_normalizing_timezone_with_edge_cases_then_handles_correctly(self):
+        """Should handle timezone edge cases correctly."""
+        test_cases = [
+            ('+0', '+0000'),      # Short positive zero
+            ('-0', '-0000'),      # Short negative zero (preserve sign)
+            ('+14', '+1400'),     # Max positive
+            ('-14', '-1400'),     # Max negative
+            ('UTC', '+0000'),     # UTC string
+            ('Z', '+0000'),       # Z timezone
+            ('GMT', '+0000'),     # GMT string
+            (None, ''),           # None input
+            ('', ''),             # Empty string
+            ('invalid', ''),      # Invalid string
+            ('15:00', ''),        # Missing sign
+            ('+1500', ''),        # Invalid hours
+            ('+1260', ''),        # Invalid minutes
+            ('+15', ''),          # Incomplete format
+            ('5abc', ''),         # Invalid with numbers
+        ]
+        for input_tz, expected_tz in test_cases:
+            with self.subTest(input_tz=input_tz):
+                result = self.normalizer._normalize_timezone(input_tz)
+                self.assertEqual(result, expected_tz,
+                    f"Expected {expected_tz} for timezone {input_tz}, got {result}")
+                    
+    def test_when_validating_timezone_input_with_invalid_types_then_returns_false(self):
+        """Should handle edge cases in _is_valid_timezone_input."""
+        test_cases = [
+            None,
+            123,
+            [],
+            {},
+            True
+        ]
+        for tz in test_cases:
+            with self.subTest(tz=tz):
+                result = self.normalizer._is_valid_timezone_input(tz)
+                self.assertFalse(result)
+                
+    def test_when_cleaning_timezone_string_then_handles_all_formats(self):
+        """Should handle all timezone string formats correctly."""
+        test_cases = [
+            ('+0500', '+0500'),   # Already clean
+            ('-5', '-5'),         # Short format
+            ('+abc5', '+5'),      # Remove invalid chars
+            ('+-5', '+5'),        # Remove duplicate signs
+            ('5', '5'),           # No sign
+            ('abc', ''),          # No valid chars
+            ('+', ''),            # Only sign
+            ('+-', ''),           # Only signs
+        ]
+        for input_tz, expected in test_cases:
+            with self.subTest(input_tz=input_tz):
+                result = self.normalizer._clean_timezone_string(input_tz)
+                self.assertEqual(result, expected)
+
 if __name__ == '__main__':
     unittest.main()
