@@ -100,12 +100,16 @@ class JPEGExifProcessor(MediaProcessor):
         date_str = None
         for key in self.exif_data:
             if key.endswith(':DateTimeOriginal'):
-                date_str = self.exif_data[key]
+                raw_date = self.exif_data[key]
                 # Convert YYYY:MM:DD HH:MM:SS to YYYY_MM_DD
-                if date_str:
+                if raw_date and ' ' in raw_date:  # Must have space between date and time
                     try:
-                        date_parts = date_str.split(' ')[0].split(':')
-                        date_str = '_'.join(date_parts)
+                        date_parts = raw_date.split(' ')[0].split(':')
+                        if len(date_parts) == 3:  # Must have year, month, day
+                            date_str = '_'.join(date_parts)
+                        else:
+                            self.logger.error(f"Invalid date format: {raw_date}")
+                            date_str = None
                     except Exception as e:
                         self.logger.error(f"Error parsing date: {e}")
                         date_str = None
