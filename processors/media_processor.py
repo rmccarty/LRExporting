@@ -214,9 +214,10 @@ class MediaProcessor(ABC):
 
     def _build_filename_with_sequence(self, parts: list) -> str:
         """Build filename with sequence number if provided."""
+        base = '_'.join(parts)
         if self.sequence:
-            parts.append(self.sequence)
-        return '_'.join(parts) + '__LRE'
+            base = f"{base}_{self.sequence}"
+        return base + '__LRE'
 
     def generate_filename(self):
         """Generate new filename based on metadata."""

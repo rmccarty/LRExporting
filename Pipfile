@@ -9,6 +9,7 @@ mutagen = "*"
 python-xmp-toolkit = "*"
 pillow = "*"
 coverage = "*"
+radon = "*"
 
 [dev-packages]
 radon = "*"

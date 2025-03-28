@@ -87,7 +87,7 @@ class ExifTool:
         
         Args:
             file_path: Path to the file
-            fields: Dictionary of field names and values to write
+            fields: Dictionary of field names and values to write. Field names can include leading dash.
             
         Returns:
             bool: True if successful, False otherwise
@@ -100,10 +100,13 @@ class ExifTool:
                 if value:
                     if isinstance(value, list):
                         value = ','.join(value)
-                    cmd.append(f'-{field}={value}')
+                    # Don't add extra dash if field already starts with one
+                    field_arg = field if field.startswith('-') else f'-{field}'
+                    cmd.append(f'{field_arg}={value}')
                     
             cmd.append(str(file_path))
             
+            self.logger.debug(f"Running exiftool command: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 self.logger.error(f"Error writing metadata: {result.stderr}")

@@ -144,6 +144,29 @@ class TestExifTool(unittest.TestCase):
         self.assertFalse(result)
 
     @patch('subprocess.run')
+    def test_when_writing_metadata_with_predashed_fields_then_preserves_dash(self, mock_run):
+        """Should preserve existing dashes in field names and not add extra ones"""
+        mock_run.return_value = MagicMock(returncode=0)
+        fields = {
+            'Title': 'Test Video',  # Regular field
+            '-ItemList:Title': 'Test Video',  # Pre-dashed field
+            '-QuickTime:Title': 'Test Video'  # Another pre-dashed field
+        }
+
+        result = self.exiftool.write_metadata(self.test_file, fields)
+        self.assertTrue(result)
+        mock_run.assert_called_once()
+        cmd_args = mock_run.call_args[0][0]
+        
+        # Regular field should get dash added
+        self.assertIn('-Title=Test Video', cmd_args)
+        # Pre-dashed fields should not get extra dash
+        self.assertIn('-ItemList:Title=Test Video', cmd_args)
+        self.assertIn('-QuickTime:Title=Test Video', cmd_args)
+        # Make sure no double-dashes were created
+        self.assertNotIn('--', ' '.join(cmd_args))
+
+    @patch('subprocess.run')
     def test_when_copying_metadata_then_formats_command_correctly(self, mock_run):
         """Should format copy metadata command correctly"""
         mock_run.return_value = MagicMock(returncode=0)
