@@ -2,19 +2,23 @@
 
 import logging
 import os
+import time
 from pathlib import Path
 
 from Photos import (
     PHAssetChangeRequest,
     PHAssetCreationRequest,
     PHPhotoLibrary,
+    PHAsset,
+    PHAssetMediaType,
+    PHFetchOptions,
 )
 from Foundation import (
     NSURL,
     NSError,
 )
 
-from .config import DELETE_ORIGINAL
+from .config import DELETE_ORIGINAL, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 
 class ImportManager:
     """Manages photo import operations for Apple Photos."""
@@ -23,49 +27,102 @@ class ImportManager:
         """Initialize the import manager."""
         self.logger = logging.getLogger(__name__)
         
-    def import_photo(self, photo_path: Path) -> bool:
+    def _get_asset_type(self, file_path: Path) -> str:
         """
-        Import a photo into Apple Photos.
+        Determine if the file is a photo or video based on extension.
         
         Args:
-            photo_path: Path to the photo file
+            file_path: Path to the media file
             
         Returns:
-            bool: True if import successful (regardless of deletion), False if import failed
+            str: 'photo' or 'video'
         """
+        ext = file_path.suffix.lower()
+        if ext in IMAGE_EXTENSIONS:
+            return 'photo'
+        elif ext in VIDEO_EXTENSIONS:
+            return 'video'
+        else:
+            raise ValueError(f"Unsupported file extension: {ext}")
+            
+    def _verify_asset_exists(self, local_id: str, max_attempts: int = 3, delay: float = 0.5) -> bool:
+        """
+        Verify that an asset exists in the Photos library by its local identifier.
+        
+        Args:
+            local_id: The local identifier of the asset to verify
+            max_attempts: Maximum number of attempts to verify
+            delay: Delay in seconds between attempts
+            
+        Returns:
+            bool: True if asset exists and is accessible
+        """
+        for attempt in range(max_attempts):
+            # Try to fetch the asset
+            result = PHAsset.fetchAssetsWithLocalIdentifiers_options_([local_id], None)
+            if result and result.count() > 0:
+                self.logger.info(f"Asset verified in Photos library: {local_id}")
+                return True
+                
+            if attempt < max_attempts - 1:
+                self.logger.debug(f"Asset not found yet, retrying in {delay}s (attempt {attempt + 1}/{max_attempts})")
+                time.sleep(delay)
+                
+        self.logger.error(f"Failed to verify asset in Photos library after {max_attempts} attempts: {local_id}")
+        return False
+            
+    def import_photo(self, photo_path: Path) -> bool:
+        """Import a photo into Apple Photos."""
         try:
-            # Check if file exists
             if not photo_path.exists():
-                self.logger.error(f"Photo does not exist: {photo_path}")
+                self.logger.error(f"File does not exist: {photo_path}")
+                return False
+
+            # Identify asset type
+            try:
+                asset_type = self._get_asset_type(photo_path)
+                self.logger.info(f"Importing {asset_type}: {photo_path}")
+            except ValueError as e:
+                self.logger.error(str(e))
                 return False
                 
-            # Log the ingest
-            self.logger.info(f"Ingesting photo: {photo_path}")
-            
-            # Convert path to NSURL
             file_url = NSURL.fileURLWithPath_(str(photo_path))
-            
-            # Get shared photo library
             shared = PHPhotoLibrary.sharedPhotoLibrary()
             
-            # Create a flag to track import success
+            # Store the placeholder asset's local identifier
+            placeholder_id = None
+            
             def changes():
-                creation_request = PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
-                if creation_request is None:
+                nonlocal placeholder_id
+                request = PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
+                if request is None:
                     raise Exception("Import failed")
+                placeholder = request.placeholderForCreatedAsset()
+                if placeholder is None:
+                    raise Exception("Failed to get placeholder asset")
+                placeholder_id = placeholder.localIdentifier()
             
-            success = shared.performChangesAndWait_error_(changes, None)
+            error = None
+            success = shared.performChangesAndWait_error_(changes, error)
             
-            if success and DELETE_ORIGINAL:
+            if not success:
+                self.logger.error(f"Import failed for {photo_path}")
+                return False
+                
+            # Verify the asset exists in Photos library
+            if placeholder_id:
+                if not self._verify_asset_exists(placeholder_id):
+                    self.logger.error(f"Import appeared to succeed but asset not found in Photos library: {photo_path}")
+                    return False
+                    
+            if DELETE_ORIGINAL:
                 try:
                     photo_path.unlink()
-                    self.logger.info(f"Photo ingested and original deleted: {photo_path}")
                 except Exception as e:
-                    # Log deletion error but don't fail the import
                     self.logger.error(f"Import succeeded but failed to delete original: {e}")
                     
-            return success
-                
+            return True
+            
         except Exception as e:
-            self.logger.error(f"Import failed for {photo_path}: {e}")
+            self.logger.error(f"Failed to import {photo_path}: {e}")
             return False

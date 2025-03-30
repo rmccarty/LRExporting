@@ -29,11 +29,12 @@ class TestImportManager(unittest.TestCase):
             block()
             return True
             
-        mock_shared.performChanges_error_.side_effect = perform_changes
+        mock_shared.performChangesAndWait_error_.side_effect = perform_changes
         
         with patch('pathlib.Path.exists', return_value=True), \
-             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request:
-            mock_request.creationRequestForAssetFromImageAtFileURL_.return_value = MagicMock()
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class:
+            mock_request = MagicMock()
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
             
             # Act
             result = self.manager.import_photo(self.test_file)
@@ -41,7 +42,7 @@ class TestImportManager(unittest.TestCase):
             # Assert
             self.assertTrue(result)
             mock_nsurl.fileURLWithPath_.assert_called_once_with(str(self.test_file))
-            mock_request.creationRequestForAssetFromImageAtFileURL_.assert_called_once_with(mock_file_url)
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.assert_called_once_with(mock_file_url)
             
     @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
     @patch('apple_photos_sdk.import_manager.NSURL')
@@ -69,13 +70,14 @@ class TestImportManager(unittest.TestCase):
         
         def perform_changes(block, error):
             block()
-            return True
+            return False
             
-        mock_shared.performChanges_error_.side_effect = perform_changes
+        mock_shared.performChangesAndWait_error_.side_effect = perform_changes
         
         with patch('pathlib.Path.exists', return_value=True), \
-             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request:
-            mock_request.creationRequestForAssetFromImageAtFileURL_.return_value = None
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class:
+            mock_request = MagicMock()
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = None
             
             # Act
             result = self.manager.import_photo(self.test_file)
@@ -93,7 +95,7 @@ class TestImportManager(unittest.TestCase):
         
         mock_shared = MagicMock()
         mock_library.sharedPhotoLibrary.return_value = mock_shared
-        mock_shared.performChanges_error_.side_effect = Exception("Photos library error")
+        mock_shared.performChangesAndWait_error_.side_effect = Exception("Photos library error")
         
         with patch('pathlib.Path.exists', return_value=True):
             # Act
@@ -118,12 +120,13 @@ class TestImportManager(unittest.TestCase):
             block()
             return True
             
-        mock_shared.performChanges_error_.side_effect = perform_changes
+        mock_shared.performChangesAndWait_error_.side_effect = perform_changes
         
         with patch('pathlib.Path.exists', return_value=True), \
-             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request, \
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
              patch('os.unlink', side_effect=OSError("Delete failed")):
-            mock_request.creationRequestForAssetFromImageAtFileURL_.return_value = MagicMock()
+            mock_request = MagicMock()
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
             
             # Act
             result = self.manager.import_photo(self.test_file)
@@ -147,12 +150,13 @@ class TestImportManager(unittest.TestCase):
             block()
             return True
             
-        mock_shared.performChanges_error_.side_effect = perform_changes
+        mock_shared.performChangesAndWait_error_.side_effect = perform_changes
         
         with patch('pathlib.Path.exists', return_value=True), \
-             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request, \
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
              patch('os.unlink') as mock_unlink:
-            mock_request.creationRequestForAssetFromImageAtFileURL_.return_value = MagicMock()
+            mock_request = MagicMock()
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
             
             # Act
             result = self.manager.import_photo(self.test_file)
@@ -176,12 +180,13 @@ class TestImportManager(unittest.TestCase):
             block()
             return True
             
-        mock_shared.performChanges_error_.side_effect = perform_changes
+        mock_shared.performChangesAndWait_error_.side_effect = perform_changes
         
         with patch('pathlib.Path.exists', return_value=True), \
-             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request, \
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
              self.assertLogs(logger='apple_photos_sdk.import_manager', level='INFO') as log:
-            mock_request.creationRequestForAssetFromImageAtFileURL_.return_value = MagicMock()
+            mock_request = MagicMock()
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
             
             # Act
             self.manager.import_photo(self.test_file)
