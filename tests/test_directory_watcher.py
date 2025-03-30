@@ -200,6 +200,42 @@ class TestDirectoryWatcher(unittest.TestCase):
         with patch.object(self.watcher, 'process_file') as mock_process:
             self.watcher.check_directory('/test/dir')
             mock_process.assert_called_once_with(mock_file)
+            
+    def test_when_starting_watcher_then_logs_startup_message(self):
+        """Should log startup message when watcher begins running."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        with patch.object(self.watcher, 'check_apple_photos_dirs') as mock_check, \
+             self.assertLogs(level='INFO') as log:
+            # Mock time.sleep to avoid infinite loop
+            with patch('time.sleep', side_effect=InterruptedError):
+                try:
+                    self.watcher.run()
+                except InterruptedError:
+                    pass
+                    
+            expected_msg = "INFO:watchers.directory_watcher:DirectoryWatcher started - monitoring Apple Photos directories for new files..."
+            self.assertIn(expected_msg, log.output)
+            
+    @patch('watchers.directory_watcher.APPLE_PHOTOS_PATHS', [Path('/test/photos1'), Path('/test/photos2')])
+    def test_when_checking_apple_photos_dirs_then_logs_directories(self):
+        """Should log each Apple Photos directory being checked."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        test_paths = [Path('/test/photos1'), Path('/test/photos2')]
+        
+        with patch.object(self.watcher, 'check_directory') as mock_check, \
+             self.assertLogs(level='INFO') as log:
+            self.watcher.check_apple_photos_dirs()
+            
+            # Should log each directory
+            for path in test_paths:
+                expected_msg = f"INFO:watchers.directory_watcher:Checking Apple Photos directory: {path}"
+                self.assertIn(expected_msg, log.output)
+            
+            # Should check each directory
+            self.assertEqual(mock_check.call_count, len(test_paths))
+            mock_check.assert_any_call(test_paths[0])
+            mock_check.assert_any_call(test_paths[1])
 
 if __name__ == '__main__':
     unittest.main()
