@@ -58,11 +58,15 @@ class ImportManager:
             bool: True if asset exists and is accessible
         """
         for attempt in range(max_attempts):
-            # Try to fetch the asset
-            result = PHAsset.fetchAssetsWithLocalIdentifiers_options_([local_id], None)
-            if result and result.count() > 0:
-                self.logger.info(f"Asset verified in Photos library: {local_id}")
-                return True
+            try:
+                # Try to fetch the asset
+                result = PHAsset.fetchAssetsWithLocalIdentifiers_options_([local_id], None)
+                if result and result.count() > 0:
+                    self.logger.info(f"Asset verified in Photos library: {local_id}")
+                    return True
+            except Exception as e:
+                self.logger.error(f"Error verifying asset {local_id}: {e}")
+                return False
                 
             if attempt < max_attempts - 1:
                 self.logger.debug(f"Asset not found yet, retrying in {delay}s (attempt {attempt + 1}/{max_attempts})")
