@@ -36,26 +36,26 @@ class DirectoryWatcher(BaseWatcher):
         try:
             # Iterate through all files in the Both_Incoming directory
             for file in self.both_incoming.glob("*"):
+                found_files = True  # Mark as found even if locked
                 # Check if the file is open
                 try:
                     with open(file, 'r+'):
-                        pass  # File is not open, proceed to copy
+                        # File is not open, proceed to copy
+                        # Copy the file to all incoming directories
+                        for incoming_dir in self.directories:
+                            shutil.copy(file, incoming_dir / file.name)
+                            self.logger.info(f"Copied {file.name} to {incoming_dir.name} directory.")
+                        
+                        # Delete the original file
+                        file.unlink()
+                        self.logger.info(f"Deleted {file.name} from Both_Incoming.")
                 except IOError:
                     self.logger.warning(f"File {file.name} is currently open. Skipping copy.")
                     continue  # Skip to the next file
-                
-                found_files = True
-                # Copy the file to all incoming directories
-                for incoming_dir in self.directories:
-                    shutil.copy(file, incoming_dir / file.name)
-                    self.logger.info(f"Copied {file.name} to {incoming_dir.name} directory.")
-                
-                # Delete the original file
-                file.unlink()
-                self.logger.info(f"Deleted {file.name} from Both_Incoming.")
         
         except Exception as e:
             self.logger.error(f"Error processing Both_Incoming: {e}")
+            found_files = False
         
         return found_files
     
@@ -68,13 +68,13 @@ class DirectoryWatcher(BaseWatcher):
         
         # Check for zero-byte files
         if file.stat().st_size == 0:
-            self.logger.warning(f"Skipping zero-byte file: {file}")
+            self.logger.warning(f"Skipping zero-byte file: {str(file)}")
             return
             
         # Process the file
-        sequence = self._get_next_sequence()
-        processor = JPEGExifProcessor(str(file), sequence=sequence)
         try:
+            sequence = self._get_next_sequence()
+            processor = JPEGExifProcessor(str(file), sequence=sequence)
             new_path = processor.process_image()
             self.logger.info(f"Image processed successfully: {new_path}")
         except Exception as e:
