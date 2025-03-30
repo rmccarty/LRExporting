@@ -54,18 +54,11 @@ class TestConfig(unittest.TestCase):
         ron_path = Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos")
         claudia_path = Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs")
         
-        # Check paths exist
+        # Ron's path should be in APPLE_PHOTOS_PATHS
         self.assertIn(ron_path, APPLE_PHOTOS_PATHS)
-        self.assertIn(claudia_path, APPLE_PHOTOS_PATHS)
-        
-        # Check values are boolean
-        self.assertIsInstance(APPLE_PHOTOS_PATHS[ron_path], bool)
-        self.assertIsInstance(APPLE_PHOTOS_PATHS[claudia_path], bool)
-        
-        # Check specific values
-        self.assertTrue(APPLE_PHOTOS_PATHS[ron_path])  # Ron's path goes to Apple Photos
-        self.assertFalse(APPLE_PHOTOS_PATHS[claudia_path])  # Claudia's path is regular filesystem
-        
+        # Claudia's path should NOT be in APPLE_PHOTOS_PATHS
+        self.assertNotIn(claudia_path, APPLE_PHOTOS_PATHS)
+
     def test_min_file_age(self):
         """Should have positive integer value for minimum file age."""
         self.assertIsInstance(MIN_FILE_AGE, int)
@@ -93,10 +86,12 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(MCCARTYS_REPLACEMENT, 'The McCartys: ')
         
     def test_transfer_and_apple_photos_paths_consistency(self):
-        """Should have matching paths between TRANSFER_PATHS values and APPLE_PHOTOS_PATHS keys."""
-        transfer_destinations = {str(path) for path in TRANSFER_PATHS.values()}
-        apple_photos_paths = {str(path) for path in APPLE_PHOTOS_PATHS.keys()}
-        self.assertEqual(transfer_destinations, apple_photos_paths)
+        """Should have matching paths between TRANSFER_PATHS values and APPLE_PHOTOS_PATHS."""
+        transfer_paths = {str(path) for path in TRANSFER_PATHS.values()}
+        apple_photos_paths = {str(path) for path in APPLE_PHOTOS_PATHS}
+        
+        # All Apple Photos paths should be in transfer paths
+        self.assertTrue(apple_photos_paths.issubset(transfer_paths))
 
 if __name__ == '__main__':
     unittest.main()
