@@ -222,12 +222,20 @@ class Transfer:
             # First move file to destination
             dest_dir.mkdir(parents=True, exist_ok=True)
             dest_path = dest_dir / file_path.name
+            self.logger.debug(f"Moving file from {file_path} to {dest_path}")
             file_path.rename(dest_path)
+            self.logger.info(f"Successfully moved file to {dest_path}")
             
             if dest_dir in APPLE_PHOTOS_PATHS:
                 # Then import to Apple Photos if needed
+                self.logger.debug(f"Importing {dest_path} to Apple Photos")
                 photos = ApplePhotos()
-                return photos.import_photo(dest_path)
+                success = photos.import_photo(dest_path)
+                if success:
+                    self.logger.info(f"Successfully imported {dest_path} to Apple Photos")
+                else:
+                    self.logger.error(f"Failed to import {dest_path} to Apple Photos")
+                return success
             
             return True
                 

@@ -62,20 +62,21 @@ class DirectoryWatcher(BaseWatcher):
         if not file_path.is_file():
             return
             
-        # Skip already processed files
-        if "__LRE" in file_path.name:
-            return
-            
         # Check for zero-byte files
         if file_path.stat().st_size == 0:
             self.logger.warning(f"Skipping zero-byte file: {str(file_path)}")
             return
             
         try:
-            # For files in Apple Photos directories, directly import without processing
+            # For files in Apple Photos directories, process regardless of suffix
             if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 self.logger.info(f"Found file in Apple Photos directory: {file_path}")
                 self.transfer.transfer_file(file_path)
+                return
+                
+            # For files in regular directories, skip if already processed
+            if "__LRE" in file_path.name:
+                self.logger.debug(f"Skipping already processed file: {file_path}")
                 return
                 
             # For files in regular directories, process and transfer

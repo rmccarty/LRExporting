@@ -71,8 +71,26 @@ class ImportManager:
         self.logger.error(f"Failed to verify asset in Photos library after {max_attempts} attempts: {local_id}")
         return False
             
+    def _create_asset_request(self, file_url, asset_type: str):
+        """
+        Create the appropriate asset request based on media type.
+        
+        Args:
+            file_url: NSURL for the media file
+            asset_type: Either 'photo' or 'video'
+            
+        Returns:
+            PHAssetCreationRequest: The creation request object
+        """
+        if asset_type == 'photo':
+            return PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
+        elif asset_type == 'video':
+            return PHAssetCreationRequest.creationRequestForAssetFromVideoAtFileURL_(file_url)
+        else:
+            raise ValueError(f"Unsupported asset type: {asset_type}")
+            
     def import_photo(self, photo_path: Path) -> bool:
-        """Import a photo into Apple Photos."""
+        """Import a photo or video into Apple Photos."""
         try:
             if not photo_path.exists():
                 self.logger.error(f"File does not exist: {photo_path}")
@@ -94,9 +112,9 @@ class ImportManager:
             
             def changes():
                 nonlocal placeholder_id
-                request = PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
+                request = self._create_asset_request(file_url, asset_type)
                 if request is None:
-                    raise Exception("Import failed")
+                    raise Exception(f"Failed to create {asset_type} import request")
                 placeholder = request.placeholderForCreatedAsset()
                 if placeholder is None:
                     raise Exception("Failed to get placeholder asset")
