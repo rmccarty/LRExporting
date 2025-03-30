@@ -73,10 +73,9 @@ TRANSFER_PATHS = {
     CLAUDIA_INCOMING: Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs")
 }
 
-# Apple Photos configuration
+# Apple Photos configuration - paths that should be imported to Photos
 APPLE_PHOTOS_PATHS = {
-    Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos"): True,  # Goes to Apple Photos
-    Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs"): False  # Regular file system
+    Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos")  # Only Ron's path goes to Apple Photos
 }
 
 MIN_FILE_AGE = 60  # Minimum age in seconds before a file can be transferred
