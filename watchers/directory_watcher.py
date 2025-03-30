@@ -5,8 +5,11 @@ import logging
 import time
 import shutil
 
-from config import SLEEP_TIME, APPLE_PHOTOS_PATHS
-from watchers.base_watcher import BaseWatcher
+from config import (
+    WATCH_DIRS, BOTH_INCOMING, APPLE_PHOTOS_PATHS,
+    JPEG_PATTERN, ALL_PATTERN
+)
+from .base_watcher import BaseWatcher
 from transfers.transfer import Transfer
 from processors.jpeg_processor import JPEGExifProcessor
 
@@ -59,7 +62,16 @@ class DirectoryWatcher(BaseWatcher):
         if not file_path.is_file():
             return
             
-        # Skip already processed files
+        # For Apple Photos directories, directly transfer without processing
+        if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+            self.logger.info(f"Found file for Apple Photos: {file_path}")
+            try:
+                self.transfer.transfer_file(file_path)
+            except Exception as e:
+                self.logger.error(f"Error transferring file to Apple Photos: {e}")
+            return
+            
+        # For regular directories, skip already processed files
         if "__LRE" in file_path.name:
             return
             
@@ -76,10 +88,6 @@ class DirectoryWatcher(BaseWatcher):
             processor = JPEGExifProcessor(str(file_path), sequence=sequence)
             new_path = processor.process_image()
             self.logger.info(f"Image processed successfully: {new_path}")
-            
-            # If it's in an Apple Photos directory, transfer it
-            if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
-                self.transfer.transfer_file(Path(new_path))
                 
         except Exception as e:
             self.logger.error(f"Error processing image: {e}")
@@ -94,12 +102,15 @@ class DirectoryWatcher(BaseWatcher):
         if not any(Path(directory) == photos_path for photos_path in APPLE_PHOTOS_PATHS):
             self.logger.info(f"Checking {directory} for new JPEG files...")
             # Regular directory - only process JPG files
-            for file in directory.glob("*.jpg"):
+            for file in directory.glob(JPEG_PATTERN):
                 self.process_file(file)
         else:
-            # Apple Photos directory - process all files
-            for file in directory.iterdir():
-                if file.is_file():
+            # Apple Photos directory - process all supported files
+            self.logger.debug(f"Looking for patterns: {ALL_PATTERN}")
+            for pattern in ALL_PATTERN:
+                self.logger.debug(f"Searching with pattern: {pattern}")
+                for file in directory.glob(pattern):
+                    self.logger.debug(f"Found file: {file}")
                     self.process_file(file)
     
     def check_apple_photos_dirs(self):

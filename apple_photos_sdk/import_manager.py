@@ -4,6 +4,8 @@ import logging
 import os
 from pathlib import Path
 
+from .config import DELETE_ORIGINAL
+
 class ImportManager:
     """Manages photo import operations for Apple Photos."""
     
@@ -35,9 +37,12 @@ class ImportManager:
                 # Just read a small chunk to verify file is accessible
                 f.read(1024)
                 
-            # Delete the original file since we're simulating a successful import
-            os.unlink(photo_path)
-            self.logger.info(f"Photo ingested and original deleted: {photo_path}")
+            # Only delete if configured to do so
+            if DELETE_ORIGINAL:
+                os.unlink(photo_path)
+                self.logger.info(f"Photo ingested and original deleted: {photo_path}")
+            else:
+                self.logger.info(f"Photo ingested, original preserved: {photo_path}")
             
             return True
             

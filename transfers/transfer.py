@@ -225,11 +225,13 @@ class Transfer:
             
     def transfer_file(self, file_path: Path) -> bool:
         """
-        Safely transfer a file to its destination directory if conditions are met:
-        1. File ends with _LRE
-        2. Source directory has a configured destination
-        3. File is at least MIN_FILE_AGE seconds old
-        4. File can be opened with exclusive access
+        Transfer a file to its destination. Has two paths:
+        1. Apple Photos path: Directly imports media files to Photos
+        2. Regular path: Requires these conditions:
+           - File ends with _LRE
+           - Source directory has a configured destination
+           - File is at least MIN_FILE_AGE seconds old
+           - File can be opened with exclusive access
         
         Args:
             file_path: Path to the file to transfer
@@ -238,6 +240,13 @@ class Transfer:
             bool: True if transfer was successful, False otherwise
         """
         try:
+            # Check if this is an Apple Photos directory
+            if any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+                # Skip validation for Apple Photos imports
+                self.logger.info(f"Importing to Apple Photos: {file_path}")
+                return self._perform_transfer(file_path, file_path.parent)
+                
+            # Regular transfer path with full validation
             if not self._validate_file_for_transfer(file_path):
                 return False
                 
