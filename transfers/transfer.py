@@ -6,8 +6,10 @@ import time
 import fcntl
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+import shutil
 
-from config import MIN_FILE_AGE, TRANSFER_PATHS
+from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS
+from apple_photos_sdk import ApplePhotos
 
 @dataclass
 class ValidationResult:
@@ -192,27 +194,33 @@ class Transfer:
         
     def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
         """
-        Perform the actual file transfer operation.
+        Transfer a file to its destination.
         
         Args:
             file_path: Path to the file to transfer
             dest_dir: Destination directory
             
         Returns:
-            bool: True if transfer successful, False otherwise
+            bool: True if transfer successful, False if failed
         """
         try:
-            # Create destination directory if it doesn't exist
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Move the file
-            dest_path = dest_dir / file_path.name
-            file_path.rename(dest_path)
-            self.logger.info(f"Transferred {file_path.name} to {dest_dir}")
-            return True
-            
+            if dest_dir in APPLE_PHOTOS_PATHS:
+                # Use SDK to import to Apple Photos
+                photos = ApplePhotos()
+                if photos.import_photo(file_path):
+                    # Clean up on success
+                    file_path.unlink()
+                    return True
+                return False
+            else:
+                # Regular filesystem transfer
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest_path = dest_dir / file_path.name
+                file_path.rename(dest_path)
+                return True
+                
         except Exception as e:
-            self.logger.error(f"Error transferring file {file_path}: {e}")
+            self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
             
     def transfer_file(self, file_path: Path) -> bool:
