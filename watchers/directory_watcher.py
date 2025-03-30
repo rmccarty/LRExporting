@@ -2,30 +2,25 @@
 
 from pathlib import Path
 import logging
+import time
 import shutil
 
-from config import SLEEP_TIME
-from processors.jpeg_processor import JPEGExifProcessor
+from config import SLEEP_TIME, APPLE_PHOTOS_PATHS
 from watchers.base_watcher import BaseWatcher
+from transfers.transfer import Transfer
+from processors.jpeg_processor import JPEGExifProcessor
 
 class DirectoryWatcher(BaseWatcher):
     """
-    A class to watch directories for new JPEG files and process them.
+    A class to watch directories for new files and process them.
     """
     
-    def __init__(self, watch_dirs, both_incoming_dir=None):
-        """
-        Initialize the directory watcher.
-        
-        Args:
-            watch_dirs: List of Path objects for directories to watch
-            both_incoming_dir: Optional Path object for a shared incoming directory
-        """
-        self.directories = [Path(d) for d in watch_dirs]
+    def __init__(self, watch_dirs=None, both_incoming_dir=None):
+        """Initialize the directory watcher."""
+        super().__init__(directories=watch_dirs)
         self.both_incoming = Path(both_incoming_dir) if both_incoming_dir else None
-        self.running = False
-        self.sleep_time = SLEEP_TIME
-        self.logger = logging.getLogger(__name__)
+        self.transfer = Transfer()
+        self.logger = logging.getLogger(__name__)  # Override base logger
     
     def process_both_incoming(self):
         """Check Both_Incoming directory and copy files to individual incoming directories."""
@@ -59,24 +54,33 @@ class DirectoryWatcher(BaseWatcher):
         
         return found_files
     
-    def process_file(self, file):
-        """Process a single JPEG file."""
-        if "__LRE" in file.name:  # Skip already processed files
+    def process_file(self, file_path: Path):
+        """Process a single file."""
+        if not file_path.is_file():
             return
             
-        self.logger.info(f"Found file to process: {file}")
+        # Skip already processed files
+        if "__LRE" in file_path.name:
+            return
+            
+        self.logger.info(f"Found file to process: {file_path}")
         
         # Check for zero-byte files
-        if file.stat().st_size == 0:
-            self.logger.warning(f"Skipping zero-byte file: {str(file)}")
+        if file_path.stat().st_size == 0:
+            self.logger.warning(f"Skipping zero-byte file: {str(file_path)}")
             return
             
-        # Process the file
         try:
+            # Process the file
             sequence = self._get_next_sequence()
-            processor = JPEGExifProcessor(str(file), sequence=sequence)
+            processor = JPEGExifProcessor(str(file_path), sequence=sequence)
             new_path = processor.process_image()
             self.logger.info(f"Image processed successfully: {new_path}")
+            
+            # If it's in an Apple Photos directory, transfer it
+            if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+                self.transfer.transfer_file(Path(new_path))
+                
         except Exception as e:
             self.logger.error(f"Error processing image: {e}")
     
@@ -89,3 +93,17 @@ class DirectoryWatcher(BaseWatcher):
         self.logger.info(f"\nChecking {directory} for new JPEG files...")
         for file in directory.glob("*.jpg"):
             self.process_file(file)
+    
+    def check_apple_photos_dirs(self):
+        """Check Apple Photos directories for media files and transfer them."""
+        for photos_path in APPLE_PHOTOS_PATHS:
+            self.logger.info(f"Checking Apple Photos directory: {photos_path}")
+            self.check_directory(photos_path)
+                    
+    def run(self):
+        """Main loop to watch directories."""
+        self.running = True
+        self.logger.info("DirectoryWatcher started - monitoring Apple Photos directories for new files...")
+        while self.running:
+            self.check_apple_photos_dirs()
+            time.sleep(self.sleep_time)
