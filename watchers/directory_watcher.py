@@ -93,8 +93,14 @@ class DirectoryWatcher(BaseWatcher):
         # Don't log for Apple Photos directories since check_apple_photos_dirs already does
         if not any(Path(directory) == photos_path for photos_path in APPLE_PHOTOS_PATHS):
             self.logger.info(f"Checking {directory} for new JPEG files...")
-        for file in directory.glob("*.jpg"):
-            self.process_file(file)
+            # Regular directory - only process JPG files
+            for file in directory.glob("*.jpg"):
+                self.process_file(file)
+        else:
+            # Apple Photos directory - process all files
+            for file in directory.iterdir():
+                if file.is_file():
+                    self.process_file(file)
     
     def check_apple_photos_dirs(self):
         """Check Apple Photos directories for media files and transfer them."""
