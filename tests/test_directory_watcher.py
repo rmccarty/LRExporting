@@ -160,24 +160,27 @@ class TestDirectoryWatcher(unittest.TestCase):
             
     def test_when_processing_file_with_error_then_logs_error(self):
         """Should log error when processing fails."""
+        # Arrange
         self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
-        file = MagicMock(spec=Path)
-        file.name = 'test.jpg'
-        file.suffix = '.jpg'
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = "test.jpg"
+        mock_file.__str__.return_value = "/test/dir/test.jpg"
+        mock_file.parent = Path("/test/dir")  # Not in APPLE_PHOTOS_PATHS
+        mock_file.suffix = ".jpg"
         
         with patch('processors.jpeg_processor.JPEGExifProcessor.__init__', return_value=None) as mock_init, \
-             patch('processors.jpeg_processor.JPEGExifProcessor.process_image') as mock_process, \
-             self.assertLogs(level='ERROR') as log:
+             patch('processors.jpeg_processor.JPEGExifProcessor.process_image') as mock_process:
             mock_init.return_value = None
             mock_process.side_effect = Exception("Test error")
             
-            self.watcher.process_file(file)
-            # Print log messages for debugging
-            print("\nLog messages:")
-            for msg in log.output:
-                print(f"  {msg}")
-            # Verify error was logged with exact message
-            expected_msg = f"ERROR:watchers.directory_watcher:Error processing image: Test error"
+            # Act
+            with self.assertLogs(logger='watchers.directory_watcher', level='ERROR') as log:
+                self.watcher.process_file(mock_file)
+                
+            # Assert
+            expected_msg = f"ERROR:watchers.directory_watcher:Error processing file {mock_file}: Test error"
             self.assertIn(expected_msg, log.output)
             
     def test_when_checking_nonexistent_directory_then_returns(self):

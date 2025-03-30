@@ -62,35 +62,41 @@ class DirectoryWatcher(BaseWatcher):
         if not file_path.is_file():
             return
             
-        # For Apple Photos directories, directly transfer without processing
-        if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
-            self.logger.info(f"Found file for Apple Photos: {file_path}")
-            try:
-                self.transfer.transfer_file(file_path)
-            except Exception as e:
-                self.logger.error(f"Error transferring file to Apple Photos: {e}")
-            return
-            
-        # For regular directories, skip already processed files
+        # Skip already processed files
         if "__LRE" in file_path.name:
             return
             
-        self.logger.info(f"Found file to process: {file_path}")
-        
         # Check for zero-byte files
         if file_path.stat().st_size == 0:
             self.logger.warning(f"Skipping zero-byte file: {str(file_path)}")
             return
             
         try:
-            # Process the file
-            sequence = self._get_next_sequence()
-            processor = JPEGExifProcessor(str(file_path), sequence=sequence)
-            new_path = processor.process_image()
-            self.logger.info(f"Image processed successfully: {new_path}")
+            # For files in Apple Photos directories, directly import without processing
+            if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+                self.logger.info(f"Found file in Apple Photos directory: {file_path}")
+                self.transfer.transfer_file(file_path)
+                return
+                
+            # For files in regular directories, process and transfer
+            self.logger.info(f"Processing file: {file_path}")
+            
+            # Process the file based on type
+            if file_path.suffix.lower() in ['.jpg', '.jpeg']:
+                sequence = self._get_next_sequence()
+                processor = JPEGExifProcessor(str(file_path), sequence=sequence)
+                new_path = processor.process_image()
+                self.logger.info(f"Image processed successfully: {new_path}")
+            else:
+                # For videos, just transfer without processing
+                new_path = file_path
+                
+            # Transfer to destination
+            if new_path:
+                self.transfer.transfer_file(new_path)
                 
         except Exception as e:
-            self.logger.error(f"Error processing image: {e}")
+            self.logger.error(f"Error processing file {file_path}: {e}")
     
     def check_directory(self, directory):
         """Check a directory for new JPEG files."""

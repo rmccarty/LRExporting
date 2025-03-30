@@ -207,11 +207,8 @@ class Transfer:
             if dest_dir in APPLE_PHOTOS_PATHS:
                 # Use SDK to import to Apple Photos
                 photos = ApplePhotos()
-                if photos.import_photo(file_path):
-                    # Clean up on success
-                    file_path.unlink()
-                    return True
-                return False
+                # Import returns True if successful, False if failed
+                return photos.import_photo(file_path)
             else:
                 # Regular filesystem transfer
                 dest_dir.mkdir(parents=True, exist_ok=True)
@@ -240,19 +237,26 @@ class Transfer:
             bool: True if transfer was successful, False otherwise
         """
         try:
-            # Check if this is an Apple Photos directory
+            # Check if source is an Apple Photos directory
             if any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 # Skip validation for Apple Photos imports
                 self.logger.info(f"Importing to Apple Photos: {file_path}")
                 return self._perform_transfer(file_path, file_path.parent)
                 
-            # Regular transfer path with full validation
+            # Check if source has a configured destination
+            source_dir = file_path.parent
+            if source_dir not in TRANSFER_PATHS:
+                self.logger.error(f"No configured destination for {source_dir}")
+                return False
+                
+            # For regular transfers, validate and move to destination
             if not self._validate_file_for_transfer(file_path):
                 return False
                 
-            dest_dir = TRANSFER_PATHS[file_path.parent]
+            dest_dir = TRANSFER_PATHS[source_dir]
+            self.logger.info(f"Moving file to {dest_dir}: {file_path}")
             return self._perform_transfer(file_path, dest_dir)
-            
+                
         except Exception as e:
-            self.logger.error(f"Error transferring file {file_path}: {e}")
+            self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
