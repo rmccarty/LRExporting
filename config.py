@@ -72,6 +72,13 @@ TRANSFER_PATHS = {
     RON_INCOMING: Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos"),
     CLAUDIA_INCOMING: Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs")
 }
+
+# Apple Photos configuration
+APPLE_PHOTOS_PATHS = {
+    Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos"): True,  # Goes to Apple Photos
+    Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs"): False  # Regular file system
+}
+
 MIN_FILE_AGE = 60  # Minimum age in seconds before a file can be transferred
 
 # File naming configuration
