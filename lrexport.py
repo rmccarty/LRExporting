@@ -75,6 +75,9 @@ if __name__ == '__main__':
                 # Check for transfers
                 transfer_watcher.check_directory(directory)
                 
+            # Check Apple Photos directories
+            jpeg_watcher.check_apple_photos_dirs()
+            
             time.sleep(SLEEP_TIME)
             
     except KeyboardInterrupt:

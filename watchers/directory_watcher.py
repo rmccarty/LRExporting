@@ -99,11 +99,3 @@ class DirectoryWatcher(BaseWatcher):
         for photos_path in APPLE_PHOTOS_PATHS:
             self.logger.info(f"Checking Apple Photos directory: {photos_path}")
             self.check_directory(photos_path)
-                    
-    def run(self):
-        """Main loop to watch directories."""
-        self.running = True
-        self.logger.info("DirectoryWatcher started - monitoring Apple Photos directories for new files...")
-        while self.running:
-            self.check_apple_photos_dirs()
-            time.sleep(self.sleep_time)
