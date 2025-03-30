@@ -36,7 +36,7 @@ class ImportManager:
         try:
             # Check if file exists
             if not photo_path.exists():
-                self.logger.error(f"File does not exist: {photo_path}")
+                self.logger.error(f"Photo does not exist: {photo_path}")
                 return False
                 
             # Log the ingest
@@ -46,39 +46,25 @@ class ImportManager:
             file_url = NSURL.fileURLWithPath_(str(photo_path))
             
             # Get shared photo library
-            photo_library = PHPhotoLibrary.sharedPhotoLibrary()
+            shared = PHPhotoLibrary.sharedPhotoLibrary()
             
             # Create a flag to track import success
-            import_success = False
+            def changes():
+                creation_request = PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
+                if creation_request is None:
+                    raise Exception("Import failed")
             
-            def change_block():
-                nonlocal import_success
+            success = shared.performChangesAndWait_error_(changes, None)
+            
+            if success and DELETE_ORIGINAL:
                 try:
-                    # Create asset creation request
-                    creation_request = PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
-                    if creation_request is not None:
-                        import_success = True
+                    photo_path.unlink()
+                    self.logger.info(f"Photo ingested and original deleted: {photo_path}")
                 except Exception as e:
-                    self.logger.error(f"Failed to create asset: {e}")
-                    import_success = False
-            
-            # Perform changes in a block
-            error = NSError.alloc().init()
-            photo_library.performChanges_error_(change_block, error)
-            
-            if import_success:
-                # Import succeeded - now handle deletion separately
-                if DELETE_ORIGINAL:
-                    try:
-                        os.unlink(photo_path)
-                        self.logger.info(f"Photo ingested and original deleted: {photo_path}")
-                    except Exception as e:
-                        # Log deletion error but don't fail the import
-                        self.logger.warning(f"Import succeeded but failed to delete original: {e}")
-                return True
-            else:
-                self.logger.error(f"Failed to import {photo_path}")
-                return False
+                    # Log deletion error but don't fail the import
+                    self.logger.error(f"Import succeeded but failed to delete original: {e}")
+                    
+            return success
                 
         except Exception as e:
             self.logger.error(f"Import failed for {photo_path}: {e}")

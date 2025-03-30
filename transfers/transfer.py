@@ -179,17 +179,32 @@ class Transfer:
         Returns:
             bool: True if file is valid for transfer, False otherwise
         """
-        validations = [
-            self._validate_file_exists(file_path),
-            self._validate_file_format(file_path),
-            self._validate_file_state(file_path)
-        ]
+        self.logger.debug(f"Validating file for transfer: {file_path}")
         
-        for result in validations:
-            if not result.is_valid:
-                self._log_validation_result(result)
-                return False
-                
+        # Check file exists
+        result = self._validate_file_exists(file_path)
+        if not result.is_valid:
+            self._log_validation_result(result)
+            return False
+            
+        # Check file format and destination
+        result = self._validate_file_format(file_path)
+        if not result.is_valid:
+            self._log_validation_result(result)
+            self.logger.debug(f"File format validation failed: {file_path}")
+            self.logger.debug(f"Has __LRE suffix: {self._is_processed_file(file_path)}")
+            self.logger.debug(f"Has configured destination: {self._has_configured_destination(file_path.parent)}")
+            return False
+            
+        # Check file state
+        result = self._validate_file_state(file_path)
+        if not result.is_valid:
+            self._log_validation_result(result)
+            self.logger.debug(f"File state validation failed: {file_path}")
+            self.logger.debug(f"Is file old enough: {self._is_file_old_enough(file_path)}")
+            self.logger.debug(f"Can access file: {self._can_access_file(file_path)}")
+            return False
+            
         return True
         
     def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
@@ -204,17 +219,17 @@ class Transfer:
             bool: True if transfer successful, False if failed
         """
         try:
+            # First move file to destination
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest_path = dest_dir / file_path.name
+            file_path.rename(dest_path)
+            
             if dest_dir in APPLE_PHOTOS_PATHS:
-                # Use SDK to import to Apple Photos
+                # Then import to Apple Photos if needed
                 photos = ApplePhotos()
-                # Import returns True if successful, False if failed
-                return photos.import_photo(file_path)
-            else:
-                # Regular filesystem transfer
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                dest_path = dest_dir / file_path.name
-                file_path.rename(dest_path)
-                return True
+                return photos.import_photo(dest_path)
+            
+            return True
                 
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
