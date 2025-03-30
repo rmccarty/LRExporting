@@ -224,9 +224,8 @@ class TestDirectoryWatcher(unittest.TestCase):
             self.watcher.check_apple_photos_dirs()
             
             # Should log each directory
-            for path in test_paths:
-                expected_msg = f"INFO:watchers.directory_watcher:Checking Apple Photos directory: {path}"
-                self.assertIn(expected_msg, log.output)
+            self.assertIn('INFO:watchers.directory_watcher:Checking /test/photos1 for new media files...', log.output)
+            self.assertIn('INFO:watchers.directory_watcher:Checking /test/photos2 for new media files...', log.output)
             
             # Should check each directory
             self.assertEqual(mock_check.call_count, len(test_paths))
