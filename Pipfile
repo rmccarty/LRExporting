@@ -10,6 +10,7 @@ python-xmp-toolkit = "*"
 pillow = "*"
 coverage = "*"
 radon = "*"
+pyobjc-framework-photos = "*"
 
 [dev-packages]
 radon = "*"

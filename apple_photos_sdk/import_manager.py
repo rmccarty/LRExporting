@@ -4,6 +4,16 @@ import logging
 import os
 from pathlib import Path
 
+from Photos import (
+    PHAssetChangeRequest,
+    PHAssetCreationRequest,
+    PHPhotoLibrary,
+)
+from Foundation import (
+    NSURL,
+    NSError,
+)
+
 from .config import DELETE_ORIGINAL
 
 class ImportManager:
@@ -32,27 +42,44 @@ class ImportManager:
             # Log the ingest
             self.logger.info(f"Ingesting photo: {photo_path}")
             
-            # Simulate successful import by verifying file is readable
-            with open(photo_path, 'rb') as f:
-                # Just read a small chunk to verify file is accessible
-                f.read(1024)
-                
-            # Import succeeded - now handle deletion separately
-            import_success = True
+            # Convert path to NSURL
+            file_url = NSURL.fileURLWithPath_(str(photo_path))
             
-            # Only delete if configured to do so
-            if DELETE_ORIGINAL:
+            # Get shared photo library
+            photo_library = PHPhotoLibrary.sharedPhotoLibrary()
+            
+            # Create a flag to track import success
+            import_success = False
+            
+            def change_block():
+                nonlocal import_success
                 try:
-                    os.unlink(photo_path)
-                    self.logger.info(f"Photo ingested and original deleted: {photo_path}")
+                    # Create asset creation request
+                    creation_request = PHAssetCreationRequest.creationRequestForAssetFromImageAtFileURL_(file_url)
+                    if creation_request is not None:
+                        import_success = True
                 except Exception as e:
-                    # Log deletion error but don't fail the import
-                    self.logger.warning(f"Import succeeded but failed to delete original: {e}")
+                    self.logger.error(f"Failed to create asset: {e}")
+                    import_success = False
+            
+            # Perform changes in a block
+            error = NSError.alloc().init()
+            photo_library.performChanges_error_(change_block, error)
+            
+            if import_success:
+                # Import succeeded - now handle deletion separately
+                if DELETE_ORIGINAL:
+                    try:
+                        os.unlink(photo_path)
+                        self.logger.info(f"Photo ingested and original deleted: {photo_path}")
+                    except Exception as e:
+                        # Log deletion error but don't fail the import
+                        self.logger.warning(f"Import succeeded but failed to delete original: {e}")
+                return True
             else:
-                self.logger.info(f"Photo ingested, original preserved: {photo_path}")
-            
-            return import_success
-            
+                self.logger.error(f"Failed to import {photo_path}")
+                return False
+                
         except Exception as e:
             self.logger.error(f"Import failed for {photo_path}: {e}")
             return False
