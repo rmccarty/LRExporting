@@ -27,7 +27,12 @@ from Foundation import (
     NSURL,
     NSError,
 )
-from .config import DELETE_ORIGINAL, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from .config import (
+    DELETE_ORIGINAL,
+    IMAGE_EXTENSIONS,
+    VIDEO_EXTENSIONS,
+    is_targeted_album_keyword,
+)
 
 class ImportManager:
     """Manages photo import operations for Apple Photos."""
@@ -104,62 +109,12 @@ class ImportManager:
             
     def _get_asset_keywords(self, local_id: str) -> list[str]:
         """Get keywords from an asset."""
-        try:
-            with autorelease_pool():
-                # Fetch the asset
-                result = PHAsset.fetchAssetsWithLocalIdentifiers_options_([local_id], None)
-                if result.count() == 0:
-                    return []
-                
-                asset = result.firstObject()
-                
-                # Try to get keywords through PHAssetResource
-                resources = PHAssetResource.assetResourcesForAsset_(asset)
-                if resources and resources.count() > 0:
-                    for idx in range(resources.count()):
-                        resource = resources.objectAtIndex_(idx)
-                        logging.debug(f"Found resource type: {resource.type()}")
-                        
-                        # Try to get metadata through resource
-                        try:
-                            # Try to get metadata directly from the resource
-                            metadata = resource.value()
-                            if metadata:
-                                logging.debug(f"Got metadata from resource: {metadata}")
-                                if hasattr(metadata, 'keywords'):
-                                    keywords = metadata.keywords
-                                    logging.debug(f"Found keywords in metadata: {keywords}")
-                                    return list(keywords)
-                        except Exception as e:
-                            logging.debug(f"Error getting metadata from resource: {e}")
-                            
-                            # Try alternate method
-                            try:
-                                info = resource.valueForKey_("info")
-                                if info:
-                                    logging.debug(f"Got info from resource: {info}")
-                                    if hasattr(info, 'keywords'):
-                                        keywords = info.keywords
-                                        logging.debug(f"Found keywords in info: {keywords}")
-                                        return list(keywords)
-                            except Exception as e:
-                                logging.debug(f"Error getting info from resource: {e}")
-                
-                return []
-                
-        except Exception as e:
-            logging.error(f"Error getting keywords for asset {local_id}: {str(e)}")
-            return []
+        # This method is deprecated as we now get keywords from original file
+        return []
             
     def _handle_image_data(self, imageData, dataUTI, orientation, info):
         """Handle image data result."""
-        try:
-            if imageData and info:
-                metadata = info.get('metadata')
-                if metadata and hasattr(metadata, 'keywords'):
-                    return list(metadata.keywords)
-        except Exception as e:
-            self.logger.error(f"Error getting keywords from image data: {e}")
+        # This method is deprecated as we now get keywords from original file
         return []
             
     def _get_original_keywords(self, photo_path: Path) -> list[str]:
@@ -172,6 +127,12 @@ class ImportManager:
             if result.returncode == 0 and result.stdout.strip():
                 keywords = result.stdout.strip().split(", ")
                 logging.debug(f"Found original keywords: {keywords}")
+                
+                # Check for targeted album keywords
+                targeted_keywords = [k for k in keywords if is_targeted_album_keyword(k)]
+                if targeted_keywords:
+                    logging.info(f"Found targeted album keywords: {targeted_keywords}")
+                
                 return keywords
             return []
         except Exception as e:
