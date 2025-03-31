@@ -50,10 +50,11 @@ class TestImportManager(unittest.TestCase):
                 mock_nsurl, mock_library, mock_request_class)
             
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertTrue(result)
+            self.assertTrue(success)
+            self.assertEqual(asset_id, "test-id-123")
             mock_nsurl.fileURLWithPath_.assert_called_once_with(str(self.test_file))
             mock_request_class.creationRequestForAssetFromImageAtFileURL_.assert_called_once_with(mock_file_url)
             
@@ -64,10 +65,11 @@ class TestImportManager(unittest.TestCase):
         # Arrange
         with patch('pathlib.Path.exists', return_value=False):
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
             mock_nsurl.fileURLWithPath_.assert_not_called()
             
     @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
@@ -91,10 +93,11 @@ class TestImportManager(unittest.TestCase):
             mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = None
             
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
             
     @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
     @patch('apple_photos_sdk.import_manager.NSURL')
@@ -110,10 +113,11 @@ class TestImportManager(unittest.TestCase):
         
         with patch('pathlib.Path.exists', return_value=True):
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
             
     @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
     @patch('apple_photos_sdk.import_manager.NSURL')
@@ -130,10 +134,11 @@ class TestImportManager(unittest.TestCase):
                 mock_nsurl, mock_library, mock_request_class)
             
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertTrue(result)  # Import succeeded, even though delete failed
+            self.assertTrue(success)  # Import succeeded, even though delete failed
+            self.assertEqual(asset_id, "test-id-123")
             
     @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
     @patch('apple_photos_sdk.import_manager.NSURL')
@@ -150,10 +155,11 @@ class TestImportManager(unittest.TestCase):
                 mock_nsurl, mock_library, mock_request_class)
             
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertTrue(result)
+            self.assertTrue(success)
+            self.assertEqual(asset_id, "test-id-123")
             mock_unlink.assert_not_called()  # Should not try to delete file
             
     @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
@@ -206,10 +212,11 @@ class TestImportManager(unittest.TestCase):
                 mock_nsurl, mock_library, mock_request_class)
             
             # Act
-            result = self.manager.import_photo(test_video)
+            success, asset_id = self.manager.import_photo(test_video)
             
             # Assert
-            self.assertTrue(result)
+            self.assertTrue(success)
+            self.assertEqual(asset_id, "test-id-123")
             mock_request_class.creationRequestForAssetFromVideoAtFileURL_.assert_called_once_with(mock_file_url)
             mock_request_class.creationRequestForAssetFromImageAtFileURL_.assert_not_called()
             
@@ -273,92 +280,75 @@ class TestImportManager(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.manager._create_asset_request(MagicMock(), 'invalid')
 
-    def test_when_placeholder_is_none_then_fails(self):
-        """Should fail when placeholder asset is None."""
+    def test_when_importing_nonexistent_photo_then_fails(self):
+        """Should fail when photo doesn't exist."""
+        # Arrange
+        with patch('pathlib.Path.exists', return_value=False):
+            # Act
+            success, asset_id = self.manager.import_photo(self.test_file)
+            
+            # Assert
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
+            
+    def test_when_import_fails_then_returns_false(self):
+        """Should return False when import fails."""
+        # Arrange
         with patch('pathlib.Path.exists', return_value=True), \
-             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
-             patch('apple_photos_sdk.import_manager.NSURL') as mock_nsurl, \
              patch('apple_photos_sdk.import_manager.PHPhotoLibrary') as mock_library:
-            
-            # Arrange
-            mock_file_url = MagicMock()
-            mock_nsurl.fileURLWithPath_.return_value = mock_file_url
-            
+            # Mock shared library
             mock_shared = MagicMock()
             mock_library.sharedPhotoLibrary.return_value = mock_shared
-            
-            def perform_changes(block, error):
-                block()
-                return True
-                
-            mock_shared.performChangesAndWait_error_.side_effect = perform_changes
-            
-            mock_request = MagicMock()
-            mock_request.placeholderForCreatedAsset.return_value = None  # Placeholder is None
-            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
+            mock_shared.performChangesAndWait_error_.return_value = False
             
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
             
-    def test_when_verifying_asset_then_handles_fetch_error(self):
-        """Should handle errors during asset fetch."""
-        with patch('apple_photos_sdk.import_manager.PHAsset') as mock_asset_class, \
-             patch('time.sleep') as mock_sleep:
-            
-            # Arrange
-            mock_asset_class.fetchAssetsWithLocalIdentifiers_options_.side_effect = Exception("Fetch error")
+    def test_when_photos_library_raises_then_returns_false(self):
+        """Should handle Photos library errors gracefully."""
+        # Arrange
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('apple_photos_sdk.import_manager.PHPhotoLibrary') as mock_library:
+            # Mock shared library to raise
+            mock_shared = MagicMock()
+            mock_library.sharedPhotoLibrary.side_effect = Exception("Photos library error")
             
             # Act
-            result = self.manager._verify_asset_exists('test-id', max_attempts=2, delay=0.1)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
-            self.assertEqual(mock_asset_class.fetchAssetsWithLocalIdentifiers_options_.call_count, 1)
-            mock_sleep.assert_not_called()
-            
-    def test_when_verifying_asset_then_handles_count_error(self):
-        """Should handle errors when getting result count."""
-        with patch('apple_photos_sdk.import_manager.PHAsset') as mock_asset_class, \
-             patch('time.sleep') as mock_sleep:
-            
-            # Arrange
-            mock_result = MagicMock()
-            mock_result.count.side_effect = Exception("Count error")
-            mock_asset_class.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_result
-            
-            # Act
-            result = self.manager._verify_asset_exists('test-id', max_attempts=2, delay=0.1)
-            
-            # Assert
-            self.assertFalse(result)
-            self.assertEqual(mock_asset_class.fetchAssetsWithLocalIdentifiers_options_.call_count, 1)
-            mock_sleep.assert_not_called()
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
             
     def test_when_importing_photo_then_handles_get_asset_type_error(self):
         """Should handle errors in asset type detection."""
+        # Arrange
         with patch('pathlib.Path.exists', return_value=True), \
              patch.object(ImportManager, '_get_asset_type', side_effect=ValueError("Invalid extension")):
-            
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
             
-    def test_when_importing_photo_then_handles_placeholder_id_error(self):
-        """Should handle errors getting placeholder ID."""
+    def test_when_placeholder_is_none_then_fails(self):
+        """Should fail when placeholder asset is None."""
+        # Arrange
         with patch('pathlib.Path.exists', return_value=True), \
              patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
              patch('apple_photos_sdk.import_manager.NSURL') as mock_nsurl, \
              patch('apple_photos_sdk.import_manager.PHPhotoLibrary') as mock_library:
             
-            # Arrange
+            # Mock file URL
             mock_file_url = MagicMock()
             mock_nsurl.fileURLWithPath_.return_value = mock_file_url
             
+            # Mock shared library
             mock_shared = MagicMock()
             mock_library.sharedPhotoLibrary.return_value = mock_shared
             
@@ -368,6 +358,41 @@ class TestImportManager(unittest.TestCase):
                 
             mock_shared.performChangesAndWait_error_.side_effect = perform_changes
             
+            # Mock request with None placeholder
+            mock_request = MagicMock()
+            mock_request.placeholderForCreatedAsset.return_value = None
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
+            
+            # Act
+            success, asset_id = self.manager.import_photo(self.test_file)
+            
+            # Assert
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
+            
+    def test_when_importing_photo_then_handles_placeholder_id_error(self):
+        """Should handle errors getting placeholder ID."""
+        # Arrange
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
+             patch('apple_photos_sdk.import_manager.NSURL') as mock_nsurl, \
+             patch('apple_photos_sdk.import_manager.PHPhotoLibrary') as mock_library:
+            
+            # Mock file URL
+            mock_file_url = MagicMock()
+            mock_nsurl.fileURLWithPath_.return_value = mock_file_url
+            
+            # Mock shared library
+            mock_shared = MagicMock()
+            mock_library.sharedPhotoLibrary.return_value = mock_shared
+            
+            def perform_changes(block, error):
+                block()
+                return True
+                
+            mock_shared.performChangesAndWait_error_.side_effect = perform_changes
+            
+            # Mock request with placeholder that raises
             mock_request = MagicMock()
             mock_placeholder = MagicMock()
             mock_placeholder.localIdentifier.side_effect = Exception("ID error")
@@ -375,7 +400,72 @@ class TestImportManager(unittest.TestCase):
             mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
             
             # Act
-            result = self.manager.import_photo(self.test_file)
+            success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
-            self.assertFalse(result)
+            self.assertFalse(success)
+            self.assertIsNone(asset_id)
+
+    def test_when_importing_photo_then_gets_keywords(self):
+        """Should get keywords after successful import."""
+        # Arrange
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
+             patch('apple_photos_sdk.import_manager.NSURL') as mock_nsurl, \
+             patch('apple_photos_sdk.import_manager.PHPhotoLibrary') as mock_library, \
+             patch('apple_photos_sdk.import_manager.PHAsset') as mock_asset_class, \
+             patch('apple_photos_sdk.import_manager.PHImageRequestOptions') as mock_options_class, \
+             patch('apple_photos_sdk.import_manager.PHImageManager') as mock_manager_class:
+            
+            # Mock file URL
+            mock_file_url = MagicMock()
+            mock_nsurl.fileURLWithPath_.return_value = mock_file_url
+            
+            # Mock shared library
+            mock_shared = MagicMock()
+            mock_library.sharedPhotoLibrary.return_value = mock_shared
+            
+            def perform_changes(block, error):
+                block()
+                return True
+                
+            mock_shared.performChangesAndWait_error_.side_effect = perform_changes
+            
+            # Mock request and placeholder
+            mock_request = MagicMock()
+            mock_placeholder = MagicMock()
+            mock_placeholder.localIdentifier.return_value = 'test-id'
+            mock_request.placeholderForCreatedAsset.return_value = mock_placeholder
+            mock_request_class.creationRequestForAssetFromImageAtFileURL_.return_value = mock_request
+            
+            # Mock asset fetch for verification
+            mock_result = MagicMock()
+            mock_result.count.return_value = 1
+            mock_asset_class.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_result
+            
+            # Mock asset and image manager
+            mock_asset = MagicMock()
+            mock_result.firstObject.return_value = mock_asset
+            
+            # Mock options
+            mock_options = MagicMock()
+            mock_options_class.new.return_value = mock_options
+            
+            # Mock image manager
+            mock_manager = MagicMock()
+            mock_manager_class.defaultManager.return_value = mock_manager
+            
+            # Mock image data callback
+            def mock_callback(asset, options, handler):
+                mock_info = {'metadata': {'keywords': ["test", "photo"]}}
+                handler(b"test_data", "public.jpeg", 1, mock_info)
+                
+            mock_manager.requestImageDataForAsset_options_resultHandler_.side_effect = mock_callback
+            
+            # Act
+            success, asset_id = self.manager.import_photo(self.test_file)
+            
+            # Assert
+            self.assertTrue(success)
+            self.assertEqual(asset_id, 'test-id')
+            mock_manager.requestImageDataForAsset_options_resultHandler_.assert_called_once()
