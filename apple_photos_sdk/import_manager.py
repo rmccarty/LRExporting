@@ -1,38 +1,47 @@
-"""Handles importing photos into Apple Photos."""
+"""Manages photo import operations for Apple Photos."""
 
 import logging
 import os
 import time
 from pathlib import Path
+import subprocess
 from objc import autorelease_pool
 
 from Photos import (
+    PHAsset,
     PHAssetChangeRequest,
     PHAssetCreationRequest,
-    PHPhotoLibrary,
-    PHAsset,
+    PHAssetResourceCreationOptions,
+    PHAssetResourceType,
+    PHImageManager,
+    PHAssetResourceRequestOptions,
+    PHAssetResourceManager,
+    PHCollectionList,
+    PHAssetCollection,
+    PHCollectionListChangeRequest,
+    PHAssetCollectionChangeRequest,
     PHAssetMediaType,
     PHFetchOptions,
     PHAssetResource,
-    PHAssetResourceType,
     PHContentEditingInputRequestOptions,
     PHImageRequestOptions,
     PHImageRequestOptionsVersion,
     PHImageRequestOptionsDeliveryMode,
-    PHImageManager,
-    PHAssetResourceRequestOptions,
-    PHAssetResourceManager,
+    PHPhotoLibrary,
 )
 from Foundation import (
     NSURL,
     NSError,
+    NSData,
+    NSString,
 )
 from .config import (
     DELETE_ORIGINAL,
     IMAGE_EXTENSIONS,
     VIDEO_EXTENSIONS,
-    is_targeted_album_keyword,
+    TARGETED_ALBUM_PREFIXES,
 )
+from .album import AlbumManager
 
 class ImportManager:
     """Manages photo import operations for Apple Photos."""
@@ -40,6 +49,7 @@ class ImportManager:
     def __init__(self):
         """Initialize the import manager."""
         self.logger = logging.getLogger(__name__)
+        self.album_manager = AlbumManager()
         
     def _get_asset_type(self, file_path: Path) -> str:
         """
@@ -117,26 +127,31 @@ class ImportManager:
         # This method is deprecated as we now get keywords from original file
         return []
             
+    def _is_targeted_keyword(self, keyword: str) -> bool:
+        """Check if a keyword indicates a targeted album."""
+        return any(keyword.startswith(prefix) for prefix in TARGETED_ALBUM_PREFIXES)
+
     def _get_original_keywords(self, photo_path: Path) -> list[str]:
         """Get keywords from original photo before import."""
         try:
-            # Run exiftool to get keywords
+            # Run exiftool to get XMP Subject which contains our hierarchical keywords
             import subprocess
-            cmd = ["exiftool", "-Keywords", "-s3", str(photo_path)]
+            cmd = ["exiftool", "-XMP:Subject", "-s", "-s", "-sep", "||", str(photo_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0 and result.stdout.strip():
-                keywords = result.stdout.strip().split(", ")
-                logging.debug(f"Found original keywords: {keywords}")
+                # Split on our custom separator and strip any whitespace
+                keywords = [k.strip() for k in result.stdout.strip().split("||")]
+                self.logger.debug(f"Found original keywords: {keywords}")
                 
                 # Check for targeted album keywords
-                targeted_keywords = [k for k in keywords if is_targeted_album_keyword(k)]
+                targeted_keywords = [k for k in keywords if self._is_targeted_keyword(k)]
                 if targeted_keywords:
-                    logging.info(f"Found targeted album keywords: {targeted_keywords}")
+                    self.logger.info(f"Found targeted album keywords: {targeted_keywords}")
                 
                 return keywords
             return []
         except Exception as e:
-            logging.error(f"Error getting original keywords: {e}")
+            self.logger.error(f"Error getting original keywords: {e}")
             return []
 
     def import_photo(self, photo_path: Path) -> tuple[bool, str | None]:
@@ -160,58 +175,213 @@ class ImportManager:
             if original_keywords:
                 self.logger.info(f"Original keywords for {photo_path}: {original_keywords}")
 
+            # Get targeted album keywords
+            targeted_keywords = [k for k in original_keywords if self._is_targeted_keyword(k)]
+
             # Identify asset type
             try:
                 asset_type = self._get_asset_type(photo_path)
-                self.logger.info(f"Importing {asset_type}: {photo_path}")
-            except ValueError as e:
-                self.logger.error(str(e))
+            except Exception as e:
+                self.logger.error(f"Failed to identify asset type: {e}")
                 return False, None
-                
-            file_url = NSURL.fileURLWithPath_(str(photo_path))
-            shared = PHPhotoLibrary.sharedPhotoLibrary()
-            
-            # Store the placeholder asset's local identifier
-            placeholder_id = None
-            
-            def changes():
-                nonlocal placeholder_id
-                request = self._create_asset_request(file_url, asset_type)
-                if request is None:
-                    raise Exception(f"Failed to create {asset_type} import request")
-                placeholder = request.placeholderForCreatedAsset()
-                if placeholder is None:
-                    raise Exception("Failed to get placeholder asset")
-                placeholder_id = placeholder.localIdentifier()
-            
+
+            # Import the photo/video
+            self.logger.info(f"Importing photo: {photo_path}")
+            success = False
+            placeholder = None
+
+            def handle_import():
+                nonlocal success, placeholder
+                try:
+                    # Create asset request
+                    url = NSURL.fileURLWithPath_(str(photo_path))
+                    creation_request = self._create_asset_request(url, asset_type)
+                    if creation_request:
+                        # Get the placeholder for the created asset
+                        placeholder = creation_request.placeholderForCreatedAsset()
+                        success = True
+                except Exception as e:
+                    self.logger.error(f"Error in creation request: {e}")
+                    success = False
+
+            # Perform import in a change block
             error = None
-            success = shared.performChangesAndWait_error_(changes, error)
-            
-            if not success:
-                self.logger.error(f"Import failed for {photo_path}")
+            PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_(handle_import, error)
+
+            if not success or not placeholder:
                 return False, None
-                
-            # Verify the asset exists in Photos library
-            if placeholder_id:
-                if not self._verify_asset_exists(placeholder_id):
-                    self.logger.error(f"Import appeared to succeed but asset not found in Photos library: {photo_path}")
-                    return False, None
-                    
-                # Get and print keywords
-                keywords = self._get_asset_keywords(placeholder_id)
-                if keywords:
-                    self.logger.info(f"Keywords for {photo_path}: {', '.join(keywords)}")
-                else:
-                    self.logger.info(f"No keywords found for {photo_path}")
-                    
+
+            # Get the imported asset's ID
+            asset_id = placeholder.localIdentifier()
+            self.logger.debug(f"Asset verified in Photos library: {asset_id}")
+
+            # Add to targeted albums based on keywords
+            if targeted_keywords:
+                self.logger.info(f"Adding asset to targeted albums: {targeted_keywords}")
+                if not self.album_manager.add_asset_to_targeted_albums(asset_id, targeted_keywords):
+                    self.logger.error("Failed to add asset to one or more targeted albums")
+
+            # Delete original if configured
             if DELETE_ORIGINAL:
                 try:
                     photo_path.unlink()
+                    self.logger.debug(f"Deleted original file: {photo_path}")
                 except Exception as e:
-                    self.logger.error(f"Import succeeded but failed to delete original: {e}")
-                    
-            return True, placeholder_id
-            
+                    self.logger.error(f"Failed to delete original file: {e}")
+
+            return True, asset_id
+
         except Exception as e:
             self.logger.error(f"Failed to import {photo_path}: {e}")
             return False, None
+
+    def _create_folder_path(self, path_parts: list[str]) -> tuple[bool, str | None]:
+        """Create a folder path in Apple Photos, creating parent folders as needed.
+        Returns (success, folder_id) tuple."""
+        try:
+            with autorelease_pool():
+                current_folder = None
+                current_path = []
+                
+                for part in path_parts:
+                    current_path.append(part)
+                    path_str = "/".join(current_path)
+                    
+                    # Try to find existing folder at this level
+                    folder_list = PHCollectionList.fetchCollectionListsWithLocalIdentifiers_options_([path_str], None)
+                    if folder_list.count() > 0:
+                        current_folder = folder_list.firstObject()
+                        self.logger.debug(f"Found existing folder: {path_str}")
+                        continue
+                        
+                    # Need to create this folder
+                    self.logger.info(f"Creating folder: {path_str}")
+                    success = False
+                    
+                    def handle_change(changeInstance):
+                        nonlocal success
+                        try:
+                            # Create folder list (folder in Apple Photos)
+                            folder = PHCollectionList.creationRequestForCollectionListWithTitle_(part)
+                            if current_folder:
+                                # Add to parent folder
+                                parent_request = PHCollectionListChangeRequest.changeRequestForCollectionList_(current_folder)
+                                parent_request.addChildCollections_([folder])
+                            success = True
+                        except Exception as e:
+                            self.logger.error(f"Error creating folder {path_str}: {e}")
+                            success = False
+                    
+                    # Perform changes in a change block
+                    PHPhotoLibrary.sharedPhotoLibrary().performChanges_completionHandler_(
+                        handle_change,
+                        None
+                    )
+                    
+                    if not success:
+                        return False, None
+                        
+                    # Get the created folder
+                    folder_list = PHCollectionList.fetchCollectionListsWithLocalIdentifiers_options_([path_str], None)
+                    if folder_list.count() > 0:
+                        current_folder = folder_list.firstObject()
+                    else:
+                        return False, None
+                
+                return True, current_folder.localIdentifier if current_folder else None
+                
+        except Exception as e:
+            self.logger.error(f"Error creating folder path: {e}")
+            return False, None
+            
+    def _create_album_in_folder(self, album_name: str, folder_id: str) -> tuple[bool, str | None]:
+        """Create an album in the specified folder. Returns (success, album_id) tuple."""
+        try:
+            with autorelease_pool():
+                # Try to find existing album
+                album_list = PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_([album_name], None)
+                if album_list.count() > 0:
+                    album = album_list.firstObject()
+                    self.logger.debug(f"Found existing album: {album_name}")
+                    return True, album.localIdentifier
+                
+                # Need to create the album
+                self.logger.info(f"Creating album: {album_name}")
+                success = False
+                
+                def handle_change(changeInstance):
+                    nonlocal success
+                    try:
+                        # Create album
+                        album = PHAssetCollectionChangeRequest.creationRequestForAssetCollectionWithTitle_(album_name)
+                        
+                        # Add to folder
+                        folder_list = PHCollectionList.fetchCollectionListsWithLocalIdentifiers_options_([folder_id], None)
+                        if folder_list.count() > 0:
+                            folder = folder_list.firstObject()
+                            folder_request = PHCollectionListChangeRequest.changeRequestForCollectionList_(folder)
+                            folder_request.addChildCollections_([album])
+                            success = True
+                    except Exception as e:
+                        self.logger.error(f"Error creating album {album_name}: {e}")
+                        success = False
+                
+                # Perform changes in a change block
+                PHPhotoLibrary.sharedPhotoLibrary().performChanges_completionHandler_(
+                    handle_change,
+                    None
+                )
+                
+                if not success:
+                    return False, None
+                    
+                # Get the created album
+                album_list = PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_([album_name], None)
+                if album_list.count() > 0:
+                    album = album_list.firstObject()
+                    return True, album.localIdentifier
+                
+                return False, None
+                
+        except Exception as e:
+            self.logger.error(f"Error creating album: {e}")
+            return False, None
+            
+    def _add_to_album(self, asset_id: str, album_id: str) -> bool:
+        """Add an asset to an album. Returns success boolean."""
+        try:
+            with autorelease_pool():
+                # Get the asset and album
+                asset_list = PHAsset.fetchAssetsWithLocalIdentifiers_options_([asset_id], None)
+                album_list = PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_([album_id], None)
+                
+                if asset_list.count() == 0 or album_list.count() == 0:
+                    return False
+                    
+                asset = asset_list.firstObject()
+                album = album_list.firstObject()
+                
+                success = False
+                
+                def handle_change(changeInstance):
+                    nonlocal success
+                    try:
+                        # Add asset to album
+                        album_request = PHAssetCollectionChangeRequest.changeRequestForAssetCollection_(album)
+                        album_request.addAssets_([asset])
+                        success = True
+                    except Exception as e:
+                        self.logger.error(f"Error adding asset to album: {e}")
+                        success = False
+                
+                # Perform changes in a change block
+                PHPhotoLibrary.sharedPhotoLibrary().performChanges_completionHandler_(
+                    handle_change,
+                    None
+                )
+                
+                return success
+                
+        except Exception as e:
+            self.logger.error(f"Error adding to album: {e}")
+            return False

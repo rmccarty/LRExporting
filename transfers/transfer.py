@@ -243,6 +243,16 @@ class Transfer:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
             
+    def _import_to_photos(self, photo_path: Path) -> bool:
+        """Import a photo into Apple Photos."""
+        success, asset_id = ApplePhotos().import_photo(photo_path)
+        if success and asset_id:
+            self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
+            return True
+        else:
+            self.logger.error(f"Failed to import {photo_path} to Apple Photos")
+            return False
+
     def transfer_file(self, file_path: Path) -> bool:
         """
         Transfer a file to its destination. Has two paths:
@@ -264,7 +274,7 @@ class Transfer:
             if any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 # Skip validation for Apple Photos imports
                 self.logger.info(f"Importing to Apple Photos: {file_path}")
-                return self._perform_transfer(file_path, file_path.parent)
+                return self._import_to_photos(file_path)
                 
             # Check if source has a configured destination
             source_dir = file_path.parent
