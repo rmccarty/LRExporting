@@ -90,7 +90,7 @@ class MediaProcessor(ABC):
         Returns:
             int: Rating value (0-5), defaults to 0 if not found
         """
-        rating = self.exif_data.get('Rating', 0)
+        rating = self.exif_data.get('XMP:Rating', 0)
         try:
             return int(rating)
         except (ValueError, TypeError):
@@ -106,10 +106,9 @@ class MediaProcessor(ABC):
         Returns:
             str: Rating keyword (e.g., "0-star", "1-star", etc.)
         """
-        if rating <= 1:
+        if rating < 1:
             return "0-star"
-        stars = rating - 1
-        return f"{stars}-star"
+        return f"{rating}-star"
         
     def _is_json_like(self, text: str) -> bool:
         """Check if text looks like JSON."""
