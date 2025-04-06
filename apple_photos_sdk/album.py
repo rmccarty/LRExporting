@@ -18,6 +18,9 @@ class AlbumManager:
         
     def _is_targeted_album_keyword(self, keyword: str) -> bool:
         """Check if a keyword indicates a targeted album by matching top-level folder prefixes."""
+        # Strip "Subject: " prefix if present
+        if keyword.startswith("Subject: "):
+            keyword = keyword[9:]
         return any(keyword.startswith(prefix) for prefix in TARGETED_ALBUM_PREFIXES)
         
     def _wait_for_changes(self) -> bool:
@@ -216,10 +219,14 @@ class AlbumManager:
         success = True
         self.logger.info(f"Processing {len(targeted_keywords)} targeted keywords for asset {asset_id}")
         for keyword in targeted_keywords:
+            # Strip "Subject: " prefix if present
+            if keyword.startswith("Subject: "):
+                keyword = keyword[9:]
+                
             # Split into folder path and album name
             parts = keyword.split('/')
             if len(parts) < 2:
-                self.logger.error(f"Invalid targeted keyword format: {keyword}")
+                self.logger.error(f"Invalid targeted keyword format (needs at least folder/album): {keyword}")
                 success = False
                 continue
                 

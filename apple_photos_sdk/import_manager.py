@@ -129,6 +129,9 @@ class ImportManager:
             
     def _is_targeted_keyword(self, keyword: str) -> bool:
         """Check if a keyword indicates a targeted album."""
+        # Strip "Subject: " prefix if present
+        if keyword.startswith("Subject: "):
+            keyword = keyword[9:]
         return any(keyword.startswith(prefix) for prefix in TARGETED_ALBUM_PREFIXES)
 
     def _get_original_keywords(self, photo_path: Path) -> list[str]:
