@@ -148,11 +148,30 @@ class MediaProcessor(ABC):
 
     def _get_base_keywords(self) -> list:
         """Get base keywords including existing and rating."""
-        keywords = self.exif_data.get('Keywords', [])
-        if isinstance(keywords, str):
-            keywords = [keywords]
+        # Get keywords from both IPTC:Keywords and XMP:Subject
+        keywords = []
+        iptc_keywords = self.exif_data.get('IPTC:Keywords', [])
+        xmp_subject = self.exif_data.get('XMP:Subject', [])
+        
+        # Handle string or list for IPTC:Keywords
+        if isinstance(iptc_keywords, str):
+            keywords.extend(iptc_keywords.split(','))
+        elif isinstance(iptc_keywords, list):
+            keywords.extend(iptc_keywords)
+            
+        # Handle string or list for XMP:Subject
+        if isinstance(xmp_subject, str):
+            keywords.extend(xmp_subject.split(','))
+        elif isinstance(xmp_subject, list):
+            keywords.extend(xmp_subject)
+            
+        # Add rating keyword
         rating_keyword = self.translate_rating_to_keyword(self.get_image_rating())
-        return list(set(keywords + [rating_keyword]))
+        keywords.append(rating_keyword)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        return [k for k in keywords if not (k in seen or seen.add(k))]
 
     def _get_export_keywords(self) -> list:
         """Get export-related keywords."""

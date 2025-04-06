@@ -172,8 +172,14 @@ class ExifTool:
         try:
             # Ensure all keywords are strings
             keywords = [str(k) for k in keywords]
+            keywords_str = ','.join(keywords)
             
-            cmd = ['exiftool'] + self.default_flags + [f'-keywords={",".join(keywords)}', str(file_path)]
+            # Write to both IPTC:Keywords and XMP:Subject
+            cmd = ['exiftool'] + self.default_flags + [
+                f'-IPTC:Keywords={keywords_str}',
+                f'-XMP:Subject={keywords_str}',
+                str(file_path)
+            ]
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
