@@ -235,5 +235,47 @@ class TestExifTool(unittest.TestCase):
         result = self.exiftool.update_keywords(self.test_file, keywords)
         self.assertFalse(result)
 
+    @patch('subprocess.run')
+    def test_when_metadata_has_integer_values_then_converts_to_strings(self, mock_run):
+        """Should convert integer values to strings when reading metadata"""
+        input_metadata = {
+            'IPTC:Sub-location': 688,
+            'XMP:Rating': 2,
+            'EXIF:ISO': 200,
+            'Keywords': ['test', 123, 456],
+            'FNumber': 8.0
+        }
+        expected_metadata = {
+            'IPTC:Sub-location': '688',
+            'XMP:Rating': '2',
+            'EXIF:ISO': '200',
+            'Keywords': ['test', '123', '456'],
+            'FNumber': '8.0'
+        }
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps([input_metadata])
+        )
+
+        result = self.exiftool.read_all_metadata(self.test_file)
+        self.assertEqual(result, expected_metadata)
+
+    @patch('subprocess.run')
+    def test_when_writing_metadata_with_integer_values_then_converts_to_strings(self, mock_run):
+        """Should convert integer values to strings when writing metadata"""
+        fields = {
+            'Sub-location': 688,
+            'Rating': 2,
+            'Keywords': ['test', 123, 456]
+        }
+        
+        self.exiftool.write_metadata(self.test_file, fields)
+        
+        mock_run.assert_called_once()
+        cmd_args = mock_run.call_args[0][0]
+        self.assertIn('-Sub-location=688', cmd_args)
+        self.assertIn('-Rating=2', cmd_args)
+        self.assertIn('-Keywords=test,123,456', cmd_args)
+
 if __name__ == '__main__':
     unittest.main()
