@@ -42,7 +42,18 @@ class ExifTool:
                 return {}
                 
             data = json.loads(result.stdout)
-            return data[0] if data else {}
+            if not data:
+                return {}
+                
+            # Convert any non-string values to strings
+            metadata = data[0]
+            for key, value in metadata.items():
+                if isinstance(value, list):
+                    metadata[key] = [str(item) for item in value]
+                elif not isinstance(value, str):
+                    metadata[key] = str(value)
+                
+            return metadata
             
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error reading metadata: {e}")
@@ -98,15 +109,19 @@ class ExifTool:
             # Add each field
             for field, value in fields.items():
                 if value:
+                    # Convert value to string or list of strings
                     if isinstance(value, list):
+                        value = [str(item) for item in value]
                         value = ','.join(value)
+                    else:
+                        value = str(value)
+                        
                     # Don't add extra dash if field already starts with one
                     field_arg = field if field.startswith('-') else f'-{field}'
                     cmd.append(f'{field_arg}={value}')
                     
             cmd.append(str(file_path))
             
-            self.logger.debug(f"Running exiftool command: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 self.logger.error(f"Error writing metadata: {result.stderr}")
@@ -155,6 +170,9 @@ class ExifTool:
             bool: True if successful, False otherwise
         """
         try:
+            # Ensure all keywords are strings
+            keywords = [str(k) for k in keywords]
+            
             cmd = ['exiftool'] + self.default_flags + [f'-keywords={",".join(keywords)}', str(file_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             
