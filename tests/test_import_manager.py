@@ -406,16 +406,21 @@ class TestImportManager(unittest.TestCase):
             self.assertFalse(success)
             self.assertIsNone(asset_id)
 
-    def test_when_importing_photo_then_gets_keywords(self):
-        """Should get keywords after successful import."""
-        # Arrange
+    @patch('subprocess.run')
+    def test_when_importing_photo_then_gets_keywords(self, mock_run):
+        """Should get keywords from original file before import."""
+        # Mock exiftool output
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="test||photo"
+        )
+        
+        # Mock Photos library dependencies
         with patch('pathlib.Path.exists', return_value=True), \
              patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
              patch('apple_photos_sdk.import_manager.NSURL') as mock_nsurl, \
              patch('apple_photos_sdk.import_manager.PHPhotoLibrary') as mock_library, \
-             patch('apple_photos_sdk.import_manager.PHAsset') as mock_asset_class, \
-             patch('apple_photos_sdk.import_manager.PHImageRequestOptions') as mock_options_class, \
-             patch('apple_photos_sdk.import_manager.PHImageManager') as mock_manager_class:
+             patch('apple_photos_sdk.import_manager.PHAsset') as mock_asset_class:
             
             # Mock file URL
             mock_file_url = MagicMock()
@@ -428,7 +433,6 @@ class TestImportManager(unittest.TestCase):
             def perform_changes(block, error):
                 block()
                 return True
-                
             mock_shared.performChangesAndWait_error_.side_effect = perform_changes
             
             # Mock request and placeholder
@@ -443,29 +447,14 @@ class TestImportManager(unittest.TestCase):
             mock_result.count.return_value = 1
             mock_asset_class.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_result
             
-            # Mock asset and image manager
-            mock_asset = MagicMock()
-            mock_result.firstObject.return_value = mock_asset
-            
-            # Mock options
-            mock_options = MagicMock()
-            mock_options_class.new.return_value = mock_options
-            
-            # Mock image manager
-            mock_manager = MagicMock()
-            mock_manager_class.defaultManager.return_value = mock_manager
-            
-            # Mock image data callback
-            def mock_callback(asset, options, handler):
-                mock_info = {'metadata': {'keywords': ["test", "photo"]}}
-                handler(b"test_data", "public.jpeg", 1, mock_info)
-                
-            mock_manager.requestImageDataForAsset_options_resultHandler_.side_effect = mock_callback
-            
             # Act
             success, asset_id = self.manager.import_photo(self.test_file)
             
             # Assert
             self.assertTrue(success)
             self.assertEqual(asset_id, 'test-id')
-            mock_manager.requestImageDataForAsset_options_resultHandler_.assert_called_once()
+            mock_run.assert_called_once_with(
+                ["exiftool", "-XMP:Subject", "-s", "-s", "-sep", "||", str(self.test_file)],
+                capture_output=True,
+                text=True
+            )
