@@ -4,11 +4,8 @@ import unittest
 from unittest.mock import patch, Mock, MagicMock
 from pathlib import Path
 import subprocess
-from PIL import Image
-import io
 
 from processors.jpeg_processor import JPEGExifProcessor
-from config import JPEG_QUALITY
 
 class TestJPEGExifProcessor(unittest.TestCase):
     def setUp(self):
@@ -25,64 +22,6 @@ class TestJPEGExifProcessor(unittest.TestCase):
         """Should use input directory as output when no output specified."""
         processor = JPEGExifProcessor(str(self.test_file))
         self.assertEqual(processor.output_path, self.test_file.parent)
-        
-    def test_when_compressing_image_then_preserves_metadata(self):
-        """Should compress image while preserving metadata."""
-        # Mock PIL Image
-        mock_image = MagicMock()
-        mock_image.mode = 'RGB'
-        
-        # Mock PIL open context
-        mock_context = MagicMock()
-        mock_context.__enter__.return_value = mock_image
-        
-        with patch('PIL.Image.open', return_value=mock_context) as mock_open, \
-             patch('pathlib.Path.exists', return_value=True), \
-             patch('pathlib.Path.unlink'), \
-             patch('pathlib.Path.replace'), \
-             patch.object(self.processor.exiftool, 'copy_metadata', return_value=True):
-             
-            result = self.processor.compress_image()
-            
-            self.assertTrue(result)
-            mock_image.save.assert_called_once_with(
-                self.processor.file_path.with_stem(self.processor.file_path.stem + '_temp'),
-                'JPEG',
-                quality=JPEG_QUALITY,
-                optimize=True
-            )
-            
-    def test_when_compressing_rgba_image_then_converts_to_rgb(self):
-        """Should convert RGBA images to RGB before compressing."""
-        # Mock PIL Image
-        mock_image = MagicMock()
-        mock_image.mode = 'RGBA'
-        
-        # Mock PIL open context
-        mock_context = MagicMock()
-        mock_context.__enter__.return_value = mock_image
-        
-        with patch('PIL.Image.open', return_value=mock_context) as mock_open, \
-             patch('pathlib.Path.exists', return_value=True), \
-             patch('pathlib.Path.unlink'), \
-             patch('pathlib.Path.replace'), \
-             patch.object(self.processor.exiftool, 'copy_metadata', return_value=True):
-             
-            result = self.processor.compress_image()
-            
-            self.assertTrue(result)
-            mock_image.convert.assert_called_once_with('RGB')
-            
-    def test_when_compressing_fails_then_cleans_up(self):
-        """Should clean up temporary file when compression fails."""
-        with patch('PIL.Image.open', side_effect=Exception("Test error")), \
-             patch('pathlib.Path.exists', return_value=True), \
-             patch('pathlib.Path.unlink') as mock_unlink:
-             
-            result = self.processor.compress_image()
-            
-            self.assertFalse(result)
-            mock_unlink.assert_called_once()
             
     def test_when_getting_metadata_components_then_parses_date(self):
         """Should correctly parse date from metadata."""
@@ -122,51 +61,13 @@ class TestJPEGExifProcessor(unittest.TestCase):
         
         self.assertEqual(result, processed_file)
         
-    def test_when_processing_new_file_then_sets_title_if_none(self):
-        """Should set title if one doesn't exist."""
-        test_title = "Test Title"
-        
+    def test_when_processing_new_file_then_renames(self):
+        """Should rename new files with LRE suffix."""
         with patch.object(self.processor, 'read_exif'), \
-             patch.object(self.processor, 'get_exif_title', return_value=test_title), \
-             patch.object(self.processor, 'update_keywords_with_rating_and_export_tags'), \
-             patch.object(self.processor, 'rename_file', return_value=self.test_file), \
-             patch('subprocess.run') as mock_run:
-             
-            self.processor.exif_data = {}  # No existing title
-            result = self.processor.process_image()
-            
-            self.assertEqual(result, self.test_file)
-            mock_run.assert_called_once()
-            cmd_args = mock_run.call_args[0][0]
-            self.assertIn(f'-Title={test_title}', cmd_args)
-            
-    def test_when_processing_with_compression_enabled_then_compresses(self):
-        """Should compress image when JPEG_COMPRESS is True."""
-        with patch('processors.jpeg_processor.JPEG_COMPRESS', True), \
-             patch.object(self.processor, 'read_exif'), \
-             patch.object(self.processor, 'get_exif_title', return_value=None), \
-             patch.object(self.processor, 'update_keywords_with_rating_and_export_tags'), \
-             patch.object(self.processor, 'rename_file', return_value=self.test_file), \
-             patch.object(self.processor, 'compress_image') as mock_compress:
+             patch.object(self.processor, 'rename_file', return_value=self.test_file):
              
             result = self.processor.process_image()
-            
             self.assertEqual(result, self.test_file)
-            mock_compress.assert_called_once()
-            
-    def test_when_processing_with_compression_disabled_then_skips_compression(self):
-        """Should skip compression when JPEG_COMPRESS is False."""
-        with patch('processors.jpeg_processor.JPEG_COMPRESS', False), \
-             patch.object(self.processor, 'read_exif'), \
-             patch.object(self.processor, 'get_exif_title', return_value=None), \
-             patch.object(self.processor, 'update_keywords_with_rating_and_export_tags'), \
-             patch.object(self.processor, 'rename_file', return_value=self.test_file), \
-             patch.object(self.processor, 'compress_image') as mock_compress:
-             
-            result = self.processor.process_image()
-            
-            self.assertEqual(result, self.test_file)
-            mock_compress.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

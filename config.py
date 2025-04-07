@@ -23,10 +23,6 @@ VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v']  # Will handle case sensitivity in t
 # Combined pattern for Apple Photos
 ALL_PATTERN = [JPEG_PATTERN] + [pat.upper() for pat in VIDEO_PATTERN] + [pat.lower() for pat in VIDEO_PATTERN]
 
-# JPEG compression settings
-JPEG_COMPRESS = True  # Set to True to enable compression
-JPEG_QUALITY = 85  # Default quality, good balance of size and quality
-
 # XML/RDF Namespaces
 XML_NAMESPACES = {
     'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',

@@ -2,11 +2,9 @@
 
 from pathlib import Path
 import sys
-from PIL import Image
 import subprocess
 import logging
 
-from config import JPEG_QUALITY, JPEG_COMPRESS
 from processors.media_processor import MediaProcessor
 
 class JPEGExifProcessor(MediaProcessor):
@@ -35,60 +33,9 @@ class JPEGExifProcessor(MediaProcessor):
         # Remove the username validation logic
         try:
             original_name = self.input_path.stem
-            # Removed the check for underscore in the filename
-            # if '_' not in original_name:
-            #     self.logger.error(f"Original filename must contain username followed by underscore. Found: {original_name}")
-            #     sys.exit(1)
-            
-            # The rest of the logic can remain unchanged
-            # username = original_name.split('_')[0]
-            # if not username:
-            #     self.logger.error("Username cannot be empty")
-            #     sys.exit(1)
-                
         except Exception as e:
             self.logger.error(f"Error validating filename: {str(e)}")
             sys.exit(1)
-            
-    def compress_image(self) -> bool:
-        """
-        Compress JPEG image while preserving metadata.
-        
-        Uses Pillow for compression and exiftool to preserve metadata.
-        
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            # Create temporary file for compressed image
-            temp_path = self.file_path.with_stem(self.file_path.stem + '_temp')
-            
-            # Open and compress image
-            with Image.open(self.file_path) as img:
-                # Convert to RGB if needed (some JPEGs can be RGBA)
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-                    
-                # Save compressed image to temporary file
-                img.save(temp_path, 'JPEG', quality=JPEG_QUALITY, optimize=True)
-                
-            # Copy metadata from original to compressed file
-            if not self.exiftool.copy_metadata(self.file_path, temp_path):
-                self.logger.error("Failed to copy metadata to compressed file")
-                if temp_path.exists():
-                    temp_path.unlink()
-                return False
-                
-            # Replace original with compressed file
-            temp_path.replace(self.file_path)
-            self.logger.info(f"Compressed image saved to: {self.file_path}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error compressing image: {e}")
-            if temp_path.exists():
-                temp_path.unlink()
-            return False
             
     def get_metadata_components(self):
         """Get metadata components for JPEG files."""
@@ -123,7 +70,7 @@ class JPEGExifProcessor(MediaProcessor):
         
     def process_image(self) -> Path:
         """
-        Main method to process an image - reads EXIF, updates keywords and title, and renames file.
+        Main method to process an image - reads EXIF and renames file.
         
         Returns:
             Path: Path to the processed file
@@ -133,30 +80,8 @@ class JPEGExifProcessor(MediaProcessor):
             self.logger.info(f"Skipping already processed file: {self.file_path}")
             return self.file_path
             
-        # Read EXIF data
+        # Read EXIF data for filename generation
         self.read_exif()
-        
-        # Set the title only if one doesn't exist
-        title = self.get_exif_title()
-        if title and not self.exif_data.get('Title'):
-            try:
-                cmd = ['exiftool', '-overwrite_original',
-                      '-Title=' + title,
-                      '-XPTitle=' + title,
-                      '-XMP:Title=' + title,
-                      '-IPTC:ObjectName=' + title,
-                      '-IPTC:Headline=' + title,
-                      str(self.file_path)]
-                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-                self.logger.info(f"Title set to: {title}")
-            except subprocess.CalledProcessError as e:
-                self.logger.error(f"Error setting title: {e.stderr}")
-                raise
-            
-        # Update keywords and compress if needed
-        self.update_keywords_with_rating_and_export_tags()
-        if JPEG_COMPRESS:
-            self.compress_image()
             
         # Rename the file
         return self.rename_file()
