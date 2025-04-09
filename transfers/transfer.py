@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 import shutil
 
-from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS
+from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS
 from apple_photos_sdk import ApplePhotos
 
 @dataclass
@@ -226,7 +226,7 @@ class Transfer:
             file_path.rename(dest_path)
             self.logger.info(f"Successfully moved file to {dest_path}")
             
-            if dest_dir in APPLE_PHOTOS_PATHS:
+            if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS:
                 # Then import to Apple Photos if needed
                 self.logger.debug(f"Importing {dest_path} to Apple Photos")
                 photos = ApplePhotos()
@@ -236,6 +236,8 @@ class Transfer:
                 else:
                     self.logger.error(f"Failed to import {dest_path} to Apple Photos")
                 return success
+            elif dest_dir in APPLE_PHOTOS_PATHS:
+                self.logger.info(f"Apple Photos processing is disabled. Skipping import of {dest_path}")
             
             return True
                 
@@ -271,10 +273,13 @@ class Transfer:
         """
         try:
             # Check if source is an Apple Photos directory
-            if any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+            if ENABLE_APPLE_PHOTOS and any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 # Skip validation for Apple Photos imports
                 self.logger.info(f"Importing to Apple Photos: {file_path}")
                 return self._import_to_photos(file_path)
+            elif any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+                self.logger.info(f"Apple Photos processing is disabled. Skipping import of {file_path}")
+                return True
                 
             # Check if source has a configured destination
             source_dir = file_path.parent

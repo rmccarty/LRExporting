@@ -77,6 +77,9 @@ APPLE_PHOTOS_PATHS = {
     Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos")  # Only Ron's path goes to Apple Photos
 }
 
+# Flag to enable/disable Apple Photos processing
+ENABLE_APPLE_PHOTOS = False
+
 MIN_FILE_AGE = 30  # Minimum age in seconds before a file can be transferred
 
 # File naming configuration

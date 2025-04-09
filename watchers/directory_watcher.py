@@ -7,7 +7,7 @@ import shutil
 
 from config import (
     WATCH_DIRS, BOTH_INCOMING, APPLE_PHOTOS_PATHS,
-    JPEG_PATTERN, ALL_PATTERN
+    JPEG_PATTERN, ALL_PATTERN, ENABLE_APPLE_PHOTOS
 )
 from .base_watcher import BaseWatcher
 from transfers.transfer import Transfer
@@ -69,7 +69,7 @@ class DirectoryWatcher(BaseWatcher):
             
         try:
             # For files in Apple Photos directories, process regardless of suffix
-            if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+            if ENABLE_APPLE_PHOTOS and any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 self.logger.info(f"Found file in Apple Photos directory: {file_path}")
                 self.transfer.transfer_file(file_path)
                 return
@@ -122,6 +122,10 @@ class DirectoryWatcher(BaseWatcher):
     
     def check_apple_photos_dirs(self):
         """Check Apple Photos directories for media files and transfer them."""
+        if not ENABLE_APPLE_PHOTOS:
+            self.logger.info("Apple Photos processing is disabled. Skipping checks.")
+            return
+
         for photos_path in APPLE_PHOTOS_PATHS:
             self.logger.info(f"Checking {photos_path} for new media files...")
             self.check_directory(photos_path)
