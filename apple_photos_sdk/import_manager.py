@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 import subprocess
 from objc import autorelease_pool
+import threading
+import json
 
 from Photos import (
     PHAsset,
@@ -157,6 +159,117 @@ class ImportManager:
             self.logger.error(f"Error getting original keywords: {e}")
             return []
 
+    def _get_original_title(self, photo_path: Path) -> str | None:
+        """Get title from original photo before import."""
+        try:
+            # Run exiftool to get title from the specific fields Apple Photos uses
+            import subprocess
+            cmd = ["exiftool", "-IPTC:ObjectName", "-XMP:Title", "-s", "-s", "-j", str(photo_path)]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                import json
+                data = json.loads(result.stdout)
+                if not data or not isinstance(data, list) or len(data) == 0:
+                    return None
+                    
+                metadata = data[0]
+                
+                # Check for title in both fields that Apple Photos uses
+                title = metadata.get('ObjectName') or metadata.get('Title')
+                if title:
+                    self.logger.debug(f"Found original title: {title}")
+                    return title
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting original title: {e}")
+            return None
+            
+    def _set_title_on_asset(self, asset_id: str, title: str) -> bool:
+        """Set the title on an asset in Photos library with proper async handling."""
+        if not title:
+            return False
+            
+        try:
+            with autorelease_pool():
+                # Get the asset
+                asset_list = PHAsset.fetchAssetsWithLocalIdentifiers_options_([asset_id], None)
+                
+                if asset_list.count() == 0:
+                    self.logger.error(f"Asset not found: {asset_id}")
+                    return False
+                    
+                asset = asset_list.firstObject()
+                success = [False]  # Use a list so it can be modified in the completion handler
+                error_ref = [None]  # To capture any error
+                semaphore = threading.Semaphore(0)  # For synchronization
+                
+                def handle_change():
+                    try:
+                        # Create a change request for the asset
+                        request = PHAssetChangeRequest.changeRequestForAsset_(asset)
+                        # Set the title
+                        request.setTitle_(title)
+                    except Exception as e:
+                        self.logger.error(f"Error in change request: {e}")
+                        raise  # Re-raise to be caught by Photos API
+                
+                def completion_handler(result, error):
+                    success[0] = result
+                    error_ref[0] = error
+                    semaphore.release()  # Signal that the operation is complete
+                
+                # Perform changes in a change block with completion handler
+                PHPhotoLibrary.sharedPhotoLibrary().performChanges_completionHandler_(
+                    handle_change,
+                    completion_handler
+                )
+                
+                # Wait for completion (with timeout)
+                if not semaphore.acquire(timeout=10):  # 10 second timeout
+                    self.logger.error(f"Timeout waiting for title update on asset {asset_id}")
+                    return False
+                
+                # Check results
+                if success[0]:
+                    self.logger.info(f"Set title on asset {asset_id}: {title}")
+                    
+                    # Verify title was set by reading it back
+                    if self._verify_asset_title(asset_id, title):
+                        self.logger.debug(f"Verified title was set on asset {asset_id}")
+                    else:
+                        self.logger.warning(f"Title was set but verification failed on asset {asset_id}")
+                else:
+                    if error_ref[0]:
+                        self.logger.error(f"Error setting title on asset {asset_id}: {error_ref[0]}")
+                    else:
+                        self.logger.error(f"Failed to set title on asset {asset_id}, no error details available")
+                
+                return success[0]
+                
+        except Exception as e:
+            self.logger.error(f"Error setting title on asset: {e}")
+            return False
+            
+    def _verify_asset_title(self, asset_id: str, expected_title: str) -> bool:
+        """Verify that an asset has the expected title."""
+        try:
+            with autorelease_pool():
+                # Get the asset
+                asset_list = PHAsset.fetchAssetsWithLocalIdentifiers_options_([asset_id], None)
+                
+                if asset_list.count() == 0:
+                    return False
+                    
+                asset = asset_list.firstObject()
+                current_title = asset.title()
+                
+                return current_title == expected_title
+                
+        except Exception as e:
+            self.logger.error(f"Error verifying asset title: {e}")
+            return False
+
     def import_photo(self, photo_path: Path) -> tuple[bool, str | None]:
         """
         Import a photo or video into Apple Photos.
@@ -177,6 +290,11 @@ class ImportManager:
             original_keywords = self._get_original_keywords(photo_path)
             if original_keywords:
                 self.logger.info(f"Original keywords for {photo_path}: {original_keywords}")
+                
+            # Get original title before import
+            original_title = self._get_original_title(photo_path)
+            if original_title:
+                self.logger.info(f"Original title for {photo_path}: {original_title}")
 
             # Get targeted album keywords
             targeted_keywords = [k for k in original_keywords if self._is_targeted_keyword(k)]
@@ -217,6 +335,13 @@ class ImportManager:
             # Get the imported asset's ID
             asset_id = placeholder.localIdentifier()
             self.logger.debug(f"Asset verified in Photos library: {asset_id}")
+
+            # Set title if available
+            if original_title:
+                self.logger.info(f"Setting title on asset {asset_id}: {original_title}")
+                if not self._set_title_on_asset(asset_id, original_title):
+                    self.logger.warning(f"Failed to set title on asset {asset_id}")
+                    # Continue with import even if title setting fails
 
             # Add to targeted albums based on keywords
             if targeted_keywords:

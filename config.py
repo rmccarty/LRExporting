@@ -78,7 +78,7 @@ APPLE_PHOTOS_PATHS = {
 }
 
 # Flag to enable/disable Apple Photos processing
-ENABLE_APPLE_PHOTOS = False
+ENABLE_APPLE_PHOTOS = True
 
 MIN_FILE_AGE = 30  # Minimum age in seconds before a file can be transferred
 
