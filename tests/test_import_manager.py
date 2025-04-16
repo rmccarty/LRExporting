@@ -409,11 +409,11 @@ class TestImportManager(unittest.TestCase):
     @patch('subprocess.run')
     def test_when_importing_photo_then_gets_keywords(self, mock_run):
         """Should get keywords from original file before import."""
-        # Mock exiftool output
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="test||photo"
-        )
+        # Mock exiftool output for both calls
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="test||photo"),
+            MagicMock(returncode=0, stdout="Title")
+        ]
         
         # Mock Photos library dependencies
         with patch('pathlib.Path.exists', return_value=True), \
@@ -453,8 +453,14 @@ class TestImportManager(unittest.TestCase):
             # Assert
             self.assertTrue(success)
             self.assertEqual(asset_id, 'test-id')
-            mock_run.assert_called_once_with(
+            self.assertEqual(mock_run.call_count, 2)
+            mock_run.assert_any_call(
                 ["exiftool", "-XMP:Subject", "-s", "-s", "-sep", "||", str(self.test_file)],
+                capture_output=True,
+                text=True
+            )
+            mock_run.assert_any_call(
+                ["exiftool", "-IPTC:ObjectName", "-XMP:Title", "-s", "-s", "-j", str(self.test_file)],
                 capture_output=True,
                 text=True
             )
