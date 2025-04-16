@@ -139,3 +139,35 @@ class TestAlbumManager(unittest.TestCase):
         # Should NOT match non-targeted
         self.assertFalse(self.manager._is_targeted_album_keyword("Random/Album"))
         self.assertFalse(self.manager._is_targeted_album_keyword("Subject: NotAnAlbum"))
+
+    @patch("apple_photos_sdk.album.autorelease_pool")
+    @patch("apple_photos_sdk.album.Photos")
+    def test_create_folder_success_and_error(self, mock_photos, mock_pool):
+        """Test _create_folder for success and error handling."""
+        # Mock successful folder creation
+        mock_folder = MagicMock()
+        mock_placeholder = MagicMock()
+        mock_placeholder.localIdentifier.return_value = "folder-id-123"
+        mock_folder.placeholderForCreatedCollectionList.return_value = mock_placeholder
+        mock_photos.PHCollectionListChangeRequest.creationRequestForCollectionListWithTitle_.return_value = mock_folder
+
+        def perform_changes_and_wait_effect(callback, _):
+            callback()  # This sets success/folder_id in the implementation
+            return (True, None)
+        mock_photos.PHPhotoLibrary.sharedPhotoLibrary.return_value.performChangesAndWait_error_.side_effect = perform_changes_and_wait_effect
+
+        success, folder_id = self.manager._create_folder("Test Folder")
+        self.assertTrue(success)
+        self.assertEqual(folder_id, "folder-id-123")
+
+        # Mock failure (result False)
+        mock_photos.PHPhotoLibrary.sharedPhotoLibrary.return_value.performChangesAndWait_error_.side_effect = lambda cb, _: (False, None)
+        success, folder_id = self.manager._create_folder("Fail Folder")
+        self.assertFalse(success)
+        self.assertIsNone(folder_id)
+
+        # Mock exception
+        mock_photos.PHPhotoLibrary.sharedPhotoLibrary.return_value.performChangesAndWait_error_.side_effect = Exception("API error")
+        success, folder_id = self.manager._create_folder("Error Folder")
+        self.assertFalse(success)
+        self.assertIsNone(folder_id)
