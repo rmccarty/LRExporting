@@ -171,3 +171,52 @@ class TestAlbumManager(unittest.TestCase):
         success, folder_id = self.manager._create_folder("Error Folder")
         self.assertFalse(success)
         self.assertIsNone(folder_id)
+
+    @patch("apple_photos_sdk.album.autorelease_pool")
+    @patch("apple_photos_sdk.album.Photos")
+    def test_create_album_in_folder_success_and_error(self, mock_photos, mock_pool):
+        """Test _create_album_in_folder for success, already exists, and error handling."""
+        # Setup for album already exists
+        self.manager._find_album_in_folder = MagicMock(return_value="existing-album-id")
+        success, album_id = self.manager._create_album_in_folder("Existing Album", "parent-folder-id")
+        self.assertTrue(success)
+        self.assertEqual(album_id, "existing-album-id")
+
+        # Setup for new album creation success (with parent)
+        self.manager._find_album_in_folder = MagicMock(return_value=None)
+        mock_album = MagicMock()
+        mock_placeholder = MagicMock()
+        mock_placeholder.localIdentifier.return_value = "album-id-456"
+        mock_album.placeholderForCreatedAssetCollection.return_value = mock_placeholder
+        mock_photos.PHAssetCollectionChangeRequest.creationRequestForAssetCollectionWithTitle_.return_value = mock_album
+
+        # Mock parent folder fetch
+        mock_parent_result = MagicMock()
+        mock_parent_result.count.return_value = 1
+        mock_parent = MagicMock()
+        mock_parent_result.objectAtIndex_.return_value = mock_parent
+        mock_photos.PHCollectionList.fetchCollectionListsWithLocalIdentifiers_options_.return_value = mock_parent_result
+        # Mock parent change request
+        mock_parent_change = MagicMock()
+        mock_photos.PHCollectionListChangeRequest.changeRequestForCollectionList_.return_value = mock_parent_change
+
+        def perform_changes_and_wait_effect(callback, _):
+            callback()  # This sets success/album_id in the implementation
+            return (True, None)
+        mock_photos.PHPhotoLibrary.sharedPhotoLibrary.return_value.performChangesAndWait_error_.side_effect = perform_changes_and_wait_effect
+
+        success, album_id = self.manager._create_album_in_folder("New Album", "parent-folder-id")
+        self.assertTrue(success)
+        self.assertEqual(album_id, "album-id-456")
+
+        # Setup for failure (result False)
+        mock_photos.PHPhotoLibrary.sharedPhotoLibrary.return_value.performChangesAndWait_error_.side_effect = lambda cb, _: (False, None)
+        success, album_id = self.manager._create_album_in_folder("Fail Album", "parent-folder-id")
+        self.assertFalse(success)
+        self.assertIsNone(album_id)
+
+        # Setup for exception
+        mock_photos.PHPhotoLibrary.sharedPhotoLibrary.return_value.performChangesAndWait_error_.side_effect = Exception("API error")
+        success, album_id = self.manager._create_album_in_folder("Error Album", "parent-folder-id")
+        self.assertFalse(success)
+        self.assertIsNone(album_id)
