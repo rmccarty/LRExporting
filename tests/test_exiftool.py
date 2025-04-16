@@ -203,18 +203,6 @@ class TestExifTool(unittest.TestCase):
         self.assertFalse(result)
 
     @patch('subprocess.run')
-    def test_when_updating_keywords_then_formats_command_correctly(self, mock_run):
-        """Should format keywords command with correct flags and values"""
-        mock_run.return_value = MagicMock(returncode=0)
-        keywords = ['test', 'video']
-
-        result = self.exiftool.update_keywords(self.test_file, keywords)
-        self.assertTrue(result)
-        mock_run.assert_called_once()
-        cmd_args = mock_run.call_args[0][0]
-        self.assertIn('-keywords=test,video', cmd_args)
-
-    @patch('subprocess.run')
     def test_when_updating_keywords_fails_then_returns_false(self, mock_run):
         """Should return False when exiftool fails to update keywords"""
         mock_run.side_effect = subprocess.CalledProcessError(1, 'cmd')

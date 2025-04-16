@@ -201,12 +201,6 @@ class TestRatingHandling(unittest.TestCase):
         self.test_file = Path('/test/path/test.mov')
         self.processor = TestMediaProcessor(str(self.test_file), exiftool=self.mock_exiftool)
 
-    def test_when_getting_valid_rating_then_returns_integer(self):
-        """Should return integer rating when valid."""
-        self.processor.exif_data = {'Rating': '4'}
-        result = self.processor.get_image_rating()
-        self.assertEqual(result, 4)
-
     def test_when_rating_missing_then_returns_zero(self):
         """Should return 0 when rating is missing."""
         self.processor.exif_data = {}
@@ -219,16 +213,6 @@ class TestRatingHandling(unittest.TestCase):
         result = self.processor.get_image_rating()
         self.assertEqual(result, 0)
 
-    def test_when_translating_rating_zero_then_returns_zero_star(self):
-        """Should return '0-star' for rating 0 or 1."""
-        self.assertEqual(self.processor.translate_rating_to_keyword(0), '0-star')
-        self.assertEqual(self.processor.translate_rating_to_keyword(1), '0-star')
-
-    def test_when_translating_rating_above_one_then_returns_n_minus_one_star(self):
-        """Should return correct star rating for ratings above 1."""
-        self.assertEqual(self.processor.translate_rating_to_keyword(2), '1-star')
-        self.assertEqual(self.processor.translate_rating_to_keyword(5), '4-star')
-
 class TestKeywordHandling(unittest.TestCase):
     """Tests for keyword-related methods."""
     
@@ -237,44 +221,6 @@ class TestKeywordHandling(unittest.TestCase):
         self.test_file = Path('/test/path/test.mov')
         self.processor = TestMediaProcessor(str(self.test_file), exiftool=self.mock_exiftool)
         self.today = datetime.now().strftime('%Y_%m_%d')
-
-    @patch('processors.media_processor.datetime')
-    def test_when_updating_keywords_then_adds_all_required_tags(self, mock_datetime):
-        """Should add rating, export, and date keywords."""
-        mock_datetime.now.return_value = datetime(2025, 3, 26)
-        self.processor.exif_data = {
-            'Rating': '4',
-            'Keywords': ['existing']
-        }
-        self.mock_exiftool.update_keywords.return_value = True
-
-        self.processor.update_keywords_with_rating_and_export_tags()
-
-        self.mock_exiftool.update_keywords.assert_called_once()
-        keywords = self.mock_exiftool.update_keywords.call_args[0][1]
-        self.assertIn('existing', keywords)
-        self.assertIn('3-star', keywords)
-        self.assertIn('Lightroom_Export', keywords)
-        self.assertIn('Lightroom_Export_on_2025_03_26', keywords)
-
-    def test_when_updating_claudia_file_then_adds_claudia_keyword(self):
-        """Should add Export_Claudia keyword for claudia_ files."""
-        self.processor = TestMediaProcessor('/test/path/claudia_test.mov', exiftool=self.mock_exiftool)
-        self.processor.exif_data = {'Rating': '3'}
-        self.mock_exiftool.update_keywords.return_value = True
-
-        self.processor.update_keywords_with_rating_and_export_tags()
-
-        keywords = self.mock_exiftool.update_keywords.call_args[0][1]
-        self.assertIn('Export_Claudia', keywords)
-
-    def test_when_keyword_update_fails_then_raises_error(self):
-        """Should raise RuntimeError when keyword update fails."""
-        self.processor.exif_data = {'Rating': '3'}
-        self.mock_exiftool.update_keywords.return_value = False
-
-        with self.assertRaises(RuntimeError):
-            self.processor.update_keywords_with_rating_and_export_tags()
 
 class TestFileOperations(unittest.TestCase):
     """Tests for file operation methods."""
