@@ -7,6 +7,7 @@ import fcntl
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import shutil
+import yaml
 
 from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS
 from apple_photos_sdk import ApplePhotos
@@ -207,16 +208,23 @@ class Transfer:
             
         return True
         
+    def _get_album_paths_for_city(self, city: str) -> list[str]:
+        """Load album paths for a given city from album.yaml."""
+        try:
+            with open("album.yaml", "r") as f:
+                mapping = yaml.safe_load(f)
+            if city in mapping:
+                return [mapping[city]] if isinstance(mapping[city], str) else list(mapping[city])
+            else:
+                self.logger.warning(f"No album mapping found for city: {city}")
+                return []
+        except Exception as e:
+            self.logger.error(f"Error loading album.yaml: {e}")
+            return []
+            
     def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
         """
         Transfer a file to its destination.
-        
-        Args:
-            file_path: Path to the file to transfer
-            dest_dir: Destination directory
-            
-        Returns:
-            bool: True if transfer successful, False if failed
         """
         try:
             # First move file to destination
@@ -229,12 +237,14 @@ class Transfer:
             if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS:
                 # Then import to Apple Photos if needed
                 self.logger.debug(f"Importing {dest_path} to Apple Photos")
+                # Use album.yaml mapping
+                city = None
+                for candidate in ["Stuttgart", "Dallas", "Anniversary"]:
+                    if candidate.lower() in dest_path.name.lower():
+                        city = candidate
+                        break
+                album_paths = self._get_album_paths_for_city(city) if city else []
                 photos = ApplePhotos()
-                # Always use hardcoded albums for test
-                album_paths = [
-                    "01/Gr/Releations/Anniversity Test",
-                    "02/DE/Stuttgart/Stuttgart Test"
-                ]
                 success = photos.import_photo(dest_path, album_paths=album_paths)
                 if success:
                     self.logger.info(f"Successfully imported {dest_path} to Apple Photos")
@@ -251,12 +261,14 @@ class Transfer:
             return False
             
     def _import_to_photos(self, photo_path: Path) -> bool:
-        """Import a photo into Apple Photos."""
-        # Hard-coded album paths for testing
-        album_paths = [
-            "01/Gr/Releations/Anniversity Test",
-            "02/DE/Stuttgart/Stuttgart Test"
-        ]
+        """Import a photo into Apple Photos using album.yaml mapping."""
+        # For demo: extract city from filename (customize as needed)
+        city = None
+        for candidate in ["Stuttgart", "Dallas", "Anniversary"]:
+            if candidate.lower() in photo_path.name.lower():
+                city = candidate
+                break
+        album_paths = self._get_album_paths_for_city(city) if city else []
         success = ApplePhotos().import_photo(photo_path, album_paths=album_paths)
         if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
