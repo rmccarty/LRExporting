@@ -128,3 +128,14 @@ class TestAlbumManager(unittest.TestCase):
                 
                 # Assert
                 self.assertIn(f"Failed to add {self.test_photo} to album {self.test_album}", log.output[0])
+
+    def test_is_targeted_album_keyword(self):
+        """Test _is_targeted_album_keyword with various prefixes and formats."""
+        # Should match targeted prefixes
+        self.assertTrue(self.manager._is_targeted_album_keyword("01/Family"))
+        self.assertTrue(self.manager._is_targeted_album_keyword("02/Travel/Europe"))
+        # Should match with 'Subject: ' prefix
+        self.assertTrue(self.manager._is_targeted_album_keyword("Subject: 03/Events/Birthday"))
+        # Should NOT match non-targeted
+        self.assertFalse(self.manager._is_targeted_album_keyword("Random/Album"))
+        self.assertFalse(self.manager._is_targeted_album_keyword("Subject: NotAnAlbum"))
