@@ -264,3 +264,44 @@ class TestAlbumManager(unittest.TestCase):
         self.manager._add_to_album = MagicMock(return_value=True)
         with self.assertRaises(Exception):
             self.manager.add_asset_to_targeted_albums(asset_id, targeted_keywords)
+
+    @patch("apple_photos_sdk.album.Photos")
+    def test_find_album_in_folder(self, mock_photos):
+        """Test _find_album_in_folder for found, not found, and error cases."""
+        # Setup for found
+        mock_parent_result = MagicMock()
+        mock_parent_result.count.return_value = 1
+        mock_parent = MagicMock()
+        mock_parent_result.objectAtIndex_.return_value = mock_parent
+        mock_photos.PHCollectionList.fetchCollectionListsWithLocalIdentifiers_options_.return_value = mock_parent_result
+
+        mock_child_collections = MagicMock()
+        mock_child_collections.count.return_value = 2
+        mock_album1 = MagicMock()
+        mock_album1.localizedTitle.return_value = "Album1"
+        mock_album1.localIdentifier.return_value = "id-1"
+        mock_album2 = MagicMock()
+        mock_album2.localizedTitle.return_value = "Album2"
+        mock_album2.localIdentifier.return_value = "id-2"
+        mock_child_collections.objectAtIndex_.side_effect = [mock_album1, mock_album2]
+        mock_photos.PHAssetCollection.fetchCollectionsInCollectionList_options_.return_value = mock_child_collections
+
+        # Should find Album2
+        album_id = self.manager._find_album_in_folder("parent-id", "Album2")
+        self.assertEqual(album_id, "id-2")
+
+        # Not found case
+        mock_child_collections.count.return_value = 1
+        mock_album1.localizedTitle.return_value = "OtherAlbum"
+        album_id = self.manager._find_album_in_folder("parent-id", "MissingAlbum")
+        self.assertIsNone(album_id)
+
+        # Parent not found
+        mock_parent_result.count.return_value = 0
+        album_id = self.manager._find_album_in_folder("parent-id", "AnyAlbum")
+        self.assertIsNone(album_id)
+
+        # Exception case
+        mock_photos.PHCollectionList.fetchCollectionListsWithLocalIdentifiers_options_.side_effect = Exception("API error")
+        album_id = self.manager._find_album_in_folder("parent-id", "Album2")
+        self.assertIsNone(album_id)
