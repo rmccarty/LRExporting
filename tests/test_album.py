@@ -220,3 +220,47 @@ class TestAlbumManager(unittest.TestCase):
         success, album_id = self.manager._create_album_in_folder("Error Album", "parent-folder-id")
         self.assertFalse(success)
         self.assertIsNone(album_id)
+
+    @patch("apple_photos_sdk.album.autorelease_pool")
+    @patch("apple_photos_sdk.album.Photos")
+    def test_add_asset_to_targeted_albums(self, mock_photos, mock_pool):
+        """Test add_asset_to_targeted_albums for normal, partial, and error cases."""
+        # Setup mocks for _create_folder_path, _create_album_in_folder, _add_to_album
+        asset_id = "asset-123"
+        targeted_keywords = ["01/Family/2020", "02/Travel/Europe"]
+
+        # All succeed
+        self.manager._create_folder_path = MagicMock(return_value=(True, "folder-1"))
+        self.manager._create_album_in_folder = MagicMock(return_value=(True, "album-1"))
+        self.manager._add_to_album = MagicMock(return_value=True)
+        result = self.manager.add_asset_to_targeted_albums(asset_id, targeted_keywords)
+        self.assertTrue(result)
+        self.assertEqual(self.manager._create_folder_path.call_count, 2)
+        self.assertEqual(self.manager._create_album_in_folder.call_count, 2)
+        self.assertEqual(self.manager._add_to_album.call_count, 2)
+
+        # One album fails to create
+        self.manager._create_folder_path.reset_mock()
+        self.manager._create_album_in_folder.reset_mock()
+        self.manager._add_to_album.reset_mock()
+        self.manager._create_folder_path.side_effect = [(True, "folder-1"), (False, None)]
+        result = self.manager.add_asset_to_targeted_albums(asset_id, targeted_keywords)
+        self.assertFalse(result)
+        self.assertEqual(self.manager._create_folder_path.call_count, 2)
+        self.assertEqual(self.manager._create_album_in_folder.call_count, 1)
+        self.assertEqual(self.manager._add_to_album.call_count, 1)
+
+        # _add_to_album fails
+        self.manager._create_folder_path = MagicMock(return_value=(True, "folder-1"))
+        self.manager._create_album_in_folder = MagicMock(return_value=(True, "album-1"))
+        self.manager._add_to_album = MagicMock(side_effect=[True, False])
+        result = self.manager.add_asset_to_targeted_albums(asset_id, targeted_keywords)
+        self.assertFalse(result)
+        self.assertEqual(self.manager._add_to_album.call_count, 2)
+
+        # Exception in _create_album_in_folder
+        self.manager._create_folder_path = MagicMock(return_value=(True, "folder-1"))
+        self.manager._create_album_in_folder = MagicMock(side_effect=Exception("API error"))
+        self.manager._add_to_album = MagicMock(return_value=True)
+        with self.assertRaises(Exception):
+            self.manager.add_asset_to_targeted_albums(asset_id, targeted_keywords)
