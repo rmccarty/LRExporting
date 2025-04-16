@@ -343,11 +343,9 @@ class ImportManager:
                     self.logger.warning(f"Failed to set title on asset {asset_id}")
                     # Continue with import even if title setting fails
 
-            # Add to targeted albums based on keywords
-            if targeted_keywords:
-                self.logger.info(f"Adding asset to targeted albums: {targeted_keywords}")
-                if not self.album_manager.add_asset_to_targeted_albums(asset_id, targeted_keywords):
-                    self.logger.error("Failed to add asset to one or more targeted albums")
+            # Remove album assignment via targeted keywords
+            # if not self.album_manager.add_asset_to_targeted_albums(asset_id, targeted_keywords):
+            #     self.logger.error("Failed to add asset to one or more targeted albums")
 
             # Delete original if configured
             if DELETE_ORIGINAL:

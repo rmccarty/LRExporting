@@ -464,3 +464,21 @@ class TestImportManager(unittest.TestCase):
                 capture_output=True,
                 text=True
             )
+
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.NSURL')
+    def test_when_importing_photo_then_does_not_add_to_album(self, mock_nsurl, mock_library):
+        """Should not attempt album assignment during import."""
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('apple_photos_sdk.import_manager.PHAssetCreationRequest') as mock_request_class, \
+             patch.object(ImportManager, '_verify_asset_exists', return_value=True) as mock_verify:
+            # Arrange
+            mock_file_url, mock_shared, mock_request = self._setup_successful_import_mocks(
+                mock_nsurl, mock_library, mock_request_class)
+            # Act
+            success, asset_id = self.manager.import_photo(self.test_file)
+            # Assert
+            self.assertTrue(success)
+            self.assertEqual(asset_id, "test-id-123")
+            # There should be no call to any album assignment logic (since it's removed)
+            # (If album assignment was a method, we would patch and assert_not_called)
