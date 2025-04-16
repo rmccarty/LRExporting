@@ -186,17 +186,6 @@ class MediaProcessor(ABC):
             
         return keywords
 
-    def update_keywords_with_rating_and_export_tags(self):
-        """Update image keywords with rating and export tags."""
-        # Get all keywords
-        keywords = self._get_base_keywords()
-        keywords.extend(self._get_export_keywords())
-        
-        # Update keywords in file
-        if not self.exiftool.update_keywords(self.file_path, keywords):
-            self.logger.error("Error updating keywords: Failed to update keywords")
-            raise RuntimeError("Failed to update keywords")
-            
     def _clean_location_component(self, component: str) -> str:
         """Clean a single location component."""
         return self.clean_component(component)
