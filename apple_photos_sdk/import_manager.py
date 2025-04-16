@@ -270,13 +270,14 @@ class ImportManager:
             self.logger.error(f"Error verifying asset title: {e}")
             return False
 
-    def import_photo(self, photo_path: Path) -> tuple[bool, str | None]:
+    def import_photo(self, photo_path: Path, album_paths: list[str] = None) -> tuple[bool, str | None]:
         """
         Import a photo or video into Apple Photos.
-        
+
         Args:
             photo_path: Path to the photo or video to import
-            
+            album_paths: List of hierarchical album paths (optional, for album assignment)
+
         Returns:
             tuple[bool, str | None]: (success, asset_id) where success is True if import succeeded,
                                    and asset_id is the local identifier of the imported asset
@@ -343,16 +344,13 @@ class ImportManager:
                     self.logger.warning(f"Failed to set title on asset {asset_id}")
                     # Continue with import even if title setting fails
 
-            # Hard-coded album paths for testing new album logic
-            album_paths = [
-                "01/Gr/Releations/Anniversity Test",
-                "02/DE/Stuttgart/Stuttgart Test"
-            ]
-            self.logger.info(f"Adding photo to albums: {album_paths}")
-            if asset_id:
-                self.album_manager.add_to_albums(asset_id, album_paths)
-            else:
-                self.logger.warning("No asset_id available to add to albums.")
+            # Album assignment now handled by caller, but support for backward compatibility
+            if album_paths:
+                self.logger.info(f"Adding photo to albums: {album_paths}")
+                if asset_id:
+                    self.album_manager.add_to_albums(asset_id, album_paths)
+                else:
+                    self.logger.warning("No asset_id available to add to albums.")
 
             # Remove album assignment via targeted keywords
             # if not self.album_manager.add_asset_to_targeted_albums(asset_id, targeted_keywords):

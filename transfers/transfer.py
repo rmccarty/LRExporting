@@ -230,7 +230,12 @@ class Transfer:
                 # Then import to Apple Photos if needed
                 self.logger.debug(f"Importing {dest_path} to Apple Photos")
                 photos = ApplePhotos()
-                success = photos.import_photo(dest_path)
+                # Always use hardcoded albums for test
+                album_paths = [
+                    "01/Gr/Releations/Anniversity Test",
+                    "02/DE/Stuttgart/Stuttgart Test"
+                ]
+                success = photos.import_photo(dest_path, album_paths=album_paths)
                 if success:
                     self.logger.info(f"Successfully imported {dest_path} to Apple Photos")
                 else:
@@ -240,15 +245,20 @@ class Transfer:
                 self.logger.info(f"Apple Photos processing is disabled. Skipping import of {dest_path}")
             
             return True
-                
+            
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
             
     def _import_to_photos(self, photo_path: Path) -> bool:
         """Import a photo into Apple Photos."""
-        success, asset_id = ApplePhotos().import_photo(photo_path)
-        if success and asset_id:
+        # Hard-coded album paths for testing
+        album_paths = [
+            "01/Gr/Releations/Anniversity Test",
+            "02/DE/Stuttgart/Stuttgart Test"
+        ]
+        success = ApplePhotos().import_photo(photo_path, album_paths=album_paths)
+        if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
             return True
         else:
