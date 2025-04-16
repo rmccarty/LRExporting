@@ -96,20 +96,6 @@ class MediaProcessor(ABC):
         except (ValueError, TypeError):
             return 0
             
-    def translate_rating_to_keyword(self, rating: int) -> str:
-        """
-        Translate numeric rating to keyword format.
-        
-        Args:
-            rating (int): Numeric rating value
-            
-        Returns:
-            str: Rating keyword (e.g., "0-star", "1-star", etc.)
-        """
-        if rating < 1:
-            return "0-star"
-        return f"{rating}-star"
-        
     def _is_json_like(self, text: str) -> bool:
         """Check if text looks like JSON."""
         return text.startswith('{') or text.startswith('[')
@@ -146,7 +132,7 @@ class MediaProcessor(ABC):
                 not self._is_text_in_reference(component, reference))
 
     def _get_base_keywords(self) -> list:
-        """Get base keywords including existing and rating."""
+        """Get base keywords including existing."""
         # Get keywords from both IPTC:Keywords and XMP:Subject
         keywords = []
         iptc_keywords = self.exif_data.get('IPTC:Keywords', [])
@@ -164,27 +150,9 @@ class MediaProcessor(ABC):
         elif isinstance(xmp_subject, list):
             keywords.extend(xmp_subject)
             
-        # Add rating keyword
-        rating_keyword = self.translate_rating_to_keyword(self.get_image_rating())
-        keywords.append(rating_keyword)
-        
         # Remove duplicates while preserving order
         seen = set()
         return [k for k in keywords if not (k in seen or seen.add(k))]
-
-    def _get_export_keywords(self) -> list:
-        """Get export-related keywords."""
-        keywords = ['Lightroom_Export']
-        
-        # Add date-specific export tag
-        today = datetime.now().strftime('%Y_%m_%d')
-        keywords.append(f'Lightroom_Export_on_{today}')
-        
-        # Add Claudia tag if needed
-        if 'claudia_' in self.file_path.name.lower():
-            keywords.append('Export_Claudia')
-            
-        return keywords
 
     def _clean_location_component(self, component: str) -> str:
         """Clean a single location component."""
