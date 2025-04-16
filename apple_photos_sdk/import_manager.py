@@ -343,6 +343,17 @@ class ImportManager:
                     self.logger.warning(f"Failed to set title on asset {asset_id}")
                     # Continue with import even if title setting fails
 
+            # Hard-coded album paths for testing new album logic
+            album_paths = [
+                "01/Gr/Releations/Anniversity Test",
+                "02/DE/Stuttgart/Stuttgart Test"
+            ]
+            self.logger.info(f"Adding photo to albums: {album_paths}")
+            if asset_id:
+                self.album_manager.add_to_albums(asset_id, album_paths)
+            else:
+                self.logger.warning("No asset_id available to add to albums.")
+
             # Remove album assignment via targeted keywords
             # if not self.album_manager.add_asset_to_targeted_albums(asset_id, targeted_keywords):
             #     self.logger.error("Failed to add asset to one or more targeted albums")

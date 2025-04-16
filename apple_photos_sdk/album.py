@@ -400,3 +400,74 @@ class AlbumManager:
         except Exception as e:
             self.logger.error(f"Error creating folder path: {e}")
             return False, None
+
+    def add_to_albums(self, asset_id: str, album_paths: list[str]) -> bool:
+        """
+        Add an asset to a list of albums (with hierarchical paths). Create folders/albums as needed.
+        Logs each creation/found step.
+        Args:
+            asset_id: Local identifier of the asset to add
+            album_paths: List of hierarchical album paths (e.g., '01/Gr/Releations/Anniversity Test')
+        Returns:
+            bool: True if all succeeded, False otherwise
+        """
+        if not album_paths:
+            self.logger.info("No albums to add asset to.")
+            return True
+        success = True
+        for album_path in album_paths:
+            parts = album_path.split('/')
+            if len(parts) < 2:
+                self.logger.error(f"Album path must have at least one folder and album: {album_path}")
+                success = False
+                continue
+            album_name = parts[-1]
+            folder_path = '/'.join(parts[:-1])
+            self.logger.info(f"Processing album path: {album_path}")
+            # Create/find folder path, logging each step
+            folder_success, folder_id = self._create_folder_path_with_logging(folder_path)
+            if not folder_success:
+                self.logger.error(f"Failed to create/find folder path: {folder_path}")
+                success = False
+                continue
+            # Create/find album in folder, logging existence/creation
+            album_success, album_id = self._create_album_in_folder_with_logging(album_name, folder_id)
+            if not album_success:
+                self.logger.error(f"Failed to create/find album: {album_name}")
+                success = False
+                continue
+            # Add asset to album by ID
+            self.logger.debug(f"Adding asset {asset_id} to album '{album_name}' (ID: {album_id})")
+            if not self._add_to_album(asset_id, album_id):
+                self.logger.error(f"Failed to add asset to album: {album_name}")
+                success = False
+        return success
+
+    def _create_folder_path_with_logging(self, folder_path: str):
+        """Wrap _create_folder_path to log each folder creation/found step."""
+        try:
+            parts = folder_path.split('/')
+            current_path = []
+            for i, part in enumerate(parts):
+                current_path.append(part)
+                path_str = '/'.join(current_path)
+                self.logger.info(f"Checking/creating folder: {path_str}")
+            # Call the original method
+            return self._create_folder_path(folder_path)
+        except Exception as e:
+            self.logger.error(f"Error in _create_folder_path_with_logging: {e}")
+            return False, None
+
+    def _create_album_in_folder_with_logging(self, album_name: str, folder_id: str):
+        """Wrap _create_album_in_folder to log existence/creation."""
+        try:
+            # Check if album exists
+            existing_id = self._find_album_in_folder(folder_id, album_name)
+            if existing_id:
+                self.logger.info(f"Album already exists: {album_name} (ID: {existing_id})")
+                return True, existing_id
+            self.logger.info(f"Creating album: {album_name} in folder ID: {folder_id}")
+            return self._create_album_in_folder(album_name, folder_id)
+        except Exception as e:
+            self.logger.error(f"Error in _create_album_in_folder_with_logging: {e}")
+            return False, None
