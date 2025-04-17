@@ -208,6 +208,28 @@ class Transfer:
             
         return True
         
+    def _get_album_paths_from_keywords(self, keywords: list[str]) -> list[str]:
+        """Given a list of keywords, return album paths based on folder/album keywords and album.yaml mapping."""
+        try:
+            with open("album.yaml", "r") as f:
+                mapping = yaml.safe_load(f)
+        except Exception as e:
+            self.logger.error(f"Error loading album.yaml: {e}")
+            return []
+        album_paths = []
+        for kw in keywords:
+            if "/" in kw:
+                folder, album = kw.split("/", 1)
+                folder = folder.strip()
+                album = album.strip()
+                if folder in mapping:
+                    base_path = mapping[folder]
+                    # Remove trailing slash if present
+                    base_path = base_path.rstrip("/")
+                    album_path = f"{base_path}/{album}"
+                    album_paths.append(album_path)
+        return album_paths
+        
     def _get_album_paths_for_city(self, city: str) -> list[str]:
         """Load album paths for a given city from album.yaml."""
         try:
@@ -222,6 +244,20 @@ class Transfer:
             self.logger.error(f"Error loading album.yaml: {e}")
             return []
             
+    def _import_to_photos(self, photo_path: Path) -> bool:
+        """Import a photo into Apple Photos using album.yaml mapping and Folder/Album keywords."""
+        # Extract keywords from the file (using ImportManager logic for consistency)
+        from apple_photos_sdk.import_manager import ImportManager
+        keywords = ImportManager()._get_original_keywords(photo_path)
+        album_paths = self._get_album_paths_from_keywords(keywords)
+        success = ApplePhotos().import_photo(photo_path, album_paths=album_paths)
+        if success:
+            self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
+            return True
+        else:
+            self.logger.error(f"Failed to import {photo_path} to Apple Photos")
+            return False
+
     def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
         """
         Transfer a file to its destination.
@@ -237,13 +273,10 @@ class Transfer:
             if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS:
                 # Then import to Apple Photos if needed
                 self.logger.debug(f"Importing {dest_path} to Apple Photos")
-                # Use album.yaml mapping
-                city = None
-                for candidate in ["Stuttgart", "Dallas", "Anniversary"]:
-                    if candidate.lower() in dest_path.name.lower():
-                        city = candidate
-                        break
-                album_paths = self._get_album_paths_for_city(city) if city else []
+                # Use album.yaml mapping and Folder/Album keywords
+                from apple_photos_sdk.import_manager import ImportManager
+                keywords = ImportManager()._get_original_keywords(dest_path)
+                album_paths = self._get_album_paths_from_keywords(keywords)
                 photos = ApplePhotos()
                 success = photos.import_photo(dest_path, album_paths=album_paths)
                 if success:
@@ -258,23 +291,6 @@ class Transfer:
             
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
-            return False
-            
-    def _import_to_photos(self, photo_path: Path) -> bool:
-        """Import a photo into Apple Photos using album.yaml mapping."""
-        # For demo: extract city from filename (customize as needed)
-        city = None
-        for candidate in ["Stuttgart", "Dallas", "Anniversary"]:
-            if candidate.lower() in photo_path.name.lower():
-                city = candidate
-                break
-        album_paths = self._get_album_paths_for_city(city) if city else []
-        success = ApplePhotos().import_photo(photo_path, album_paths=album_paths)
-        if success:
-            self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
-            return True
-        else:
-            self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
     def transfer_file(self, file_path: Path) -> bool:
