@@ -208,8 +208,9 @@ class Transfer:
             
         return True
         
-    def _get_album_paths_from_keywords(self, keywords: list[str]) -> list[str]:
-        """Given a list of keywords, return album paths based on folder/album keywords and album.yaml mapping."""
+    def _get_album_paths_from_keywords(self, keywords: list[str], title: str | None = None) -> list[str]:
+        """Given a list of keywords, return album paths based on Folder/Album or Folder/ patterns and album.yaml mapping.
+        If Folder/ is provided with no album, use the photo title as the album name (if present)."""
         try:
             with open("album.yaml", "r") as f:
                 mapping = yaml.safe_load(f)
@@ -223,11 +224,15 @@ class Transfer:
                 folder = folder.strip()
                 album = album.strip()
                 if folder in mapping:
-                    base_path = mapping[folder]
-                    # Remove trailing slash if present
-                    base_path = base_path.rstrip("/")
-                    album_path = f"{base_path}/{album}"
-                    album_paths.append(album_path)
+                    base_path = mapping[folder].rstrip("/")
+                    # Case 1: Folder/Album (album is non-empty)
+                    if album:
+                        album_path = f"{base_path}/{album}"
+                        album_paths.append(album_path)
+                    # Case 2: Folder/ (album is empty)
+                    elif title:
+                        album_path = f"{base_path}/{title.strip()}"
+                        album_paths.append(album_path)
         return album_paths
         
     def _get_album_paths_for_city(self, city: str) -> list[str]:
@@ -245,11 +250,11 @@ class Transfer:
             return []
             
     def _import_to_photos(self, photo_path: Path) -> bool:
-        """Import a photo into Apple Photos using album.yaml mapping and Folder/Album keywords."""
-        # Extract keywords from the file (using ImportManager logic for consistency)
+        """Import a photo into Apple Photos using album.yaml mapping and Folder/Album or Folder/ keywords."""
         from apple_photos_sdk.import_manager import ImportManager
         keywords = ImportManager()._get_original_keywords(photo_path)
-        album_paths = self._get_album_paths_from_keywords(keywords)
+        title = ImportManager()._get_original_title(photo_path)
+        album_paths = self._get_album_paths_from_keywords(keywords, title=title)
         success = ApplePhotos().import_photo(photo_path, album_paths=album_paths)
         if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
@@ -271,12 +276,11 @@ class Transfer:
             self.logger.info(f"Successfully moved file to {dest_path}")
             
             if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS:
-                # Then import to Apple Photos if needed
                 self.logger.debug(f"Importing {dest_path} to Apple Photos")
-                # Use album.yaml mapping and Folder/Album keywords
                 from apple_photos_sdk.import_manager import ImportManager
                 keywords = ImportManager()._get_original_keywords(dest_path)
-                album_paths = self._get_album_paths_from_keywords(keywords)
+                title = ImportManager()._get_original_title(dest_path)
+                album_paths = self._get_album_paths_from_keywords(keywords, title=title)
                 photos = ApplePhotos()
                 success = photos.import_photo(dest_path, album_paths=album_paths)
                 if success:
