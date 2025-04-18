@@ -88,13 +88,33 @@ class DirectoryWatcher(BaseWatcher):
                 processor = JPEGExifProcessor(str(file_path), sequence=sequence)
                 new_path = processor.process_image()
                 self.logger.info(f"Image processed successfully: {new_path}")
+                
+                # --- City-based album mapping enhancement ---
+                # Extract city from metadata
+                _, _, _, city, _ = processor.get_metadata_components()
+                album_paths = []
+                if city:
+                    album_paths = self.transfer._get_album_paths_for_city(city)
+                    if album_paths:
+                        self.logger.info(f"Resolved album paths for city '{city}': {album_paths}")
+                # Pass album_paths to transfer_file (if supported)
+                # This requires transfer_file to accept album_paths as an optional argument.
+                # For now, store album_paths on the processor for downstream use if needed.
+                processor.album_paths = album_paths
+                # --- End enhancement ---
             else:
                 # For videos, just transfer without processing
                 new_path = file_path
-                
+            
             # Transfer to destination
             if new_path:
-                self.transfer.transfer_file(new_path)
+                # Enhancement: If album_paths were resolved, pass them to transfer logic
+                album_paths = getattr(processor, 'album_paths', []) if 'processor' in locals() else []
+                if album_paths:
+                    self.logger.info(f"Transferring with city-based album paths: {album_paths}")
+                    self.transfer.transfer_file(new_path, album_paths=album_paths)
+                else:
+                    self.transfer.transfer_file(new_path)
                 
         except Exception as e:
             self.logger.error(f"Error processing file {file_path}: {e}")

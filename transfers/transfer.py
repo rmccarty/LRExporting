@@ -249,13 +249,17 @@ class Transfer:
             self.logger.error(f"Error loading album.yaml: {e}")
             return []
             
-    def _import_to_photos(self, photo_path: Path) -> bool:
+    def _import_to_photos(self, photo_path: Path, album_paths: list[str] = None) -> bool:
         """Import a photo into Apple Photos using album.yaml mapping and Folder/Album or Folder/ keywords."""
         from apple_photos_sdk.import_manager import ImportManager
         keywords = ImportManager()._get_original_keywords(photo_path)
         title = ImportManager()._get_original_title(photo_path)
-        album_paths = self._get_album_paths_from_keywords(keywords, title=title)
-        success = ApplePhotos().import_photo(photo_path, album_paths=album_paths)
+        # Use provided album_paths (city-based) if available, else fallback to keyword logic
+        if album_paths is not None and len(album_paths) > 0:
+            resolved_album_paths = album_paths
+        else:
+            resolved_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
+        success = ApplePhotos().import_photo(photo_path, album_paths=resolved_album_paths)
         if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
             return True
@@ -263,7 +267,7 @@ class Transfer:
             self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
-    def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
+    def _perform_transfer(self, file_path: Path, dest_dir: Path, album_paths: list[str] = None) -> bool:
         """
         Transfer a file to its destination.
         """
@@ -280,9 +284,13 @@ class Transfer:
                 from apple_photos_sdk.import_manager import ImportManager
                 keywords = ImportManager()._get_original_keywords(dest_path)
                 title = ImportManager()._get_original_title(dest_path)
-                album_paths = self._get_album_paths_from_keywords(keywords, title=title)
+                # Use provided album_paths (city-based) if available, else fallback to keyword logic
+                if album_paths is not None and len(album_paths) > 0:
+                    resolved_album_paths = album_paths
+                else:
+                    resolved_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
                 photos = ApplePhotos()
-                success = photos.import_photo(dest_path, album_paths=album_paths)
+                success = photos.import_photo(dest_path, album_paths=resolved_album_paths)
                 if success:
                     self.logger.info(f"Successfully imported {dest_path} to Apple Photos")
                 else:
@@ -297,7 +305,7 @@ class Transfer:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
 
-    def transfer_file(self, file_path: Path) -> bool:
+    def transfer_file(self, file_path: Path, album_paths: list[str] = None) -> bool:
         """
         Transfer a file to its destination. Has two paths:
         1. Apple Photos path: Directly imports media files to Photos
@@ -309,6 +317,7 @@ class Transfer:
         
         Args:
             file_path: Path to the file to transfer
+            album_paths: Optional list of album paths to use for import (city-based mapping)
             
         Returns:
             bool: True if transfer was successful, False otherwise
@@ -318,7 +327,7 @@ class Transfer:
             if ENABLE_APPLE_PHOTOS and any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 # Skip validation for Apple Photos imports
                 self.logger.info(f"Importing to Apple Photos: {file_path}")
-                return self._import_to_photos(file_path)
+                return self._import_to_photos(file_path, album_paths=album_paths)
             elif any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 self.logger.info(f"Apple Photos processing is disabled. Skipping import of {file_path}")
                 return True
@@ -335,7 +344,7 @@ class Transfer:
                 
             dest_dir = TRANSFER_PATHS[source_dir]
             self.logger.info(f"Moving file to {dest_dir}: {file_path}")
-            return self._perform_transfer(file_path, dest_dir)
+            return self._perform_transfer(file_path, dest_dir, album_paths=album_paths)
                 
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
