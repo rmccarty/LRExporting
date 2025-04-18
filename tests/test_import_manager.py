@@ -482,3 +482,38 @@ class TestImportManager(unittest.TestCase):
             self.assertEqual(asset_id, "test-id-123")
             # There should be no call to any album assignment logic (since it's removed)
             # (If album assignment was a method, we would patch and assert_not_called)
+
+    def test_get_asset_type_photo(self):
+        path = Path('test.jpg')
+        manager = ImportManager()
+        with patch('apple_photos_sdk.import_manager.IMAGE_EXTENSIONS', ['.jpg', '.jpeg']):
+            self.assertEqual(manager._get_asset_type(path), 'photo')
+
+    def test_get_asset_type_video(self):
+        path = Path('test.mov')
+        manager = ImportManager()
+        with patch('apple_photos_sdk.import_manager.VIDEO_EXTENSIONS', ['.mov', '.mp4']):
+            self.assertEqual(manager._get_asset_type(path), 'video')
+
+    def test_get_asset_type_invalid(self):
+        path = Path('test.txt')
+        manager = ImportManager()
+        with patch('apple_photos_sdk.import_manager.IMAGE_EXTENSIONS', ['.jpg']), \
+             patch('apple_photos_sdk.import_manager.VIDEO_EXTENSIONS', ['.mov']):
+            with self.assertRaises(ValueError):
+                manager._get_asset_type(path)
+
+    def test_is_targeted_keyword(self):
+        manager = ImportManager()
+        with patch('apple_photos_sdk.import_manager.TARGETED_ALBUM_PREFIXES', ['MyPrefix']):
+            self.assertTrue(manager._is_targeted_keyword('MyPrefixSomething'))
+            self.assertTrue(manager._is_targeted_keyword('Subject: MyPrefixSomething'))
+            self.assertFalse(manager._is_targeted_keyword('OtherPrefixSomething'))
+
+    def test_get_asset_keywords_always_empty(self):
+        manager = ImportManager()
+        self.assertEqual(manager._get_asset_keywords('any_id'), [])
+
+    def test_handle_image_data_always_empty(self):
+        manager = ImportManager()
+        self.assertEqual(manager._handle_image_data(None, None, None, None), [])
