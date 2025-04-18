@@ -233,33 +233,76 @@ class Transfer:
                     elif title:
                         album_path = f"{base_path}/{title.strip()}"
                         album_paths.append(album_path)
-        return album_paths
-        
-    def _get_album_paths_for_city(self, city: str) -> list[str]:
-        """Load album paths for a given city from album.yaml."""
+            # Case 3: Keyword is just a folder (no slash)
+            elif kw in mapping and title:
+                base_path = mapping[kw].rstrip("/")
+                album_path = f"{base_path}/{title.strip()}"
+                album_paths.append(album_path)
+        # Deduplicate
+        return list(dict.fromkeys(album_paths))
+
+    def _get_album_paths_for_city(self, city: str, title: str = None) -> list[str]:
+        """Load album paths for a given city from album.yaml. If mapping ends with '/', append title as sub-album."""
         try:
             with open("album.yaml", "r") as f:
                 mapping = yaml.safe_load(f)
             if city in mapping:
-                return [mapping[city]] if isinstance(mapping[city], str) else list(mapping[city])
+                mapped = mapping[city]
+                result = []
+                # If it's a list, handle each entry
+                if isinstance(mapped, list):
+                    for m in mapped:
+                        if isinstance(m, str) and m.endswith("/") and title:
+                            result.append(f"{m}{title.strip()}")
+                        elif isinstance(m, str):
+                            result.append(m)
+                # If it's a string
+                elif isinstance(mapped, str):
+                    if mapped.endswith("/") and title:
+                        result.append(f"{mapped}{title.strip()}")
+                    else:
+                        result.append(mapped)
+                # Deduplicate
+                return list(dict.fromkeys(result))
             else:
                 self.logger.warning(f"No album mapping found for city: {city}")
                 return []
         except Exception as e:
             self.logger.error(f"Error loading album.yaml: {e}")
             return []
-            
+
     def _import_to_photos(self, photo_path: Path, album_paths: list[str] = None) -> bool:
         """Import a photo into Apple Photos using album.yaml mapping and Folder/Album or Folder/ keywords."""
         from apple_photos_sdk.import_manager import ImportManager
         keywords = ImportManager()._get_original_keywords(photo_path)
         title = ImportManager()._get_original_title(photo_path)
-        # Use provided album_paths (city-based) if available, else fallback to keyword logic
-        if album_paths is not None and len(album_paths) > 0:
-            resolved_album_paths = album_paths
-        else:
-            resolved_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
-        success = ApplePhotos().import_photo(photo_path, album_paths=resolved_album_paths)
+        # --- Unified city extraction ---
+        try:
+            from processors.jpeg_processor import JPEGExifProcessor
+            if photo_path.suffix.lower() in ['.jpg', '.jpeg']:
+                exif_logger = JPEGExifProcessor(str(photo_path))
+                exif_logger.read_exif()
+                city = self.extract_city_from_exif(exif_logger.exif_data)
+                self.logger.info(f"[IMPORT] Extracted city for {photo_path}: {city}")
+        except Exception as ex:
+            self.logger.warning(f"Could not extract city from EXIF for import: {ex}")
+            city = None
+        # Combine city-based album_paths (if any) with keyword-based album paths, deduplicated
+        keyword_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
+        combined_album_paths = []
+        # Use city-based album paths if city and title exist
+        if city and title:
+            city_album_paths = self._get_album_paths_for_city(city, title=title)
+            combined_album_paths.extend(city_album_paths)
+        if album_paths is not None:
+            combined_album_paths.extend(album_paths)
+        if keyword_album_paths:
+            combined_album_paths.extend([p for p in keyword_album_paths if p not in combined_album_paths])
+        # Final deduplication
+        combined_album_paths = list(dict.fromkeys(combined_album_paths))
+        if not combined_album_paths:
+            self.logger.warning(f"No album paths resolved for import: {photo_path}")
+        success = ApplePhotos().import_photo(photo_path, album_paths=combined_album_paths)
         if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
             return True
@@ -267,10 +310,22 @@ class Transfer:
             self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
+    def extract_city_from_exif(self, exif_data: dict) -> str:
+        """Try to extract city from all common EXIF fields."""
+        for key in [
+            'IPTC:City', 'XMP:City', 'EXIF:City', 'File:City',
+            'IPTC:Sub-location', 'XMP:Location', 'XMP:State', 'IPTC:Province-State'
+        ]:
+            city = exif_data.get(key)
+            if city:
+                return city
+        return None
+
     def _perform_transfer(self, file_path: Path, dest_dir: Path, album_paths: list[str] = None) -> bool:
         """
         Transfer a file to its destination.
         """
+        self.logger.info(f"[TRANSFER] _perform_transfer called for {file_path} to {dest_dir} with album_paths: {album_paths}")
         try:
             # First move file to destination
             dest_dir.mkdir(parents=True, exist_ok=True)
@@ -281,26 +336,11 @@ class Transfer:
             
             if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS:
                 self.logger.debug(f"Importing {dest_path} to Apple Photos")
-                from apple_photos_sdk.import_manager import ImportManager
-                keywords = ImportManager()._get_original_keywords(dest_path)
-                title = ImportManager()._get_original_title(dest_path)
-                # Use provided album_paths (city-based) if available, else fallback to keyword logic
-                if album_paths is not None and len(album_paths) > 0:
-                    resolved_album_paths = album_paths
-                else:
-                    resolved_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
-                photos = ApplePhotos()
-                success = photos.import_photo(dest_path, album_paths=resolved_album_paths)
-                if success:
-                    self.logger.info(f"Successfully imported {dest_path} to Apple Photos")
-                else:
-                    self.logger.error(f"Failed to import {dest_path} to Apple Photos")
-                return success
+                return self._import_to_photos(dest_path, album_paths=album_paths)
             elif dest_dir in APPLE_PHOTOS_PATHS:
                 self.logger.info(f"Apple Photos processing is disabled. Skipping import of {dest_path}")
             
             return True
-            
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
@@ -320,8 +360,9 @@ class Transfer:
             album_paths: Optional list of album paths to use for import (city-based mapping)
             
         Returns:
-            bool: True if transfer was successful, False otherwise
+            bool: True if transfer succeeded, False otherwise
         """
+        self.logger.info(f"[TRANSFER] transfer_file called for {file_path} with album_paths: {album_paths}")
         try:
             # Check if source is an Apple Photos directory
             if ENABLE_APPLE_PHOTOS and any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
@@ -344,8 +385,27 @@ class Transfer:
                 
             dest_dir = TRANSFER_PATHS[source_dir]
             self.logger.info(f"Moving file to {dest_dir}: {file_path}")
-            return self._perform_transfer(file_path, dest_dir, album_paths=album_paths)
-                
+            # Log EXIF data before moving
+            try:
+                from processors.jpeg_processor import JPEGExifProcessor
+                if file_path.suffix.lower() in ['.jpg', '.jpeg']:
+                    exif_logger = JPEGExifProcessor(str(file_path))
+                    exif_logger.read_exif()
+                    self.logger.info(f"[EXIF BEFORE MOVE] {file_path}: {exif_logger.exif_data}")
+            except Exception as ex:
+                self.logger.warning(f"Could not log EXIF before move: {ex}")
+            # Move file
+            result = self._perform_transfer(file_path, dest_dir, album_paths=album_paths)
+            # Log EXIF data after moving
+            try:
+                if file_path.suffix.lower() in ['.jpg', '.jpeg']:
+                    moved_path = dest_dir / file_path.name
+                    exif_logger_after = JPEGExifProcessor(str(moved_path))
+                    exif_logger_after.read_exif()
+                    self.logger.info(f"[EXIF AFTER MOVE] {moved_path}: {exif_logger_after.exif_data}")
+            except Exception as ex:
+                self.logger.warning(f"Could not log EXIF after move: {ex}")
+            return result
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
