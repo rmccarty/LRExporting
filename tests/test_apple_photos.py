@@ -15,7 +15,7 @@ class TestApplePhotos(unittest.TestCase):
         
     def test_import_photo_success(self):
         """Should successfully import a photo."""
-        with patch('apple_photos_sdk.import_manager.ImportManager.import_photo', return_value=True):
+        with patch('apple_photos_sdk.import_manager.ImportManager.import_photo', return_value=(True, "mock_asset_id")):
             result = self.photos.import_photo(self.test_photo)
             self.assertTrue(result)
             
