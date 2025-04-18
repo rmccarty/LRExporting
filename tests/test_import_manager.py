@@ -438,6 +438,7 @@ class TestImportManager(unittest.TestCase):
             def perform_changes(block, error):
                 block()
                 return True
+                
             mock_shared.performChangesAndWait_error_.side_effect = perform_changes
             
             # Mock request and placeholder
@@ -687,3 +688,112 @@ class TestImportManager(unittest.TestCase):
         local_id = 'id1'
         mock_phasset.fetchAssetsWithLocalIdentifiers_options_.side_effect = Exception('fail')
         self.assertFalse(manager._verify_asset_exists(local_id))
+
+    @patch('apple_photos_sdk.import_manager.PHAsset')
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.PHAssetChangeRequest')
+    def test_set_title_on_asset_no_title(self, mock_change_request_class, mock_photolib, mock_phasset):
+        manager = ImportManager()
+        asset_id = 'id1'
+        self.assertFalse(manager._set_title_on_asset(asset_id, ''))
+
+    @patch('apple_photos_sdk.import_manager.PHAsset')
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.PHAssetChangeRequest')
+    def test_set_title_on_asset_asset_not_found(self, mock_change_request_class, mock_photolib, mock_phasset):
+        manager = ImportManager()
+        asset_id = 'id1'
+        title = 'Test Title'
+        mock_asset_list = MagicMock()
+        mock_asset_list.count.return_value = 0
+        mock_phasset.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_asset_list
+        self.assertFalse(manager._set_title_on_asset(asset_id, title))
+
+    @patch('apple_photos_sdk.import_manager.PHAsset')
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.PHAssetChangeRequest')
+    def test_set_title_on_asset_timeout(self, mock_change_request_class, mock_photolib, mock_phasset):
+        manager = ImportManager()
+        asset_id = 'id1'
+        title = 'Test Title'
+        mock_asset_list = MagicMock()
+        mock_asset_list.count.return_value = 1
+        mock_asset = MagicMock()
+        mock_asset_list.firstObject.return_value = mock_asset
+        mock_phasset.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_asset_list
+        mock_request = MagicMock()
+        mock_change_request_class.changeRequestForAsset_.return_value = mock_request
+        with patch('threading.Semaphore') as mock_semaphore_class, \
+             patch.object(ImportManager, '_verify_asset_title', return_value=True):
+            mock_semaphore = MagicMock()
+            mock_semaphore.acquire.return_value = False  # Simulate timeout
+            mock_semaphore_class.return_value = mock_semaphore
+            mock_photolib.sharedPhotoLibrary.return_value.performChanges_completionHandler_.side_effect = lambda block, cb: (block(), cb(True, None))
+            self.assertFalse(manager._set_title_on_asset(asset_id, title))
+
+    @patch('apple_photos_sdk.import_manager.PHAsset')
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.PHAssetChangeRequest')
+    def test_set_title_on_asset_verification_fails(self, mock_change_request_class, mock_photolib, mock_phasset):
+        manager = ImportManager()
+        asset_id = 'id1'
+        title = 'Test Title'
+        mock_asset_list = MagicMock()
+        mock_asset_list.count.return_value = 1
+        mock_asset = MagicMock()
+        mock_asset_list.firstObject.return_value = mock_asset
+        mock_phasset.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_asset_list
+        mock_request = MagicMock()
+        mock_change_request_class.changeRequestForAsset_.return_value = mock_request
+        with patch('threading.Semaphore') as mock_semaphore_class, \
+             patch.object(ImportManager, '_verify_asset_title', return_value=False):
+            mock_semaphore = MagicMock()
+            mock_semaphore.acquire.return_value = True
+            mock_semaphore_class.return_value = mock_semaphore
+            mock_photolib.sharedPhotoLibrary.return_value.performChanges_completionHandler_.side_effect = lambda block, cb: (block(), cb(True, None))
+            self.assertTrue(manager._set_title_on_asset(asset_id, title))  # Still returns True even if verification fails
+
+    @patch('apple_photos_sdk.import_manager.PHAsset')
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.PHAssetChangeRequest')
+    def test_set_title_on_asset_completion_error(self, mock_change_request_class, mock_photolib, mock_phasset):
+        manager = ImportManager()
+        asset_id = 'id1'
+        title = 'Test Title'
+        mock_asset_list = MagicMock()
+        mock_asset_list.count.return_value = 1
+        mock_asset = MagicMock()
+        mock_asset_list.firstObject.return_value = mock_asset
+        mock_phasset.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_asset_list
+        mock_request = MagicMock()
+        mock_change_request_class.changeRequestForAsset_.return_value = mock_request
+        with patch('threading.Semaphore') as mock_semaphore_class, \
+             patch.object(ImportManager, '_verify_asset_title', return_value=True):
+            mock_semaphore = MagicMock()
+            mock_semaphore.acquire.return_value = True
+            mock_semaphore_class.return_value = mock_semaphore
+            # Simulate completion handler with error
+            mock_photolib.sharedPhotoLibrary.return_value.performChanges_completionHandler_.side_effect = lambda block, cb: (block(), cb(False, 'SomeError'))
+            self.assertFalse(manager._set_title_on_asset(asset_id, title))
+
+    @patch('apple_photos_sdk.import_manager.PHAsset')
+    @patch('apple_photos_sdk.import_manager.PHPhotoLibrary')
+    @patch('apple_photos_sdk.import_manager.PHAssetChangeRequest')
+    def test_set_title_on_asset_exception(self, mock_change_request_class, mock_photolib, mock_phasset):
+        manager = ImportManager()
+        asset_id = 'id1'
+        title = 'Test Title'
+        mock_asset_list = MagicMock()
+        mock_asset_list.count.return_value = 1
+        mock_asset = MagicMock()
+        mock_asset_list.firstObject.return_value = mock_asset
+        mock_phasset.fetchAssetsWithLocalIdentifiers_options_.return_value = mock_asset_list
+        mock_request = MagicMock()
+        mock_change_request_class.changeRequestForAsset_.side_effect = Exception('fail')
+        with patch('threading.Semaphore') as mock_semaphore_class, \
+             patch.object(ImportManager, '_verify_asset_title', return_value=True):
+            mock_semaphore = MagicMock()
+            mock_semaphore.acquire.return_value = True
+            mock_semaphore_class.return_value = mock_semaphore
+            mock_photolib.sharedPhotoLibrary.return_value.performChanges_completionHandler_.side_effect = lambda block, cb: (block(), cb(True, None))
+            self.assertFalse(manager._set_title_on_asset(asset_id, title))
