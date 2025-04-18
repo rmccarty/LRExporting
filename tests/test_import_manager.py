@@ -517,3 +517,69 @@ class TestImportManager(unittest.TestCase):
     def test_handle_image_data_always_empty(self):
         manager = ImportManager()
         self.assertEqual(manager._handle_image_data(None, None, None, None), [])
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_keywords_success(self, mock_run):
+        manager = ImportManager()
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = 'keyword1||keyword2||keyword3'
+        mock_run.return_value = mock_result
+        with patch('apple_photos_sdk.import_manager.TARGETED_ALBUM_PREFIXES', ['keyword']):
+            keywords = manager._get_original_keywords(Path('photo.jpg'))
+            self.assertEqual(keywords, ['keyword1', 'keyword2', 'keyword3'])
+            mock_run.assert_called_once()
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_keywords_no_keywords(self, mock_run):
+        manager = ImportManager()
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = ''
+        mock_run.return_value = mock_result
+        keywords = manager._get_original_keywords(Path('photo.jpg'))
+        self.assertEqual(keywords, [])
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_keywords_exception(self, mock_run):
+        manager = ImportManager()
+        mock_run.side_effect = Exception('fail')
+        keywords = manager._get_original_keywords(Path('photo.jpg'))
+        self.assertEqual(keywords, [])
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_title_success(self, mock_run):
+        manager = ImportManager()
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = '[{"ObjectName": "Title1"}]'
+        mock_run.return_value = mock_result
+        title = manager._get_original_title(Path('photo.jpg'))
+        self.assertEqual(title, 'Title1')
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_title_no_title(self, mock_run):
+        manager = ImportManager()
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = '[{}]'
+        mock_run.return_value = mock_result
+        title = manager._get_original_title(Path('photo.jpg'))
+        self.assertIsNone(title)
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_title_invalid_json(self, mock_run):
+        manager = ImportManager()
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = 'not json'
+        mock_run.return_value = mock_result
+        title = manager._get_original_title(Path('photo.jpg'))
+        self.assertIsNone(title)
+
+    @patch('apple_photos_sdk.import_manager.subprocess.run')
+    def test_get_original_title_exception(self, mock_run):
+        manager = ImportManager()
+        mock_run.side_effect = Exception('fail')
+        title = manager._get_original_title(Path('photo.jpg'))
+        self.assertIsNone(title)
