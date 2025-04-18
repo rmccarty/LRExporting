@@ -280,6 +280,11 @@ class TestImportManager(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.manager._create_asset_request(MagicMock(), 'invalid')
 
+    def test_create_asset_request_invalid_type(self):
+        manager = ImportManager()
+        with self.assertRaises(ValueError):
+            manager._create_asset_request(None, 'invalid_type')
+
     def test_when_importing_nonexistent_photo_then_fails(self):
         """Should fail when photo doesn't exist."""
         # Arrange
