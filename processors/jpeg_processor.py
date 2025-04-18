@@ -65,6 +65,7 @@ class JPEGExifProcessor(MediaProcessor):
         # Get title and location data
         title = self.get_exif_title()
         location, city, country = self.get_location_data()
+        self.logger.info(f"Extracted city from EXIF: {city}")
         
         return date_str, title, location, city, country
         

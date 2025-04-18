@@ -683,6 +683,8 @@ class VideoProcessor(MediaProcessor):
         city = self.metadata_for_filename.get('City', '')
         country = self.metadata_for_filename.get('Country', '')
         
+        self.logger.info(f"Extracted city from video metadata: {city}")
+        
         if date_str:
             self.logger.debug(f"Added date to filename: {date_str}")
         if title:
