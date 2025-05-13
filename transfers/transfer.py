@@ -271,31 +271,69 @@ class Transfer:
             self.logger.error(f"Error loading album.yaml: {e}")
             return []
 
+    def _get_album_paths_for_location(self, location: str, title: str = None) -> list[str]:
+        """Load album paths for a given location from album.yaml. If mapping ends with '/', append title as sub-album."""
+        try:
+            with open("album.yaml", "r") as f:
+                mapping = yaml.safe_load(f)
+            if location in mapping:
+                mapped = mapping[location]
+                result = []
+                # If it's a list, handle each entry
+                if isinstance(mapped, list):
+                    for m in mapped:
+                        if isinstance(m, str) and m.endswith("/") and title:
+                            result.append(f"{m}{title.strip()}")
+                        elif isinstance(m, str):
+                            result.append(m)
+                # If it's a string
+                elif isinstance(mapped, str):
+                    if mapped.endswith("/") and title:
+                        result.append(f"{mapped}{title.strip()}")
+                    else:
+                        result.append(mapped)
+                # Deduplicate
+                return list(dict.fromkeys(result))
+            else:
+                self.logger.warning(f"No album mapping found for location: {location}")
+                return []
+        except Exception as e:
+            self.logger.error(f"Error loading album.yaml: {e}")
+            return []
+
     def _import_to_photos(self, photo_path: Path, album_paths: list[str] = None) -> bool:
         """Import a photo into Apple Photos using album.yaml mapping and Folder/Album or Folder/ keywords."""
         from apple_photos_sdk.import_manager import ImportManager
         keywords = ImportManager()._get_original_keywords(photo_path)
         title = ImportManager()._get_original_title(photo_path)
-        # --- Unified city extraction ---
+        # --- Unified city and location extraction ---
+        city = None
+        location = None
         try:
             from processors.jpeg_processor import JPEGExifProcessor
             if photo_path.suffix.lower() in ['.jpg', '.jpeg']:
                 exif_logger = JPEGExifProcessor(str(photo_path))
                 exif_logger.read_exif()
                 city = self.extract_city_from_exif(exif_logger.exif_data)
+                # FIX: Extract location using get_location_data()
+                location, _, _ = exif_logger.get_location_data()
                 self.logger.info(f"[IMPORT] Extracted city for {photo_path}: {city}")
+                self.logger.info(f"[IMPORT] Extracted location for {photo_path}: {location}")
         except Exception as ex:
-            self.logger.warning(f"Could not extract city from EXIF for import: {ex}")
-            city = None
-        # Combine city-based album_paths (if any) with keyword-based album paths, deduplicated
+            self.logger.warning(f"Could not extract city/location from EXIF for import: {ex}")
+        # Combine city, location, and keyword-based album paths, deduplicated
         keyword_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
         combined_album_paths = []
         # Use city-based album paths if city and title exist
         if city and title:
             city_album_paths = self._get_album_paths_for_city(city, title=title)
             combined_album_paths.extend(city_album_paths)
+        # Use location-based album paths if location and title exist
+        if location and title:
+            location_album_paths = self._get_album_paths_for_location(location, title=title)
+            combined_album_paths.extend([p for p in location_album_paths if p not in combined_album_paths])
         if album_paths is not None:
-            combined_album_paths.extend(album_paths)
+            combined_album_paths.extend([p for p in album_paths if p not in combined_album_paths])
         if keyword_album_paths:
             combined_album_paths.extend([p for p in keyword_album_paths if p not in combined_album_paths])
         # Final deduplication

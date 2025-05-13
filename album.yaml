@@ -1,12 +1,52 @@
 # Mapping of city to album paths for Apple Photos
 
-
+Childhood: 01/Fa/
+Ancestors: 01/Fa/Ancestors
+DateNeeded: 01/Fa/DateNeeded/
+Relations: 01/Gr/Relations/
+Employers: 01/Gr/Employers/
+Iomega: 01/Gr/Employers/Iomega/
+L3: 01/Gr/Employers/L3/
+Lucent: 01/Gr/Employers/Lucent/
+Army: 01/Gr/Employers/Army/
 Birth: 02/Events/Birth/
-
+Death: 02/Events/Death/
+Obituary: 02/Events/Death/Obituary/
+Baptism: 02/Events/Faith/Baptism/
+Communion: 02/Events/Faith/Communion/
+Confirmation: 02/Events/Faith/Confirmation/
+Medical: 02/Events/Medical/
+Christmas: 02/Events/Holidays/Christmas/
+Easter: 02/Events/Holidays/Easter/
+Halloween: 02/Events/Holidays/Halloween/
+AR: 03/US/AR/
+South Side High School: 03/US/AR/Fort Smith South Side High School/
+DC: 03/US/DC/
+District of Columbia: 03/US/DC/ 
+Virginia: 03/US/VA/
+VA: 03/US/VA
+Crete: 03/GR/Crete/
+Greece: 03/GR/
+Davis: 03/US/OK/Davis/
+Jollyville: 03/US/OK/Jollyville/
+Turner Falls: 03/US/OK/Turner Falls/
+Davis High School: 03/US/OK/Davis/Davis High School/
+Honey Creek Drive: 03/US/OK/Davis/Honey Creek Drive/
+Honey Creek Bridge: 03/US/OK/Davis/Honey Creek Bridge/
+Durant: 03/US/OK/Durant/
+Roping Lane: 03/US/OK/Durant/Roping Lane/
+Mead: 03/US/OK/Mead/
 Missouri: 03/MO/
 Dallas: 03/US/TX/Dallas/
 Rowlett: 03/US/TX/Rowlett/
+Dalrock Diner: 03/US/TX/Rowlett/Dalrock Diner/
 6305 Bobbie Lane: 03/US/TX/Rowlett/6305 Bobbie Lane/
+Steadham Elementary School: 03/US/TX/Rowlett/Steadham Elementary School/
+Vernon Schrade Middle School: 03/US/TX/Rowlett/Vernon Schrade Middle School/    
+Richardson: 03/US/TX/Richardson/
+Rockwall: 03/US/TX/Rockwall/
+912 Village Green Drive: 03/US/TX/Rockwall/912 Village Green Drive/
+US: 03/US/
 Asperg: 03/DE/Asperg/
 Berlin: 03/DE/Berlin/
 Berlin Wall: 03/DE/Berlin/Berlin Wall/
@@ -14,25 +54,48 @@ Bietigheim: 03/DE/Bietigheim/
 Checkpoint Charlie: 03/DE/Berlin/Checkpoint Charlie/
 Dachau: 03/DE/Dachau/
 Dresden: 03/DE/Dresden/
+Esslingen am Neckar: 03/DE/Esslingen am Neckar/
+Esslingen: 03/DE/Esslingen am Neckar/
 Freiburg: 03/DE/Freiburg/
 Kapfstrasse: 03/DE/Freiburg/Kapfstrasse 16/
 Kapfstrasse 16: 03/DE/Freiburg/Kapfstrasse 16/
 Hohenzollern: 03/DE/Hohenzollern/
+Lichtenstein: 03/DE/Lichtenstein/
+Ludendorff: 03/DE/Ludendorff/
+Kelley Barracks: 03/DE/Kelley Barracks/
 Ludwigsburg: 03/DE/Ludwigsburg/
+Fellbacher Str. 2: 03/DE/Ludwigsburg/Fellbacher Str. 2/
+Garmisch: 03/DE/Garmisch/
+Garmisch-Partenkirchen: 03/DE/Garmisch/
+Ludwigsburg Schloss: 03/DE/Ludwigsburg/Ludwigsburg Schloss/
 Osterwiese 4: 03/DE/Ludwigsburg/Osterwiese 4/
+Frankfurter Str 35: 03/DE/Ludwigsburg/Frankfurter Str 35/
+Marbach: 03/DE/Marbach/
 Monrepos: 03/DE/Ludwigsburg/Monrepos/
+Neckargröningen: 03/DE/Neckargröningen/
+Rothenburg: 03/DE/Rothenburg/
 Stuttgart: 03/DE/Stuttgart/
 Schwäbsich Gmünd: 03/DE/Schwäbsich Gmünd/
-Relations: 01/Gr/Relations/
+Universitätspark: 03/DE/Schwäbsich Gmünd/Universitätspark/
+Ulm: 03/DE/Ulm/
+Neu Ulm: 03/DE/Ulm/
+Wilkins: 03/DE/Wilkins/ 
+
+
 Deep Ellum: 03/US/TX/Dallas/Deep Ellum/
-Scarborough Faire: 03/US/TX/Scarborough Faire/
+Scarborough Renaissance Festival: 03/US/TX/Scarborough Renaissance Festival/    
+
 Bands: 01/Gr/Bands/
 RTPC: 01/Gr/RTPC/
 Photography for the Insane: 01/Gr/Photography for the Insane/
 Rodeo: 02/Events/Rodeo/
 Independence Day: 02/Events/Holidays/Independence Day/
 Christmas: 02/Events/Holidays/Christmas/
+Thanksgiving: 02/Events/Holidays/Thanksgiving/
 School Claudia: 02/Events/School/School Claudia/
 School Ronny: 02/Events/School/School Ronny/
 School Janice: 02/Events/School/School Janice/
 School Ron: 02/Events/School/School Ron/
+
+UK: 03/UK/
+Ireland: 03/Ireland/
