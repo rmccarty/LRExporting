@@ -146,14 +146,16 @@ class ImportManager:
             if result.returncode == 0 and result.stdout.strip():
                 # Split on our custom separator and strip any whitespace
                 keywords = [k.strip() for k in result.stdout.strip().split("||")]
-                self.logger.debug(f"Found original keywords: {keywords}")
+                # Always strip 'Subject: ' prefix if present
+                normalized_keywords = [k[9:] if k.startswith("Subject: ") else k for k in keywords]
+                self.logger.debug(f"Found original keywords: {normalized_keywords}")
                 
                 # Check for targeted album keywords
-                targeted_keywords = [k for k in keywords if self._is_targeted_keyword(k)]
+                targeted_keywords = [k for k in normalized_keywords if self._is_targeted_keyword(k)]
                 if targeted_keywords:
                     self.logger.info(f"Found targeted album keywords: {targeted_keywords}")
                 
-                return keywords
+                return normalized_keywords
             return []
         except Exception as e:
             self.logger.error(f"Error getting original keywords: {e}")

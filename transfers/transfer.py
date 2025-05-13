@@ -219,6 +219,14 @@ class Transfer:
             return []
         album_paths = []
         for kw in keywords:
+            # Normalize keywords that are a single word ending with a slash (e.g., 'RTPC/')
+            if kw.endswith("/") and "/" not in kw[:-1]:
+                normalized_kw = kw.rstrip("/")
+                if normalized_kw in mapping and title:
+                    base_path = mapping[normalized_kw].rstrip("/")
+                    album_path = f"{base_path}/{title.strip()}"
+                    album_paths.append(album_path)
+                    continue  # Skip further processing for this kw
             if "/" in kw:
                 folder, album = kw.split("/", 1)
                 folder = folder.strip()
@@ -238,6 +246,7 @@ class Transfer:
                 base_path = mapping[kw].rstrip("/")
                 album_path = f"{base_path}/{title.strip()}"
                 album_paths.append(album_path)
+            # End normalization logic
         # Deduplicate
         return list(dict.fromkeys(album_paths))
 
