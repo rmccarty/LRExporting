@@ -209,8 +209,12 @@ class Transfer:
         return True
         
     def _get_album_paths_from_keywords(self, keywords: list[str], title: str | None = None) -> list[str]:
-        """Given a list of keywords, return album paths based on Folder/Album or Folder/ patterns and album.yaml mapping.
-        If Folder/ is provided with no album, use the photo title as the album name (if present)."""
+        """Given a list of keywords, return album paths based on patterns:
+        1. Folder/Album: use album.yaml to map 'Folder' and append 'Album'
+        2. Folder/: use album.yaml to map 'Folder' and append photo title
+        3. Plain Folder: use album.yaml to map 'Folder' and append photo title
+        4. Keyword ending with colon (e.g., 'Travel:'): use as category and create {CATEGORY_PREFIX}/category/title path
+        """
         try:
             with open("album.yaml", "r") as f:
                 mapping = yaml.safe_load(f)
@@ -219,6 +223,26 @@ class Transfer:
             return []
         album_paths = []
         for kw in keywords:
+            # Case 4: Keyword with colon (e.g. "Gravestones: McCarty") - create hierarchical album path
+            if ":" in kw and title:
+                # Skip keywords ending with just a colon (e.g., "Wedding:")
+                if kw.endswith(":") and kw.count(":") == 1:
+                    self.logger.debug(f"Ignoring keyword ending with colon: {kw}")
+                    continue  # Skip further processing for this keyword
+                
+                # For all other colon-containing keywords, extract the category and create hierarchical path
+                if ":" in kw and kw.count(":") == 1 and ": " in kw:
+                    category = kw.split(": ")[0].strip()
+                    # Create hierarchical path: CATEGORY_PREFIX/Category/Full Keyword
+                    album_path = f"{CATEGORY_PREFIX}/{category}/{kw}"
+                    self.logger.info(f"Created hierarchical album path from colon-keyword: {album_path}")
+                else:
+                    # Fall back to flat structure for non-standard colons
+                    album_path = f"{CATEGORY_PREFIX}/{kw}"
+                    self.logger.info(f"Created flat album path from non-standard colon-keyword: {album_path}")
+                album_paths.append(album_path)
+                continue  # Skip further processing for this keyword
+                    
             # Normalize keywords that are a single word ending with a slash (e.g., 'RTPC/')
             if kw.endswith("/") and "/" not in kw[:-1]:
                 normalized_kw = kw.rstrip("/")
@@ -382,7 +406,7 @@ class Transfer:
             combined_album_paths.extend([p for p in location_album_paths if p not in combined_album_paths])
         # Use category-based album paths from title if title exists and has format "Category: Details"
         if title:
-            category_album_paths = self._get_category_based_album_paths(title)
+            category_album_paths = self._get_category_based_album_paths(title, keywords=keywords)
             if category_album_paths:
                 self.logger.info(f"Adding category-based album paths: {category_album_paths}")
                 combined_album_paths.extend([p for p in category_album_paths if p not in combined_album_paths])
@@ -416,7 +440,7 @@ class Transfer:
             self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
-    def _get_category_based_album_paths(self, title: str) -> list[str]:
+    def _get_category_based_album_paths(self, title: str, keywords: list[str] = None) -> list[str]:
         """
         Parse photo title for category-based album paths.
         If title has format "Category: Details", dynamically create album path
@@ -424,13 +448,23 @@ class Transfer:
         
         Args:
             title: Photo title to parse
+            keywords: Optional list of keywords to avoid duplication with keyword-based paths
             
         Returns:
             list[str]: List of album paths derived from title category
         """
         if not title:
             return []
+        
+        # Skip title-based processing if the title is already being used as a keyword
+        # This prevents duplicate albums when both title and keyword contain the same text
+        if keywords and title in keywords:
+            self.logger.info(f"Skipping title processing for '{title}' as it's already a keyword")
+            return []
             
+        # Allowing both title-based and keyword-based album paths to co-exist
+        # No skip logic here - both paths will be created as needed
+        
         # Check for "Category: Details" format (single colon followed by space)
         if ":" in title and title.count(":") == 1 and ": " in title:
             category = title.split(": ")[0].strip()
