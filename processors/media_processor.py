@@ -66,8 +66,10 @@ class MediaProcessor(ABC):
         """Get location data from EXIF metadata."""
         location = self._get_exif_field_with_group('Location')
         city = self._get_exif_field_with_group('City')
+        state = self._get_exif_field_with_group('State') or self._get_exif_field_with_group('Province-State')
         country = self._get_exif_field_with_group('Country')
-        return location, city, country
+        self.logger.debug(f"Extracted location data: location={location}, city={city}, state={state}, country={country}")
+        return location, city, state, country
         
     def _join_location_parts(self, parts: list) -> str:
         """Join non-empty location parts with spaces."""
@@ -80,8 +82,8 @@ class MediaProcessor(ABC):
         Returns:
             str: Generated title from location or empty string
         """
-        location, city, country = self.get_location_data()
-        return self._join_location_parts([location, city, country])
+        location, city, state, country = self.get_location_data()
+        return self._join_location_parts([location, city, state, country])
         
     def get_image_rating(self) -> int:
         """
@@ -160,7 +162,7 @@ class MediaProcessor(ABC):
 
     def _build_base_components(self) -> tuple:
         """Get and clean base filename components."""
-        date_str, title, _, _, _ = self.get_metadata_components()
+        date_str, title, _, _, _, _ = self.get_metadata_components()  # Updated for 6-tuple with state
         if not date_str and not title:
             self.logger.info("No valid metadata components found for filename")
             return None, None
@@ -168,12 +170,13 @@ class MediaProcessor(ABC):
 
     def _build_location_components(self, existing_text: str) -> list:
         """Get and clean location components, skipping if in existing text."""
-        _, _, location, city, country = self.get_metadata_components()
+        _, _, location, city, state, country = self.get_metadata_components()  # Updated for 6-tuple with state
         components = []
         
         # Clean all components first
         location = self._clean_location_component(location)
         city = self._clean_location_component(city)
+        state = self._clean_location_component(state)  # Clean state component
         country = self._clean_location_component(country)
         
         # Add unique components in order
@@ -181,6 +184,8 @@ class MediaProcessor(ABC):
             components.append(location)
         if self._is_component_unique(city, existing_text, location):
             components.append(city)
+        if self._is_component_unique(state, existing_text, location):
+            components.append(state)
         if self._is_component_unique(country, existing_text, location):
             components.append(country)
             

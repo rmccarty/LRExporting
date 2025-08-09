@@ -89,9 +89,9 @@ class DirectoryWatcher(BaseWatcher):
                 new_path = processor.process_image()
                 self.logger.info(f"Image processed successfully: {new_path}")
                 # --- City-based album mapping enhancement (robust) ---
-                # After renaming, re-instantiate processor on new_path and extract city and title
+                # After renaming, re-instantiate processor on new_path and extract city, state and title
                 post_processor = JPEGExifProcessor(str(new_path))
-                _, title, _, city, _ = post_processor.get_metadata_components()
+                _, title, _, city, state, _ = post_processor.get_metadata_components()
                 self.logger.info(f"Post-rename extracted city: '{city}', title: '{title}'")
                 album_paths = []
                 if city:

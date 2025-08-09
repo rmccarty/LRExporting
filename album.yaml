@@ -1,6 +1,7 @@
 # Mapping of city to album paths for Apple Photos
-
+FA: 01/Fa/
 Childhood: 01/Fa/
+School Portrait: 01/Fa/School Portrait/
 Ancestors: 01/Fa/Ancestors
 DateNeeded: 01/Fa/DateNeeded/
 Relations: 01/Gr/Relations/
@@ -9,6 +10,7 @@ Iomega: 01/Gr/Employers/Iomega/
 L3: 01/Gr/Employers/L3/
 Lucent: 01/Gr/Employers/Lucent/
 Army: 01/Gr/Employers/Army/
+P-Strangers: 01/Gr/Strangers/
 Birth: 02/Events/Birth/
 Death: 02/Events/Death/
 Obituary: 02/Events/Death/Obituary/
@@ -36,8 +38,19 @@ Honey Creek Bridge: 03/US/OK/Davis/Honey Creek Bridge/
 Durant: 03/US/OK/Durant/
 Roping Lane: 03/US/OK/Durant/Roping Lane/
 Mead: 03/US/OK/Mead/
+FL: 03/US/FL/
+Florida: 03/US/FL/
 Missouri: 03/MO/
+MO: 03/MO/
+MT: 03/US/MT/
+Montana: 03/US/MT/
+TX: 03/US/TX/
+Bogata: 03/US/TX/Bogata/
 Dallas: 03/US/TX/Dallas/
+Old City Park: 03/US/TX/Dallas/Old City Park/
+Dallas Arboretum: 03/US/TX/Dallas/Dallas Arboretum/
+Garland: 03/US/TX/Garland/
+Lavon: 03/US/TX/Lavon/
 Rowlett: 03/US/TX/Rowlett/
 Dalrock Diner: 03/US/TX/Rowlett/Dalrock Diner/
 6305 Bobbie Lane: 03/US/TX/Rowlett/6305 Bobbie Lane/
@@ -47,6 +60,8 @@ Richardson: 03/US/TX/Richardson/
 Rockwall: 03/US/TX/Rockwall/
 912 Village Green Drive: 03/US/TX/Rockwall/912 Village Green Drive/
 US: 03/US/
+NM: 03/US/NM/
+UT: 03/US/UT/
 Asperg: 03/DE/Asperg/
 Berlin: 03/DE/Berlin/
 Berlin Wall: 03/DE/Berlin/Berlin Wall/
@@ -60,6 +75,7 @@ Freiburg: 03/DE/Freiburg/
 Kapfstrasse: 03/DE/Freiburg/Kapfstrasse 16/
 Kapfstrasse 16: 03/DE/Freiburg/Kapfstrasse 16/
 Hohenzollern: 03/DE/Hohenzollern/
+Burg Hohenzollern: 03/DE/Hohenzollern/
 Lichtenstein: 03/DE/Lichtenstein/
 Ludendorff: 03/DE/Ludendorff/
 Kelley Barracks: 03/DE/Kelley Barracks/
@@ -77,8 +93,11 @@ Rothenburg: 03/DE/Rothenburg/
 Stuttgart: 03/DE/Stuttgart/
 Schwäbsich Gmünd: 03/DE/Schwäbsich Gmünd/
 Universitätspark: 03/DE/Schwäbsich Gmünd/Universitätspark/
+UMUCSG: 03/DE/Schwäbisch Gmünd/UMUCSG/SG College/
 Ulm: 03/DE/Ulm/
 Neu Ulm: 03/DE/Ulm/
+Tripsdrill: 03/DE/Tripsdrill/
+Wildbad: 03/DE/Wildbad/
 Wilkins: 03/DE/Wilkins/ 
 
 
@@ -96,6 +115,7 @@ School Claudia: 02/Events/School/School Claudia/
 School Ronny: 02/Events/School/School Ronny/
 School Janice: 02/Events/School/School Janice/
 School Ron: 02/Events/School/School Ron/
+Move: 02/Events/Move/
 
 UK: 03/UK/
 Ireland: 03/Ireland/

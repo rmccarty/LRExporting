@@ -309,6 +309,40 @@ class Transfer:
         except Exception as e:
             self.logger.error(f"Error loading album.yaml: {e}")
             return []
+            
+    def _get_album_paths_for_state(self, state: str, title: str = None) -> list[str]:
+        """Load album paths for a given state from album.yaml. If mapping ends with '/', append title as sub-album."""
+        if not state:
+            return []
+            
+        try:
+            with open("album.yaml", "r") as f:
+                mapping = yaml.safe_load(f)
+            if state in mapping:
+                mapped = mapping[state]
+                result = []
+                # If it's a list, handle each entry
+                if isinstance(mapped, list):
+                    for m in mapped:
+                        if isinstance(m, str) and m.endswith("/") and title:
+                            result.append(f"{m}{title.strip()}")
+                        elif isinstance(m, str):
+                            result.append(m)
+                # If it's a string
+                elif isinstance(mapped, str):
+                    if mapped.endswith("/") and title:
+                        result.append(f"{mapped}{title.strip()}")
+                    else:
+                        result.append(mapped)
+                # Deduplicate
+                self.logger.debug(f"Found album paths for state '{state}': {result}")
+                return list(dict.fromkeys(result))
+            else:
+                self.logger.debug(f"No album mapping found for state: {state}")
+                return []
+        except Exception as e:
+            self.logger.error(f"Error loading album.yaml for state lookup: {e}")
+            return []
 
     def _import_to_photos(self, photo_path: Path, album_paths: list[str] = None) -> bool:
         """Import a photo into Apple Photos using album.yaml mapping and Folder/Album or Folder/ keywords."""
@@ -324,9 +358,10 @@ class Transfer:
                 exif_logger = JPEGExifProcessor(str(photo_path))
                 exif_logger.read_exif()
                 city = self.extract_city_from_exif(exif_logger.exif_data)
-                # FIX: Extract location using get_location_data()
-                location, _, _ = exif_logger.get_location_data()
+                # Extract location, city, state, country using get_location_data()
+                location, _, state, _ = exif_logger.get_location_data()
                 self.logger.info(f"[IMPORT] Extracted city for {photo_path}: {city}")
+                self.logger.info(f"[IMPORT] Extracted state for {photo_path}: {state}")
                 self.logger.info(f"[IMPORT] Extracted location for {photo_path}: {location}")
         except Exception as ex:
             self.logger.warning(f"Could not extract city/location from EXIF for import: {ex}")
@@ -337,6 +372,10 @@ class Transfer:
         if city and title:
             city_album_paths = self._get_album_paths_for_city(city, title=title)
             combined_album_paths.extend(city_album_paths)
+        # Use state-based album paths if state and title exist
+        if state and title:
+            state_album_paths = self._get_album_paths_for_state(state, title=title)
+            combined_album_paths.extend([p for p in state_album_paths if p not in combined_album_paths])
         # Use location-based album paths if location and title exist
         if location and title:
             location_album_paths = self._get_album_paths_for_location(location, title=title)

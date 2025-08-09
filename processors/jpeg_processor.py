@@ -64,10 +64,11 @@ class JPEGExifProcessor(MediaProcessor):
                 
         # Get title and location data
         title = self.get_exif_title()
-        location, city, country = self.get_location_data()
+        location, city, state, country = self.get_location_data()
         self.logger.info(f"Extracted city from EXIF: {city}")
+        self.logger.info(f"Extracted state from EXIF: {state}")
         
-        return date_str, title, location, city, country
+        return date_str, title, location, city, state, country
         
     def process_image(self) -> Path:
         """
