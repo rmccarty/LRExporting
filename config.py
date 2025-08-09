@@ -90,3 +90,6 @@ FILENAME_REPLACEMENTS = {
 LRE_SUFFIX = '__LRE'
 MCCARTYS_PREFIX = 'The McCartys '
 MCCARTYS_REPLACEMENT = 'The McCartys: '
+
+# Dynamic category-based album prefix
+CATEGORY_PREFIX = '02'

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import shutil
 import yaml
 
-from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS
+from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS, CATEGORY_PREFIX
 from apple_photos_sdk import ApplePhotos
 
 @dataclass
@@ -380,6 +380,12 @@ class Transfer:
         if location and title:
             location_album_paths = self._get_album_paths_for_location(location, title=title)
             combined_album_paths.extend([p for p in location_album_paths if p not in combined_album_paths])
+        # Use category-based album paths from title if title exists and has format "Category: Details"
+        if title:
+            category_album_paths = self._get_category_based_album_paths(title)
+            if category_album_paths:
+                self.logger.info(f"Adding category-based album paths: {category_album_paths}")
+                combined_album_paths.extend([p for p in category_album_paths if p not in combined_album_paths])
         if album_paths is not None:
             combined_album_paths.extend([p for p in album_paths if p not in combined_album_paths])
         if keyword_album_paths:
@@ -396,6 +402,35 @@ class Transfer:
             self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
+    def _get_category_based_album_paths(self, title: str) -> list[str]:
+        """
+        Parse photo title for category-based album paths.
+        If title has format "Category: Details", dynamically create album path
+        in format "02/Category/Full Title" without consulting album.yaml.
+        
+        Args:
+            title: Photo title to parse
+            
+        Returns:
+            list[str]: List of album paths derived from title category
+        """
+        if not title:
+            return []
+            
+        # Check for "Category: Details" format (single colon followed by space)
+        if ":" in title and title.count(":") == 1 and ": " in title:
+            category = title.split(": ")[0].strip()
+            self.logger.info(f"Extracted category '{category}' from title '{title}'")
+            
+            if category:
+                # Dynamic path creation - use CATEGORY_PREFIX from config and create folder based on category
+                # Do not consult album.yaml - create this dynamically
+                album_path = f"{CATEGORY_PREFIX}/{category}/{title}"
+                self.logger.info(f"Created dynamic category-based album path: {album_path}")
+                return [album_path]
+                
+        return []
+    
     def extract_city_from_exif(self, exif_data: dict) -> str:
         """Try to extract city from all common EXIF fields."""
         for key in [
