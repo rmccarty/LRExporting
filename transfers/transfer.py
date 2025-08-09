@@ -392,8 +392,22 @@ class Transfer:
             combined_album_paths.extend([p for p in keyword_album_paths if p not in combined_album_paths])
         # Final deduplication
         combined_album_paths = list(dict.fromkeys(combined_album_paths))
-        if not combined_album_paths:
+        
+        # Detailed output of all album paths at the latest possible point
+        photo_name = photo_path.name
+        if combined_album_paths:
+            self.logger.info(f"\n============= ALBUM DESTINATIONS FOR {photo_name} =============")
+            print(f"\n📸 PLACING IMAGE: {photo_name}")
+            print(f"📁 INTO {len(combined_album_paths)} ALBUM(S):")
+            for i, path in enumerate(combined_album_paths, 1):
+                self.logger.info(f"  Album #{i}: {path}")
+                print(f"  {i}. {path}")
+            print("============================================\n")
+            self.logger.info("=====================================================")
+        else:
             self.logger.warning(f"No album paths resolved for import: {photo_path}")
+            print(f"⚠️ WARNING: No album paths found for {photo_name}")
+            
         success = ApplePhotos().import_photo(photo_path, album_paths=combined_album_paths)
         if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
