@@ -11,6 +11,8 @@ import yaml
 
 from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS, CATEGORY_PREFIX
 from apple_photos_sdk import ApplePhotos
+import Photos
+from objc import autorelease_pool
 
 @dataclass
 class ValidationResult:
@@ -578,3 +580,111 @@ class Transfer:
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
+    
+    def transfer_asset(self, asset) -> bool:
+        """
+        Transfer an Apple Photos asset by applying album placement logic.
+        Follows the same pattern as transfer_file() but for Apple Photos assets.
+        
+        Args:
+            asset: Apple Photos PHAsset object
+            
+        Returns:
+            bool: True if transfer succeeded, False otherwise
+        """
+        try:
+            self.logger.info(f"[TRANSFER] transfer_asset called for asset: {asset.localIdentifier()}")
+            
+            # Extract metadata from Apple Photos asset
+            metadata = self._extract_metadata_from_asset(asset)
+            self.logger.info(f"[TRANSFER] Extracted metadata: {metadata}")
+            
+            # Apply existing album placement logic using extracted metadata
+            album_paths = self._get_album_paths_for_asset_metadata(metadata)
+            
+            if album_paths:
+                self.logger.info(f"[TRANSFER] Calculated album paths: {album_paths}")
+                
+                # TODO: In future versions, create/manage albums in Apple Photos
+                # For now, just log the album placement decisions
+                self.logger.info(f"[TRANSFER] Would create/manage albums: {album_paths}")
+                return True
+            else:
+                self.logger.info(f"[TRANSFER] No album paths generated for asset")
+                return True  # Not an error - just no placement rules matched
+                
+        except Exception as e:
+            self.logger.error(f"Transfer failed for asset {asset.localIdentifier()}: {e}")
+            return False
+    
+    def _extract_metadata_from_asset(self, asset) -> dict:
+        """Extract metadata from Apple Photos asset for album placement."""
+        try:
+            with autorelease_pool():
+                metadata = {
+                    'title': asset.valueForKey_('title'),
+                    'keywords': self._get_asset_keywords(asset),
+                    'city': self._get_asset_city(asset),
+                    'date': asset.creationDate(),
+                    'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video'
+                }
+                return metadata
+        except Exception as e:
+            self.logger.error(f"Error extracting metadata from asset: {e}")
+            return {}
+    
+    def _get_asset_keywords(self, asset) -> list[str]:
+        """Extract keywords from Apple Photos asset."""
+        try:
+            # Apple Photos doesn't expose keywords directly via PHAsset
+            # Keywords are typically stored in metadata or require additional API calls
+            # For now, return empty list - this can be enhanced later
+            # TODO: Implement proper keyword extraction using PHAssetResource or other APIs
+            return []
+        except Exception as e:
+            self.logger.debug(f"Could not extract keywords from asset: {e}")
+            return []
+    
+    def _get_asset_city(self, asset) -> str | None:
+        """Extract city from Apple Photos asset location."""
+        try:
+            location = asset.location()
+            if location:
+                return location.locality()
+            return None
+        except Exception as e:
+            self.logger.debug(f"Could not extract city from asset: {e}")
+            return None
+    
+    def _get_album_paths_for_asset_metadata(self, metadata: dict) -> list[str]:
+        """Apply existing album placement logic to Apple Photos asset metadata."""
+        album_paths = []
+        
+        try:
+            # Apply keyword-based rules
+            if metadata.get('keywords'):
+                keyword_paths = self._get_album_paths_from_keywords(
+                    metadata['keywords'], metadata.get('title')
+                )
+                album_paths.extend(keyword_paths)
+            
+            # Apply city-based rules
+            if metadata.get('city'):
+                city_paths = self._get_album_paths_for_city(
+                    metadata['city'], metadata.get('title')
+                )
+                album_paths.extend(city_paths)
+            
+            # Apply title-based rules
+            if metadata.get('title'):
+                title_paths = self._get_category_based_album_paths(
+                    metadata['title'], metadata.get('keywords', [])
+                )
+                album_paths.extend(title_paths)
+            
+            # Remove duplicates while preserving order
+            return list(dict.fromkeys(album_paths))
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating album paths for metadata: {e}")
+            return []

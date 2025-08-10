@@ -7,6 +7,7 @@ from objc import autorelease_pool
 import Photos
 
 from config import SLEEP_TIME
+from transfers.transfer import Transfer
 
 class ApplePhotoWatcher:
     """
@@ -20,6 +21,7 @@ class ApplePhotoWatcher:
         self.running = False
         self.sleep_time = SLEEP_TIME
         self.watching_album_id = None
+        self.transfer = Transfer()  # Add transfer instance for album placement logic
         
         # Initialize the watching album
         self._initialize_watching_album()
@@ -148,7 +150,8 @@ class ApplePhotoWatcher:
                         'id': asset.localIdentifier(),
                         'filename': asset.valueForKey_('filename') or f"Asset_{i}",
                         'title': title,
-                        'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video'
+                        'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video',
+                        'asset_obj': asset  # Include the actual PHAsset object for Transfer
                     }
                     asset_list.append(asset_info)
                 
@@ -218,18 +221,26 @@ class ApplePhotoWatcher:
                 self.logger.debug(f"No assets found in '{self.album_name}' album")
                 return
             
-            for asset in assets:
-                self.logger.info(f"Found {asset['media_type']}: {asset['filename']}")
+            for asset_data in assets:
+                self.logger.info(f"Found {asset_data['media_type']}: {asset_data['filename']}")
                 
                 # Log title on separate line if it exists
-                if asset['title']:
-                    self.logger.info(f"  Title: {asset['title']}")
+                if asset_data['title']:
+                    self.logger.info(f"  Title: {asset_data['title']}")
                 
-                # Remove asset from album
-                if self._remove_asset_from_album(asset['id']):
-                    self.logger.info(f"Removed {asset['filename']} from '{self.album_name}' album")
+                # Follow established pattern - let Transfer handle all album placement logic
+                asset_obj = asset_data['asset_obj']  # Get the actual PHAsset object
+                success = self.transfer.transfer_asset(asset_obj)
+                
+                if success:
+                    self.logger.info(f"Successfully processed {asset_data['filename']}")
+                    # Remove asset from album after successful processing
+                    if self._remove_asset_from_album(asset_data['id']):
+                        self.logger.info(f"Removed {asset_data['filename']} from '{self.album_name}' album")
+                    else:
+                        self.logger.error(f"Failed to remove {asset_data['filename']} from album")
                 else:
-                    self.logger.error(f"Failed to remove {asset['filename']} from album")
+                    self.logger.error(f"Failed to process {asset_data['filename']}")
                     
         except Exception as e:
             self.logger.error(f"Error checking album: {e}")
