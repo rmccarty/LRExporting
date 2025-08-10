@@ -11,16 +11,6 @@ L3: 01/Gr/Employers/L3/
 Lucent: 01/Gr/Employers/Lucent/
 Army: 01/Gr/Employers/Army/
 P-Strangers: 01/Gr/Strangers/
-Birth: 02/Events/Birth/
-Death: 02/Events/Death/
-Obituary: 02/Events/Death/Obituary/
-Baptism: 02/Events/Faith/Baptism/
-Communion: 02/Events/Faith/Communion/
-Confirmation: 02/Events/Faith/Confirmation/
-Medical: 02/Events/Medical/
-Christmas: 02/Events/Holidays/Christmas/
-Easter: 02/Events/Holidays/Easter/
-Halloween: 02/Events/Holidays/Halloween/
 AR: 03/US/AR/
 South Side High School: 03/US/AR/Fort Smith South Side High School/
 DC: 03/US/DC/
@@ -56,6 +46,8 @@ Garland: 03/US/TX/Garland/
 Lavon: 03/US/TX/Lavon/
 Rowlett: 03/US/TX/Rowlett/
 Dalrock Diner: 03/US/TX/Rowlett/Dalrock Diner/
+Hang Time Bar and Grill: 03/US/TX/Rowlett/Hang Time/
+Hang Time: 
 6305 Bobbie Lane: 03/US/TX/Rowlett/6305 Bobbie Lane/
 Steadham Elementary School: 03/US/TX/Rowlett/Steadham Elementary School/
 Vernon Schrade Middle School: 03/US/TX/Rowlett/Vernon Schrade Middle School/    
@@ -107,18 +99,6 @@ Wilkins: 03/DE/Wilkins/
 Deep Ellum: 03/US/TX/Dallas/Deep Ellum/
 Scarborough Renaissance Festival: 03/US/TX/Scarborough Renaissance Festival/    
 
-Bands: 01/Gr/Bands/
-RTPC: 01/Gr/RTPC/
 Photography for the Insane: 01/Gr/Photography for the Insane/
-Rodeo: 02/Events/Rodeo/
-Independence Day: 02/Events/Holidays/Independence Day/
-Christmas: 02/Events/Holidays/Christmas/
-Thanksgiving: 02/Events/Holidays/Thanksgiving/
-School Claudia: 02/Events/School/School Claudia/
-School Ronny: 02/Events/School/School Ronny/
-School Janice: 02/Events/School/School Janice/
-School Ron: 02/Events/School/School Ron/
-Move: 02/Events/Move/
-
 UK: 03/UK/
 Ireland: 03/Ireland/
