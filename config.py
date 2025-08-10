@@ -6,6 +6,7 @@ from pathlib import Path
 RON_INCOMING = Path("/Users/rmccarty/Transfers/Ron/Ron_Incoming")
 CLAUDIA_INCOMING = Path("/Users/rmccarty/Transfers/Claudia/Claudia_Incoming")
 BOTH_INCOMING = Path("/Users/rmccarty/Transfers/Both/Both_Incoming")
+APPLE_PHOTOS_WATCHING = Path("Watching/")
 
 # Watch directories configuration
 WATCH_DIRS = [RON_INCOMING, CLAUDIA_INCOMING]

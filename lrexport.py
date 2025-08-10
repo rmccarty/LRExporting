@@ -34,7 +34,7 @@ from config import (
     MIN_FILE_AGE
 )
 
-from watchers import BaseWatcher, TransferWatcher, DirectoryWatcher, VideoWatcher
+from watchers import BaseWatcher, TransferWatcher, DirectoryWatcher, VideoWatcher, ApplePhotoWatcher
 from processors.media_processor import MediaProcessor
 from processors.video_processor import VideoProcessor
 from transfers import Transfer
@@ -53,14 +53,16 @@ if __name__ == '__main__':
     )
     video_watcher = VideoWatcher(directories=WATCH_DIRS)
     transfer_watcher = TransferWatcher(directories=WATCH_DIRS)
+    apple_photo_watcher = ApplePhotoWatcher()
     
     try:
         # Start watchers
         jpeg_watcher.running = True
         video_watcher.running = True
         transfer_watcher.running = True
+        apple_photo_watcher.running = True
         
-        while jpeg_watcher.running and video_watcher.running and transfer_watcher.running:
+        while jpeg_watcher.running and video_watcher.running and transfer_watcher.running and apple_photo_watcher.running:
             # Process both incoming directory first for JPEGs
             jpeg_watcher.process_both_incoming()
             
@@ -76,6 +78,9 @@ if __name__ == '__main__':
             # Check Apple Photos directories
             jpeg_watcher.check_apple_photos_dirs()
             
+            # Check Apple Photos watching album
+            apple_photo_watcher.check_album()
+            
             time.sleep(SLEEP_TIME)
             
     except KeyboardInterrupt:
@@ -83,3 +88,4 @@ if __name__ == '__main__':
         jpeg_watcher.running = False
         video_watcher.running = False
         transfer_watcher.running = False
+        apple_photo_watcher.running = False
