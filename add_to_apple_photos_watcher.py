@@ -135,15 +135,22 @@ class ApplePhotosWatcherAdder:
                         creation_date = asset.creationDate()
                         media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
                         title = asset.valueForKey_('title')
+                        caption = asset.valueForKey_('accessibilityDescription')  # This is the caption/description
                         
-                        # Only add assets with titles containing ':' (category format)
-                        if title and ':' in title:
+                        # Only add assets with titles or captions containing ':' (category format)
+                        has_category_title = title and ':' in title
+                        has_category_caption = caption and ':' in caption
+                        
+                        if has_category_title or has_category_caption:
                             # Add asset to Watching album
                             success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
                             
                             if success:
                                 added_count += 1
-                                logger.info(f"Added {media_type} {added_count}: '{title}' ({asset_id[:8]}...)")
+                                # Log which field had the category format
+                                category_source = "title" if has_category_title else "caption"
+                                category_text = title if has_category_title else caption
+                                logger.info(f"Added {media_type} {added_count} (category in {category_source}): '{category_text}' ({asset_id[:8]}...)")
                                 
                                 # Pause after every 1000 successfully added photos
                                 if added_count % 1000 == 0:
@@ -151,15 +158,24 @@ class ApplePhotosWatcherAdder:
                                     time.sleep(10)
                             else:
                                 error_count += 1
-                                logger.warning(f"Failed to add asset {i+1}/{total_assets}: '{title}' ({asset_id[:8]}...)")
+                                category_source = "title" if has_category_title else "caption"
+                                category_text = title if has_category_title else caption
+                                logger.warning(f"Failed to add asset {i+1}/{total_assets} (category in {category_source}): '{category_text}' ({asset_id[:8]}...)")
                         else:
-                            # Skip assets without category-format titles
+                            # Skip assets without category-format titles or captions
                             skipped_count += 1
                             if skipped_count <= 10:  # Only log first 10 skips to avoid spam
-                                skip_reason = "no title" if not title else "no colon in title"
-                                logger.debug(f"Skipped {media_type} ({skip_reason}): '{title}' ({asset_id[:8]}...)")
+                                if not title and not caption:
+                                    skip_reason = "no title or caption"
+                                elif not title:
+                                    skip_reason = "no title, caption has no colon"
+                                elif not caption:
+                                    skip_reason = "no caption, title has no colon"
+                                else:
+                                    skip_reason = "no colon in title or caption"
+                                logger.debug(f"Skipped {media_type} ({skip_reason}): title='{title}', caption='{caption}' ({asset_id[:8]}...)")
                             elif skipped_count == 11:
-                                logger.info(f"Skipping additional assets without category titles (will show total at end)...")
+                                logger.info(f"Skipping additional assets without category titles or captions (will show total at end)...")
                     
                     except Exception as e:
                         error_count += 1
