@@ -424,25 +424,35 @@ class AlbumManager:
         success = True
         for album_path in album_paths:
             parts = album_path.split('/')
-            if len(parts) < 2:
-                self.logger.error(f"Album path must have at least one folder and album: {album_path}")
-                success = False
-                continue
-            album_name = parts[-1]
-            folder_path = '/'.join(parts[:-1])
             self.logger.info(f"Processing album path: {album_path}")
-            # Create/find folder path, logging each step
-            folder_success, folder_id = self._create_folder_path_with_logging(folder_path)
-            if not folder_success:
-                self.logger.error(f"Failed to create/find folder path: {folder_path}")
-                success = False
-                continue
-            # Create/find album in folder, logging existence/creation
-            album_success, album_id = self._create_album_in_folder_with_logging(album_name, folder_id)
-            if not album_success:
-                self.logger.error(f"Failed to create/find album: {album_name}")
-                success = False
-                continue
+            
+            if len(parts) == 1:
+                # Handle top-level album (no folder structure)
+                album_name = parts[0]
+                self.logger.info(f"Creating/finding top-level album: {album_name}")
+                # Create/find top-level album
+                album_success, album_id = self._create_top_level_album_with_logging(album_name)
+                if not album_success:
+                    self.logger.error(f"Failed to create/find top-level album: {album_name}")
+                    success = False
+                    continue
+            else:
+                # Handle hierarchical album (folder/album structure)
+                album_name = parts[-1]
+                folder_path = '/'.join(parts[:-1])
+                # Create/find folder path, logging each step
+                folder_success, folder_id = self._create_folder_path_with_logging(folder_path)
+                if not folder_success:
+                    self.logger.error(f"Failed to create/find folder path: {folder_path}")
+                    success = False
+                    continue
+                # Create/find album in folder, logging existence/creation
+                album_success, album_id = self._create_album_in_folder_with_logging(album_name, folder_id)
+                if not album_success:
+                    self.logger.error(f"Failed to create/find album: {album_name}")
+                    success = False
+                    continue
+            
             # Add asset to album by ID
             self.logger.debug(f"Adding asset {asset_id} to album '{album_name}' (ID: {album_id})")
             if not self._add_to_album(asset_id, album_id):
@@ -477,4 +487,81 @@ class AlbumManager:
             return self._create_album_in_folder(album_name, folder_id)
         except Exception as e:
             self.logger.error(f"Error in _create_album_in_folder_with_logging: {e}")
+            return False, None
+
+    def _create_top_level_album_with_logging(self, album_name: str):
+        """Create or find a top-level album (not in any folder) with logging."""
+        try:
+            # Check if album exists at top level
+            existing_id = self._find_top_level_album(album_name)
+            if existing_id:
+                self.logger.info(f"Top-level album already exists: {album_name} (ID: {existing_id})")
+                return True, existing_id
+            self.logger.info(f"Creating top-level album: {album_name}")
+            return self._create_top_level_album(album_name)
+        except Exception as e:
+            self.logger.error(f"Error in _create_top_level_album_with_logging: {e}")
+            return False, None
+
+    def _find_top_level_album(self, album_name: str) -> str | None:
+        """Find a top-level album by name and return its ID if found."""
+        try:
+            with autorelease_pool():
+                # Fetch all top-level albums (not in folders)
+                fetch_options = Photos.PHFetchOptions.alloc().init()
+                albums = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
+                    Photos.PHAssetCollectionTypeAlbum,
+                    Photos.PHAssetCollectionSubtypeAlbumRegular,
+                    fetch_options
+                )
+                
+                # Look for matching album name
+                for i in range(albums.count()):
+                    album = albums.objectAtIndex_(i)
+                    if album.localizedTitle() == album_name:
+                        return album.localIdentifier()
+                
+                return None
+        except Exception as e:
+            self.logger.error(f"Error finding top-level album {album_name}: {e}")
+            return None
+
+    def _create_top_level_album(self, album_name: str) -> tuple[bool, str | None]:
+        """Create a top-level album and return (success, album_id) tuple."""
+        try:
+            with autorelease_pool():
+                # First check if album already exists
+                existing_id = self._find_top_level_album(album_name)
+                if existing_id:
+                    self.logger.debug(f"Found existing top-level album: {album_name} (ID: {existing_id})")
+                    return True, existing_id
+                
+                self.logger.debug(f"Creating new top-level album: {album_name}")
+                success = False
+                album_id = None
+                
+                def create_album():
+                    nonlocal success, album_id
+                    # Create a new top-level album
+                    album = Photos.PHAssetCollectionChangeRequest.creationRequestForAssetCollectionWithTitle_(album_name)
+                    placeholder = album.placeholderForCreatedAssetCollection()
+                    success = True
+                    album_id = placeholder.localIdentifier()
+                
+                # Perform changes
+                result, error = Photos.PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_(
+                    create_album,
+                    None
+                )
+                
+                if not result or not success:
+                    self.logger.error(f"Failed to create top-level album: {album_name}")
+                    if error:
+                        self.logger.error(f"Error: {error}")
+                    return False, None
+                
+                return True, album_id
+                
+        except Exception as e:
+            self.logger.error(f"Error creating top-level album: {e}")
             return False, None

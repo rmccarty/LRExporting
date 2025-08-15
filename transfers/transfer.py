@@ -376,70 +376,21 @@ class Transfer:
             return []
 
     def _import_to_photos(self, photo_path: Path, album_paths: list[str] = None) -> bool:
-        """Import a photo into Apple Photos using album.yaml mapping and Folder/Album or Folder/ keywords."""
-        from apple_photos_sdk.import_manager import ImportManager
-        keywords = ImportManager()._get_original_keywords(photo_path)
-        title = ImportManager()._get_original_title(photo_path)
-        # --- Unified city and location extraction ---
-        city = None
-        location = None
-        try:
-            from processors.jpeg_processor import JPEGExifProcessor
-            if photo_path.suffix.lower() in ['.jpg', '.jpeg']:
-                exif_logger = JPEGExifProcessor(str(photo_path))
-                exif_logger.read_exif()
-                city = self.extract_city_from_exif(exif_logger.exif_data)
-                # Extract location, city, state, country using get_location_data()
-                location, _, state, _ = exif_logger.get_location_data()
-                self.logger.info(f"[IMPORT] Extracted city for {photo_path}: {city}")
-                self.logger.info(f"[IMPORT] Extracted state for {photo_path}: {state}")
-                self.logger.info(f"[IMPORT] Extracted location for {photo_path}: {location}")
-        except Exception as ex:
-            self.logger.warning(f"Could not extract city/location from EXIF for import: {ex}")
-        # Combine city, location, and keyword-based album paths, deduplicated
-        keyword_album_paths = self._get_album_paths_from_keywords(keywords, title=title)
-        combined_album_paths = []
-        # Use city-based album paths if city and title exist
-        if city and title:
-            city_album_paths = self._get_album_paths_for_city(city, title=title)
-            combined_album_paths.extend(city_album_paths)
-        # Use state-based album paths if state and title exist
-        if state and title:
-            state_album_paths = self._get_album_paths_for_state(state, title=title)
-            combined_album_paths.extend([p for p in state_album_paths if p not in combined_album_paths])
-        # Use location-based album paths if location and title exist
-        if location and title:
-            location_album_paths = self._get_album_paths_for_location(location, title=title)
-            combined_album_paths.extend([p for p in location_album_paths if p not in combined_album_paths])
-        # Use category-based album paths from title if title exists and has format "Category: Details"
-        if title:
-            category_album_paths = self._get_category_based_album_paths(title, keywords=keywords)
-            if category_album_paths:
-                self.logger.info(f"Adding category-based album paths: {category_album_paths}")
-                combined_album_paths.extend([p for p in category_album_paths if p not in combined_album_paths])
-        if album_paths is not None:
-            combined_album_paths.extend([p for p in album_paths if p not in combined_album_paths])
-        if keyword_album_paths:
-            combined_album_paths.extend([p for p in keyword_album_paths if p not in combined_album_paths])
-        # Final deduplication
-        combined_album_paths = list(dict.fromkeys(combined_album_paths))
+        """Import a photo into Apple Photos with simplified album logic."""
         
-        # Detailed output of all album paths at the latest possible point
+        # Simply import to Apple Photos with the provided album paths (if any)
+        # No complex metadata extraction or album calculation here
         photo_name = photo_path.name
-        if combined_album_paths:
-            self.logger.info(f"\n============= ALBUM DESTINATIONS FOR {photo_name} =============")
-            print(f"\n📸 PLACING IMAGE: {photo_name}")
-            print(f"📁 INTO {len(combined_album_paths)} ALBUM(S):")
-            for i, path in enumerate(combined_album_paths, 1):
-                self.logger.info(f"  Album #{i}: {path}")
-                print(f"  {i}. {path}")
-            print("============================================\n")
-            self.logger.info("=====================================================")
+        
+        if album_paths:
+            self.logger.info(f"Importing {photo_name} to Apple Photos with album paths: {album_paths}")
+            print(f"\n📸 IMPORTING: {photo_name}")
+            print(f"📁 TO ALBUM(S): {', '.join(album_paths)}")
         else:
-            self.logger.warning(f"No album paths resolved for import: {photo_path}")
-            print(f"⚠️ WARNING: No album paths found for {photo_name}")
+            self.logger.info(f"Importing {photo_name} to Apple Photos (no specific albums)")
+            print(f"\n📸 IMPORTING: {photo_name} (no specific albums)")
             
-        success = ApplePhotos().import_photo(photo_path, album_paths=combined_album_paths)
+        success = ApplePhotos().import_photo(photo_path, album_paths=album_paths or [])
         if success:
             self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
             return True

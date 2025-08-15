@@ -7,7 +7,7 @@ import shutil
 
 from config import (
     WATCH_DIRS, BOTH_INCOMING, APPLE_PHOTOS_PATHS,
-    JPEG_PATTERN, ALL_PATTERN, ENABLE_APPLE_PHOTOS
+    JPEG_PATTERN, ALL_PATTERN, ENABLE_APPLE_PHOTOS, APPLE_PHOTOS_WATCHING
 )
 from .base_watcher import BaseWatcher
 from transfers.transfer import Transfer
@@ -71,7 +71,25 @@ class DirectoryWatcher(BaseWatcher):
             # For files in Apple Photos directories, process regardless of suffix
             if ENABLE_APPLE_PHOTOS and any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 self.logger.info(f"Found file in Apple Photos directory: {file_path}")
-                self.transfer.transfer_file(file_path)
+                
+                # Extract title to check for category format
+                if file_path.suffix.lower() in ['.jpg', '.jpeg']:
+                    processor = JPEGExifProcessor(str(file_path))
+                    _, title, _, _, _, _ = processor.get_metadata_components()
+                    self.logger.info(f"Extracted title: '{title}'")
+                else:
+                    title = None  # Videos don't have extracted titles in this flow
+                
+                # Check if title has category format (contains colon) for Watching album
+                if title and ':' in title:
+                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos and adding to Watching album")
+                    # Import to Apple Photos with Watching album for further processing
+                    watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
+                    self.transfer.transfer_file(file_path, album_paths=[watching_album_path])
+                else:
+                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos only")
+                    # Import to Apple Photos without any specific album
+                    self.transfer.transfer_file(file_path, album_paths=[])
                 return
                 
             # For files in regular directories, skip if already processed
@@ -88,27 +106,29 @@ class DirectoryWatcher(BaseWatcher):
                 processor = JPEGExifProcessor(str(file_path), sequence=sequence)
                 new_path = processor.process_image()
                 self.logger.info(f"Image processed successfully: {new_path}")
-                # --- City-based album mapping enhancement (robust) ---
-                # After renaming, re-instantiate processor on new_path and extract city, state and title
+                
+                # Extract title to check for category format
                 post_processor = JPEGExifProcessor(str(new_path))
-                _, title, _, city, state, _ = post_processor.get_metadata_components()
-                self.logger.info(f"Post-rename extracted city: '{city}', title: '{title}'")
-                album_paths = []
-                if city:
-                    album_paths = self.transfer._get_album_paths_for_city(city, title=title)
-                    self.logger.info(f"City-based album paths: {album_paths}")
-                    if album_paths:
-                        self.logger.info(f"Resolved album paths for city '{city}' (post-rename): {album_paths}")
-                # --- End enhancement ---
+                _, title, _, _, _, _ = post_processor.get_metadata_components()
+                self.logger.info(f"Extracted title: '{title}'")
+                
             else:
                 # For videos, just transfer without processing
                 new_path = file_path
-                album_paths = []
-            # Transfer to destination
+                title = None  # Videos don't have extracted titles in this flow
+                
+            # Transfer to Apple Photos
             if new_path:
-                # Always pass album_paths, even if empty
-                self.logger.info(f"Calling transfer_file with album_paths: {album_paths}")
-                self.transfer.transfer_file(new_path, album_paths=album_paths)
+                # Check if title has category format (contains colon) for Watching album
+                if title and ':' in title:
+                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos and adding to Watching album")
+                    # Import to Apple Photos with Watching album for further processing
+                    watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
+                    self.transfer.transfer_file(new_path, album_paths=[watching_album_path])
+                else:
+                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos only")
+                    # Import to Apple Photos without any specific album
+                    self.transfer.transfer_file(new_path, album_paths=[])
                 
         except Exception as e:
             self.logger.error(f"Error processing file {file_path}: {e}")
