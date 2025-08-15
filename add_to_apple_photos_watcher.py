@@ -135,22 +135,15 @@ class ApplePhotosWatcherAdder:
                         creation_date = asset.creationDate()
                         media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
                         title = asset.valueForKey_('title')
-                        caption = asset.valueForKey_('accessibilityDescription')  # This is the caption/description
                         
-                        # Only add assets with titles or captions containing ':' (category format)
-                        has_category_title = title and ':' in title
-                        has_category_caption = caption and ':' in caption
-                        
-                        if has_category_title or has_category_caption:
+                        # Only add assets with titles containing ':' (category format)
+                        if title and ':' in title:
                             # Add asset to Watching album
                             success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
                             
                             if success:
                                 added_count += 1
-                                # Log which field had the category format
-                                category_source = "title" if has_category_title else "caption"
-                                category_text = title if has_category_title else caption
-                                logger.info(f"Added {media_type} {added_count} (category in {category_source}): '{category_text}' ({asset_id[:8]}...)")
+                                logger.info(f"Added {media_type} {added_count} (category in title): '{title}' ({asset_id[:8]}...)")
                                 
                                 # Pause after every 1000 successfully added photos
                                 if added_count % 1000 == 0:
