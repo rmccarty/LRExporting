@@ -118,6 +118,7 @@ class ApplePhotosWatcherAdder:
         total_assets = assets.count()
         added_count = 0
         error_count = 0
+        skipped_count = 0
         batch_count = 0
         
         logger.info(f"Starting to add {total_assets} assets to '{self.watching_album_name}' album...")
@@ -129,31 +130,45 @@ class ApplePhotosWatcherAdder:
                     asset = assets.objectAtIndex_(i)
                     
                     try:
-                        # Get asset info for logging
+                        # Get asset info for logging and filtering
                         asset_id = asset.localIdentifier()
                         creation_date = asset.creationDate()
                         media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
+                        title = asset.valueForKey_('title')
                         
-                        # Add asset to Watching album
-                        success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
-                        
-                        if success:
-                            added_count += 1
-                            logger.info(f"Added {media_type} {added_count}/{total_assets}: {asset_id[:8]}... (created: {creation_date})")
+                        # Only add assets with titles containing ':' (category format)
+                        if title and ':' in title:
+                            # Add asset to Watching album
+                            success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
+                            
+                            if success:
+                                added_count += 1
+                                logger.info(f"Added {media_type} {added_count}: '{title}' ({asset_id[:8]}...)")
+                                
+                                # Pause after every 1000 successfully added photos
+                                if added_count % 1000 == 0:
+                                    logger.info(f"Reached {added_count} added photos - pausing for 10 seconds...")
+                                    time.sleep(10)
+                            else:
+                                error_count += 1
+                                logger.warning(f"Failed to add asset {i+1}/{total_assets}: '{title}' ({asset_id[:8]}...)")
                         else:
-                            error_count += 1
-                            logger.warning(f"Failed to add asset {i+1}/{total_assets}: {asset_id[:8]}...")
+                            # Skip assets without category-format titles
+                            skipped_count += 1
+                            if skipped_count <= 10:  # Only log first 10 skips to avoid spam
+                                skip_reason = "no title" if not title else "no colon in title"
+                                logger.debug(f"Skipped {media_type} ({skip_reason}): '{title}' ({asset_id[:8]}...)")
+                            elif skipped_count == 11:
+                                logger.info(f"Skipping additional assets without category titles (will show total at end)...")
                     
                     except Exception as e:
                         error_count += 1
                         logger.error(f"Error processing asset {i+1}/{total_assets}: {e}")
                     
-                    # Pause after every batch_size assets
+                    # Log progress after every batch_size assets
                     if (added_count + error_count) % self.batch_size == 0:
                         batch_count += 1
-                        logger.info(f"Completed batch {batch_count} ({added_count} added, {error_count} errors)")
-                        logger.info(f"Pausing for {self.pause_duration} seconds...")
-                        time.sleep(self.pause_duration)
+                        logger.info(f"Completed batch {batch_count} ({added_count} added, {error_count} errors, {skipped_count} skipped)")
         
         except Exception as e:
             logger.error(f"Error during batch processing: {e}")
@@ -164,6 +179,7 @@ class ApplePhotosWatcherAdder:
         logger.info("BULK ADD COMPLETE")
         logger.info(f"Total assets processed: {total_assets}")
         logger.info(f"Successfully added: {added_count}")
+        logger.info(f"Skipped (no category title): {skipped_count}")
         logger.info(f"Errors: {error_count}")
         logger.info(f"Batches processed: {batch_count}")
         logger.info("=" * 60)
