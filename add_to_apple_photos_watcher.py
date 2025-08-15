@@ -14,6 +14,7 @@ This script:
 import sys
 import time
 import logging
+import argparse
 from pathlib import Path
 
 # Add the project root to Python path
@@ -35,13 +36,28 @@ logger = logging.getLogger(__name__)
 class ApplePhotosWatcherAdder:
     """Utility to add photos from Apple Photos library to the Watching album."""
     
-    def __init__(self):
+    def __init__(self, search_mode='both'):
+        """
+        Initialize the watcher adder.
+        
+        Args:
+            search_mode (str): Where to look for ':' - 'title', 'caption', or 'both'
+        """
         self.apple_photos = ApplePhotos()
         self.album_manager = AlbumManager()
         # Use album name from config (strip trailing slash and convert to string)
         self.watching_album_name = str(APPLE_PHOTOS_WATCHING).rstrip('/')
         self.batch_size = 100
         self.pause_duration = 5  # seconds
+        self.search_mode = search_mode
+        
+        logger.info(f"Initialized with search mode: {search_mode}")
+        if search_mode == 'title':
+            logger.info("Will look for ':' in titles only")
+        elif search_mode == 'caption':
+            logger.info("Will look for ':' in captions/descriptions only")
+        else:
+            logger.info("Will look for ':' in both titles and captions/descriptions")
         
     def find_or_create_watching_album(self):
         """Find or create the Watching album."""
@@ -116,7 +132,12 @@ class ApplePhotosWatcherAdder:
             return False
         
         total_assets = assets.count()
+        logger.info(f"Processing {total_assets} assets...")
+        
         added_count = 0
+        processed_count = 0
+        title_matches = 0
+        caption_matches = 0
         error_count = 0
         skipped_count = 0
         batch_count = 0
@@ -136,14 +157,72 @@ class ApplePhotosWatcherAdder:
                         media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
                         title = asset.valueForKey_('title')
                         
-                        # Only add assets with titles containing ':' (category format)
-                        if title and ':' in title:
+                        # Get caption/description based on search mode
+                        caption = None
+                        if self.search_mode in ['caption', 'both']:
+                            # Try multiple possible caption property keys
+                            caption_keys = ['accessibilityDescription', 'localizedDescription', 'description', 'caption', 'comment']
+                            for key in caption_keys:
+                                try:
+                                    caption_value = asset.valueForKey_(key)
+                                    if (caption_value and 
+                                        isinstance(caption_value, str) and 
+                                        len(caption_value.strip()) > 0 and
+                                        not caption_value.startswith('<PHAsset:')):  # Filter out PHAsset debug strings
+                                        caption = caption_value.strip()
+                                        logger.info(f"Found valid caption using key '{key}': '{caption}'")
+                                        break
+                                except Exception as e:
+                                    logger.debug(f"Key '{key}' not available: {e}")
+                                    continue
+                        
+                        # Debug logging - print title and caption for each asset (first 10 only to avoid spam)
+                        if processed_count < 10:
+                            logger.info(f"Asset {processed_count + 1}: title='{title}', caption='{caption}'")
+                        
+                        # If no valid caption found, log this fact for caption/both modes
+                        if self.search_mode in ['caption', 'both'] and not caption and processed_count < 5:
+                            logger.info(f"No valid caption found for asset {processed_count + 1} (tried keys: {caption_keys})")
+                        
+                        # Check for category format based on search mode
+                        has_category = False
+                        category_source = None
+                        category_text = None
+                        
+                        if self.search_mode == 'title':
+                            # Only check title
+                            if title and ':' in title:
+                                has_category = True
+                                category_source = "title"
+                                category_text = title
+                                title_matches += 1
+                        elif self.search_mode == 'caption':
+                            # Only check caption
+                            if caption and ':' in caption:
+                                has_category = True
+                                category_source = "caption"
+                                category_text = caption
+                                caption_matches += 1
+                        else:  # 'both'
+                            # Check both title and caption
+                            if title and ':' in title:
+                                has_category = True
+                                category_source = "title"
+                                category_text = title
+                                title_matches += 1
+                            elif caption and ':' in caption:
+                                has_category = True
+                                category_source = "caption"
+                                category_text = caption
+                                caption_matches += 1
+                        
+                        if has_category:
                             # Add asset to Watching album
                             success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
                             
                             if success:
                                 added_count += 1
-                                logger.info(f"Added {media_type} {added_count} (category in title): '{title}' ({asset_id[:8]}...)")
+                                logger.info(f"Added {media_type} {added_count} (category in {category_source}): '{category_text}' ({asset_id[:8]}...)")
                                 
                                 # Pause after every 1000 successfully added photos
                                 if added_count % 1000 == 0:
@@ -186,9 +265,21 @@ class ApplePhotosWatcherAdder:
         # Final summary
         logger.info("=" * 60)
         logger.info("BULK ADD COMPLETE")
+        logger.info(f"Search mode: {self.search_mode}")
         logger.info(f"Total assets processed: {total_assets}")
         logger.info(f"Successfully added: {added_count}")
-        logger.info(f"Skipped (no category title): {skipped_count}")
+        
+        # Show breakdown by source
+        if self.search_mode == 'title':
+            logger.info(f"  - Title matches: {title_matches}")
+        elif self.search_mode == 'caption':
+            logger.info(f"  - Caption matches: {caption_matches}")
+        else:  # 'both'
+            logger.info(f"  - Title matches: {title_matches}")
+            logger.info(f"  - Caption matches: {caption_matches}")
+            logger.info(f"  - Total matches: {title_matches + caption_matches}")
+        
+        logger.info(f"Skipped (no category format): {skipped_count}")
         logger.info(f"Errors: {error_count}")
         logger.info(f"Batches processed: {batch_count}")
         logger.info("=" * 60)
@@ -229,9 +320,32 @@ class ApplePhotosWatcherAdder:
 
 def main():
     """Main entry point with command line argument support."""
-    import argparse
+    parser = argparse.ArgumentParser(
+        description="Add Apple Photos library images to Watching album",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Search Mode Options:
+  title    - Look for ':' in titles only
+  caption  - Look for ':' in captions/descriptions only
+  both     - Look for ':' in both titles and captions (default)
+
+Examples:
+  python add_to_apple_photos_watcher.py                    # Search both title and caption
+  python add_to_apple_photos_watcher.py title              # Search title only
+  python add_to_apple_photos_watcher.py caption            # Search caption only
+  python add_to_apple_photos_watcher.py --max-assets 100   # Limit to 100 assets
+        """
+    )
     
-    parser = argparse.ArgumentParser(description="Add Apple Photos library images to Watching album")
+    # Positional argument for search mode
+    parser.add_argument(
+        "search_mode",
+        nargs='?',
+        choices=['title', 'caption', 'both'],
+        default='both',
+        help="Where to look for ':' - title, caption, or both (default: both)"
+    )
+    
     parser.add_argument(
         "--max-assets", 
         type=int, 
@@ -241,7 +355,7 @@ def main():
         "--batch-size",
         type=int,
         default=100,
-        help="Number of assets to process before pausing (default: 20)"
+        help="Number of assets to process before pausing (default: 100)"
     )
     parser.add_argument(
         "--pause-duration",
@@ -252,8 +366,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Create and configure the adder
-    adder = ApplePhotosWatcherAdder()
+    # Create and configure the adder with search mode
+    adder = ApplePhotosWatcherAdder(search_mode=args.search_mode)
     if args.batch_size:
         adder.batch_size = args.batch_size
     if args.pause_duration:
