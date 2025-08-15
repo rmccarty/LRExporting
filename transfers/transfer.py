@@ -447,7 +447,7 @@ class Transfer:
             self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
-    def _get_category_based_album_paths(self, title: str, keywords: list[str] = None) -> list[str]:
+    def _get_category_based_album_paths(self, title: str) -> list[str]:
         """
         Parse photo title for category-based album paths.
         If title has format "Category: Details", dynamically create album path
@@ -455,22 +455,13 @@ class Transfer:
         
         Args:
             title: Photo title to parse
-            keywords: Optional list of keywords to avoid duplication with keyword-based paths
             
         Returns:
             list[str]: List of album paths derived from title category
         """
         if not title:
+            self.logger.info("No title provided - no album placement")
             return []
-        
-        # Skip title-based processing if the title is already being used as a keyword
-        # This prevents duplicate albums when both title and keyword contain the same text
-        if keywords and title in keywords:
-            self.logger.info(f"Skipping title processing for '{title}' as it's already a keyword")
-            return []
-            
-        # Allowing both title-based and keyword-based album paths to co-exist
-        # No skip logic here - both paths will be created as needed
         
         # Check for "Category: Details" format (single colon followed by space)
         if ":" in title and title.count(":") == 1 and ": " in title:
@@ -483,6 +474,8 @@ class Transfer:
                 album_path = f"{CATEGORY_PREFIX}/{category}/{title}"
                 self.logger.info(f"Created dynamic category-based album path: {album_path}")
                 return [album_path]
+        else:
+            self.logger.info(f"Title '{title}' does not match 'Category: Details' format - no album placement")
                 
         return []
     
@@ -641,16 +634,15 @@ class Transfer:
             return False
     
     def _extract_metadata_from_asset(self, asset) -> dict:
-        """Extract metadata from Apple Photos asset for album placement."""
+        """Extract title metadata from Apple Photos asset for album placement."""
         try:
             with autorelease_pool():
+                title = asset.valueForKey_('title')
                 metadata = {
-                    'title': asset.valueForKey_('title'),
-                    'keywords': self._get_asset_keywords(asset),
-                    'city': self._get_asset_city(asset),
-                    'date': asset.creationDate(),
+                    'title': title,
                     'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video'
                 }
+                self.logger.info(f"Extracted title: '{title}' from asset")
                 return metadata
         except Exception as e:
             self.logger.error(f"Error extracting metadata from asset: {e}")
@@ -903,38 +895,21 @@ class Transfer:
             return None
     
     def _get_album_paths_for_asset_metadata(self, metadata: dict) -> list[str]:
-        """Apply existing album placement logic to Apple Photos asset metadata."""
+        """Apply title/category-based album placement logic to Apple Photos asset metadata."""
         album_paths = []
         
         try:
-            # Apply keyword-based rules (when keywords become available)
-            if metadata.get('keywords'):
-                keyword_paths = self._get_album_paths_from_keywords(
-                    metadata['keywords'], metadata.get('title')
-                )
-                album_paths.extend(keyword_paths)
-                
-                # Also check for category-based keywords (e.g., "Party: Bday 1924")
-                category_keyword_paths = self._get_category_paths_from_keywords(
-                    metadata['keywords']
-                )
-                album_paths.extend(category_keyword_paths)
-            
-            # Apply city-based rules
-            if metadata.get('city'):
-                city_paths = self._get_album_paths_for_city(
-                    metadata['city'], metadata.get('title')
-                )
-                album_paths.extend(city_paths)
-            
-            # Apply title-based rules (handles "Category: Details" format)
+            # Apply ONLY title-based rules (handles "Category: Details" format)
             if metadata.get('title'):
                 title_paths = self._get_category_based_album_paths(
-                    metadata['title'], metadata.get('keywords', [])
+                    metadata['title']
                 )
                 album_paths.extend(title_paths)
+                self.logger.info(f"Title-based album paths: {title_paths}")
+            else:
+                self.logger.info("No title found - no album placement")
             
-            # Remove duplicates while preserving order
+            # Remove duplicates while preserving order (though should only be one path now)
             return list(dict.fromkeys(album_paths))
             
         except Exception as e:

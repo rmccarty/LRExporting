@@ -364,12 +364,19 @@ class AlbumManager:
                     if title == top_folder_name:
                         current_folder = folder
                         break
-                
+            
                 if not current_folder:
-                    self.logger.error(f"Could not find top-level folder: {top_folder_name}")
-                    return False, None
-                
-                current_id = current_folder.localIdentifier()
+                    self.logger.info(f"Top-level folder '{top_folder_name}' not found, creating it...")
+                    # Create the top-level folder
+                    success, folder_id = self._create_folder(top_folder_name, None)
+                    if not success:
+                        self.logger.error(f"Failed to create top-level folder: {top_folder_name}")
+                        return False, None
+                    current_id = folder_id
+                    self.logger.info(f"Created top-level folder: {top_folder_name} (ID: {current_id})")
+                else:
+                    current_id = current_folder.localIdentifier()
+            
                 current_path = [top_folder_name]
                 self.logger.debug(f"Starting folder path creation in {top_folder_name} folder (ID: {current_id})")
                 
