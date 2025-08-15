@@ -72,29 +72,23 @@ class DirectoryWatcher(BaseWatcher):
             if ENABLE_APPLE_PHOTOS and any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 self.logger.info(f"Found file in Apple Photos directory: {file_path}")
                 
-                # Extract title and caption to check for category format
+                # Extract title to check for category format
                 title = None
-                caption = None
                 if file_path.suffix.lower() in ['.jpg', '.jpeg']:
                     processor = JPEGExifProcessor(str(file_path))
-                    _, title, _, caption, _, _ = processor.get_metadata_components()
-                    self.logger.info(f"Extracted title: '{title}', caption: '{caption}'")
+                    _, title, _, _, _, _ = processor.get_metadata_components()
+                    self.logger.info(f"Extracted title: '{title}'")
                 else:
                     self.logger.info("Video file - no metadata extraction in this flow")
                 
-                # Check if title or caption has category format (contains colon) for Watching album
-                has_category_title = title and ':' in title
-                has_category_caption = caption and ':' in caption
-                
-                if has_category_title or has_category_caption:
-                    category_source = "title" if has_category_title else "caption"
-                    category_text = title if has_category_title else caption
-                    self.logger.info(f"Category format found in {category_source}: '{category_text}' - importing to Apple Photos and adding to Watching album")
+                # Check if title has category format (contains colon) for Watching album
+                if title and ':' in title:
+                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos and adding to Watching album")
                     # Import to Apple Photos with Watching album for further processing
                     watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
                     self.transfer.transfer_file(file_path, album_paths=[watching_album_path])
                 else:
-                    self.logger.info(f"No category format found (title: '{title}', caption: '{caption}') - importing to Apple Photos only")
+                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos only")
                     # Import to Apple Photos without any specific album
                     self.transfer.transfer_file(file_path, album_paths=[])
                 return
@@ -114,33 +108,27 @@ class DirectoryWatcher(BaseWatcher):
                 new_path = processor.process_image()
                 self.logger.info(f"Image processed successfully: {new_path}")
                 
-                # Extract title and caption to check for category format
+                # Extract title to check for category format
                 post_processor = JPEGExifProcessor(str(new_path))
-                _, title, _, caption, _, _ = post_processor.get_metadata_components()
-                self.logger.info(f"Extracted title: '{title}', caption: '{caption}'")
+                _, title, _, _, _, _ = post_processor.get_metadata_components()
+                self.logger.info(f"Extracted title: '{title}'")
                 
             else:
                 # For videos, just transfer without processing
                 new_path = file_path
                 title = None
-                caption = None  # Videos don't have extracted metadata in this flow
                 self.logger.info("Video file - no metadata extraction in this flow")
                 
             # Transfer to Apple Photos
             if new_path:
-                # Check if title or caption has category format (contains colon) for Watching album
-                has_category_title = title and ':' in title
-                has_category_caption = caption and ':' in caption
-                
-                if has_category_title or has_category_caption:
-                    category_source = "title" if has_category_title else "caption"
-                    category_text = title if has_category_title else caption
-                    self.logger.info(f"Category format found in {category_source}: '{category_text}' - importing to Apple Photos and adding to Watching album")
+                # Check if title has category format (contains colon) for Watching album
+                if title and ':' in title:
+                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos and adding to Watching album")
                     # Import to Apple Photos with Watching album for further processing
                     watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
                     self.transfer.transfer_file(new_path, album_paths=[watching_album_path])
                 else:
-                    self.logger.info(f"No category format found (title: '{title}', caption: '{caption}') - importing to Apple Photos only")
+                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos only")
                     # Import to Apple Photos without any specific album
                     self.transfer.transfer_file(new_path, album_paths=[])
                 
