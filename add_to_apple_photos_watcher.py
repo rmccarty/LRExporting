@@ -16,9 +16,60 @@ import time
 import logging
 import argparse
 from pathlib import Path
+import yaml
 
 # Add the project root to Python path
 sys.path.append(str(Path(__file__).parent))
+
+def load_config():
+    """Load configuration from YAML file."""
+    config_path = Path(__file__).parent / "add_to_apple_photos_watcher_config.yaml"
+    
+    # Default configuration
+    default_config = {
+        'display': {
+            'print_titles': True,
+            'print_captions': True,
+            'print_titles_if_category': False,
+            'print_captions_if_category': False
+        },
+        'processing': {
+            'batch_size': 1000,
+            'max_assets': 0,
+            'pause_duration': 10
+        },
+        'category_detection': {
+            'check_titles': True,
+            'check_captions': True
+        },
+        'debug': {
+            'show_category_debug': True,
+            'progress_interval': 50,
+            'show_batch_summaries': True
+        }
+    }
+    
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+                # Merge with defaults to ensure all keys exist
+                for section in default_config:
+                    if section not in config:
+                        config[section] = default_config[section]
+                    else:
+                        for key in default_config[section]:
+                            if key not in config[section]:
+                                config[section][key] = default_config[section][key]
+                return config
+        except Exception as e:
+            print(f"Error loading config file: {e}")
+            print("Using default configuration")
+    else:
+        print(f"Config file not found at {config_path}")
+        print("Using default configuration")
+    
+    return default_config
 
 from apple_photos_sdk import ApplePhotos
 from apple_photos_sdk.album import AlbumManager
@@ -37,21 +88,27 @@ logger = logging.getLogger(__name__)
 class ApplePhotosWatcherAdder:
     """Utility to add photos from Apple Photos library to the Watching album."""
     
-    def __init__(self, search_mode='title', batch_size=20, pause_duration=5):
+    def __init__(self, search_mode='title', batch_size=None, pause_duration=None):
         """Initialize the Apple Photos Watcher Adder.
         
         Args:
             search_mode: 'title' (recommended), 'caption', or 'both' - where to look for category format
-            batch_size: Number of assets to process before pausing
-            pause_duration: Seconds to pause between batches
+            batch_size: Number of assets to process before pausing (None = use config)
+            pause_duration: Seconds to pause between batches (None = use config)
         """
+        # Load configuration
+        self.config = load_config()
+        
+        # Debug: Print config loading status
+        print(f"DEBUG: Config loaded - photokit logging: {self.config['debug']['log_photokit_extraction']}")
+        
+        self.search_mode = search_mode
+        self.batch_size = batch_size or self.config['processing']['batch_size']
+        self.pause_duration = pause_duration or self.config['processing']['pause_duration']
+        
         self.apple_photos = ApplePhotos()
         self.album_manager = AlbumManager()
-        # Use album name from config (strip trailing slash and convert to string)
         self.watching_album_name = str(APPLE_PHOTOS_WATCHING).rstrip('/')
-        self.batch_size = batch_size
-        self.pause_duration = pause_duration  # seconds
-        self.search_mode = search_mode
         
         logger.info(f"Initialized with search mode: {search_mode}")
         if search_mode == 'title':
@@ -224,32 +281,100 @@ class ApplePhotosWatcherAdder:
                         media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
                         title = asset.valueForKey_('title')
                         
-                        # Only print debug info for titles with colons
-                        if title and ':' in title:
-                            print(f"DEBUG: Processing {media_type} {i+1}/{total_assets} - Title: '{title}'")
+                        # Print title with color coding (if enabled in config)
+                        if self.config['display']['print_titles']:
+                            if title:  # Title exists
+                                if ':' in title:
+                                    # Green for titles with colon (category format)
+                                    print(f"\033[92mTitle: '{title}'\033[0m")
+                                else:
+                                    # Red for titles without colon (no category format)
+                                    print(f"\033[91mTitle: '{title}'\033[0m")
+                            else:
+                                # Orange for blank/None titles
+                                print(f"\033[93mTitle: None\033[0m")
                         
-                        # Get caption (placeholder for now - will be None)
-                        caption = None  # TODO: Implement actual caption extraction
+                        # Get caption using RhetTbull photokit
+                        caption = None
+                        if self.config['debug']['log_photokit_extraction']:
+                            logger.debug(f"Starting photokit caption extraction for asset {i+1}")
                         
-                        # Category detection: Title first, then caption fallback
+                        try:
+                            # Try to extract caption/description using photokit
+                            asset_id = asset.localIdentifier()
+                            if self.config['debug']['log_photokit_extraction']:
+                                logger.debug(f"Asset ID: {asset_id}")
+                            
+                            # Create PhotoAsset using photokit library
+                            photo_asset = photokit.PhotoAsset(asset)
+                            if self.config['debug']['log_photokit_extraction']:
+                                logger.debug(f"PhotoAsset created successfully")
+                            
+                            # Try different caption/description fields
+                            if hasattr(photo_asset, 'description') and photo_asset.description:
+                                caption = photo_asset.description.strip()
+                                if self.config['debug']['log_photokit_extraction']:
+                                    logger.debug(f"Found description: '{caption}'")
+                            elif hasattr(photo_asset, 'caption') and photo_asset.caption:
+                                caption = photo_asset.caption.strip()
+                                if self.config['debug']['log_photokit_extraction']:
+                                    logger.debug(f"Found caption: '{caption}'")
+                            elif hasattr(photo_asset, 'comment') and photo_asset.comment:
+                                caption = photo_asset.comment.strip()
+                                if self.config['debug']['log_photokit_extraction']:
+                                    logger.debug(f"Found comment: '{caption}'")
+                            else:
+                                if self.config['debug']['log_photokit_extraction']:
+                                    logger.debug("No caption/description/comment found")
+                                
+                        except Exception as e:
+                            # Handle caption extraction errors with detailed logging
+                            caption = None
+                            if self.config['debug']['log_photokit_extraction']:
+                                logger.debug(f"PhotoKit extraction error: {type(e).__name__}: {e}")
+                                if "PhotoKitAuthError" in str(e):
+                                    logger.debug("PhotoKit permission issue - caption extraction disabled")
+                                elif "PhotoAsset" in str(e):
+                                    logger.debug("PhotoAsset creation failed - likely permission or API issue")
+                                else:
+                                    logger.debug(f"Unexpected photokit error: {e}")
+                        
+                        # Print caption with color coding (if enabled in config) - ALWAYS execute this
+                        if self.config['display']['print_captions']:
+                            if caption:
+                                if ':' in caption:
+                                    # Green for captions with colon (category format)
+                                    print(f"\033[92mCaption: '{caption}'\033[0m")
+                                else:
+                                    # White for captions without colon
+                                    print(f"Caption: '{caption}'")
+                            else:
+                                # Orange for blank/None captions
+                                print(f"\033[93mCaption: None\033[0m")
+                        
+                        # Category detection: Check both title and caption independently
                         has_category = False
                         category_source = None
                         category_text = None
                         
-                        if title and ':' in title:
-                            # Primary: Title has category format
+                        # Check title for category format
+                        has_title_category = title and ':' in title
+                        has_caption_category = caption and ':' in caption
+                        
+                        if has_title_category or has_caption_category:
                             has_category = True
-                            category_source = "title"
-                            category_text = title
-                            title_matches += 1
-                            print(f"DEBUG: Asset {i+1}: Category in TITLE: '{title}'")
-                        elif caption and ':' in caption:
-                            # Fallback: Caption has category format
-                            has_category = True
-                            category_source = "caption"
-                            category_text = caption
-                            caption_matches += 1
-                            print(f"DEBUG: Asset {i+1}: Category in CAPTION: '{caption}'")
+                            
+                            # Prefer title if both have categories, otherwise use whichever has it
+                            if has_title_category:
+                                category_source = "title"
+                                category_text = title
+                                title_matches += 1
+                                print(f"DEBUG: Asset {i+1}: Category in TITLE: '{title}'")
+                            else:
+                                category_source = "caption"
+                                category_text = caption
+                                caption_matches += 1
+                                print(f"DEBUG: Asset {i+1}: Category in CAPTION: '{caption}'")
                         
                         # Show debug for any asset with category format
                         if has_category:
@@ -355,6 +480,8 @@ class ApplePhotosWatcherAdder:
                 batch_skipped = 0
                 batch_title_added = 0
                 batch_caption_added = 0
+                batch_title_matches = 0
+                batch_caption_matches = 0
                 
                 for asset_index, asset in batch_assets:
                     try:
@@ -363,29 +490,200 @@ class ApplePhotosWatcherAdder:
                             media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
                             title = asset.valueForKey_('title')
                             
-                            # Get caption (placeholder for now - will be None)
-                            caption = None  # TODO: Implement actual caption extraction
+                            # Print title with color coding (if enabled in config)
+                            should_print_title = False
+                            if self.config['display']['print_titles']:
+                                should_print_title = True
+                            elif self.config['display']['print_titles_if_category'] and title and ':' in title:
+                                should_print_title = True
                             
-                            # Category detection: Title first, then caption fallback
+                            if should_print_title:
+                                if title:  # Title exists
+                                    if ':' in title:
+                                        # Green for titles with colon (category format)
+                                        print(f"\033[92mTitle: '{title}'\033[0m")
+                                    else:
+                                        # Red for titles without colon (no category format)
+                                        print(f"\033[91mTitle: '{title}'\033[0m")
+                                else:
+                                    # Orange for blank/None titles
+                                    print(f"\033[93mTitle: None\033[0m")
+                            
+                            # Get caption using RhetTbull photokit
+                            caption = None
+                            if self.config['debug']['log_photokit_extraction']:
+                                print(f"DEBUG: Starting photokit caption extraction for batch {batch_number}, asset {asset_index+1}")
+                                logger.debug(f"Starting photokit caption extraction for batch {batch_number}, asset {asset_index+1}")
+                            
+                            try:
+                                # Try to extract caption/description using photokit
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 1 - Getting asset ID")
+                                asset_id = asset.localIdentifier()
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 2 - Asset ID: {asset_id}")
+                                
+                                # Check if photokit module is available
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 3 - Checking photokit module: {photokit}")
+                                    print(f"DEBUG: Step 4 - PhotoAsset class: {photokit.PhotoAsset}")
+                                
+                                # Use photokit PhotoLibrary to fetch photo by UUID
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 5 - Using PhotoLibrary.fetch_uuid() approach")
+                                
+                                # Get PhotoLibrary and inspect available methods
+                                photo_library = photokit.PhotoLibrary()
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 5a - PhotoLibrary created: {photo_library}")
+                                    # Check available methods on PhotoLibrary
+                                    methods = [method for method in dir(photo_library) if not method.startswith('_')]
+                                    print(f"DEBUG: Step 5a2 - PhotoLibrary available methods: {methods}")
+                                
+                                # Extract UUID from asset_id (remove /L0/001 suffix)
+                                uuid = asset_id.split('/')[0]
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 5b - Looking for UUID: {uuid}")
+                                
+                                # Try different methods to get photo by UUID
+                                photo_asset = None
+                                methods_to_try = [
+                                    ('fetch_uuid', lambda: photo_library.fetch_uuid(uuid)),
+                                    ('get_photo', lambda: photo_library.get_photo(uuid)),
+                                    ('photo', lambda: photo_library.photo(uuid)),
+                                    ('asset', lambda: photo_library.asset(uuid)),
+                                    ('get_asset', lambda: photo_library.get_asset(uuid)),
+                                    ('fetch_asset', lambda: photo_library.fetch_asset(uuid)),
+                                ]
+                                
+                                for method_name, method_call in methods_to_try:
+                                    if hasattr(photo_library, method_name):
+                                        try:
+                                            if self.config['debug']['log_photokit_extraction']:
+                                                print(f"DEBUG: Step 5c - Trying method: {method_name}")
+                                            photo_asset = method_call()
+                                            if photo_asset:
+                                                if self.config['debug']['log_photokit_extraction']:
+                                                    print(f"DEBUG: Step 5d - Success with {method_name}: {photo_asset}")
+                                                break
+                                        except Exception as e:
+                                            if self.config['debug']['log_photokit_extraction']:
+                                                print(f"DEBUG: Step 5e - Method {method_name} failed: {e}")
+                                            continue
+                                
+                                if photo_asset is None:
+                                    if self.config['debug']['log_photokit_extraction']:
+                                        print(f"DEBUG: Step 5f - No working method found for UUID: {uuid}")
+                                    raise Exception(f"No photo found with UUID: {uuid} - tried all available methods")
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 6 - PhotoAsset created successfully: {photo_asset}")
+                                    print(f"DEBUG: Step 7 - PhotoAsset type: {type(photo_asset)}")
+                                
+                                # Check available attributes
+                                if self.config['debug']['log_photokit_extraction']:
+                                    attrs = [attr for attr in dir(photo_asset) if not attr.startswith('_')]
+                                    print(f"DEBUG: Step 8 - PhotoAsset attributes: {attrs[:10]}...")  # Show first 10
+                                
+                                # Try different caption/description fields
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: Step 9 - Checking for description attribute")
+                                if hasattr(photo_asset, 'description'):
+                                    if self.config['debug']['log_photokit_extraction']:
+                                        print(f"DEBUG: Step 10 - Has description attribute: {photo_asset.description}")
+                                    if photo_asset.description:
+                                        caption = photo_asset.description.strip()
+                                        if self.config['debug']['log_photokit_extraction']:
+                                            print(f"DEBUG: Step 11 - Found description: '{caption}'")
+                                elif hasattr(photo_asset, 'caption'):
+                                    if self.config['debug']['log_photokit_extraction']:
+                                        print(f"DEBUG: Step 12 - Has caption attribute: {photo_asset.caption}")
+                                    if photo_asset.caption:
+                                        caption = photo_asset.caption.strip()
+                                        if self.config['debug']['log_photokit_extraction']:
+                                            print(f"DEBUG: Step 13 - Found caption: '{caption}'")
+                                elif hasattr(photo_asset, 'comment'):
+                                    if self.config['debug']['log_photokit_extraction']:
+                                        print(f"DEBUG: Step 14 - Has comment attribute: {photo_asset.comment}")
+                                    if photo_asset.comment:
+                                        caption = photo_asset.comment.strip()
+                                        if self.config['debug']['log_photokit_extraction']:
+                                            print(f"DEBUG: Step 15 - Found comment: '{caption}'")
+                                else:
+                                    if self.config['debug']['log_photokit_extraction']:
+                                        print("DEBUG: Step 16 - No caption/description/comment attributes found")
+                                    
+                            except Exception as e:
+                                # Handle caption extraction errors with detailed logging
+                                caption = None
+                                if self.config['debug']['log_photokit_extraction']:
+                                    print(f"DEBUG: EXCEPTION - PhotoKit extraction error at step: {type(e).__name__}: {e}")
+                                    print(f"DEBUG: EXCEPTION - Full error details: {repr(e)}")
+                                    import traceback
+                                    print(f"DEBUG: EXCEPTION - Traceback: {traceback.format_exc()}")
+                                    if "PhotoKitAuthError" in str(e):
+                                        print("DEBUG: EXCEPTION - PhotoKit permission issue - caption extraction disabled")
+                                    elif "PhotoAsset" in str(e):
+                                        print("DEBUG: EXCEPTION - PhotoAsset creation failed - likely permission or API issue")
+                                    elif "ModuleNotFoundError" in str(e):
+                                        print("DEBUG: EXCEPTION - Photokit module not found or not installed")
+                                    else:
+                                        print(f"DEBUG: EXCEPTION - Unexpected photokit error: {e}")
+                            
+                            # Print caption with color coding (if enabled in config)
+                            should_print_caption = False
+                            if self.config['display']['print_captions']:
+                                should_print_caption = True
+                            elif self.config['display']['print_captions_if_category'] and caption and ':' in caption:
+                                should_print_caption = True
+                            
+                            if should_print_caption:
+                                if caption:
+                                    if ':' in caption:
+                                        # Green for captions with colon (category format)
+                                        print(f"\033[92mCaption: '{caption}'\033[0m")
+                                    else:
+                                        # White for captions without colon
+                                        print(f"Caption: '{caption}'")
+                                else:
+                                    # Orange for blank/None captions
+                                    print(f"\033[93mCaption: None\033[0m")
+                            
+                            # Category detection: Check title and caption based on config
                             has_category = False
                             category_source = None
                             category_text = None
                             
-                            if title and ':' in title:
-                                # Primary: Title has category format
+                            # Check title for category format (if enabled in config)
+                            has_title_category = False
+                            if self.config['category_detection']['check_titles']:
+                                has_title_category = title and ':' in title
+                            
+                            # Check caption for category format (if enabled in config)
+                            has_caption_category = False
+                            if self.config['category_detection']['check_captions']:
+                                has_caption_category = caption and ':' in caption
+                            
+                            if has_title_category or has_caption_category:
                                 has_category = True
-                                category_source = "title"
-                                category_text = title
-                                total_title_matches += 1
-                                if title and ':' in title:
+                                
+                                # Count both title and caption matches independently
+                                if has_title_category:
+                                    total_title_matches += 1
+                                    batch_title_matches += 1
                                     print(f"DEBUG: Asset {asset_index+1}: Category in TITLE: '{title}'")
-                            elif caption and ':' in caption:
-                                # Fallback: Caption has category format
-                                has_category = True
-                                category_source = "caption"
-                                category_text = caption
-                                total_caption_matches += 1
-                                print(f"DEBUG: Asset {asset_index+1}: Category in CAPTION: '{caption}'")
+                                
+                                if has_caption_category:
+                                    total_caption_matches += 1
+                                    batch_caption_matches += 1
+                                    print(f"DEBUG: Asset {asset_index+1}: Category in CAPTION: '{caption}'")
+                                
+                                # Determine primary source for album placement (prefer title if both)
+                                if has_title_category:
+                                    category_source = "title"
+                                    category_text = title
+                                else:
+                                    category_source = "caption"
+                                    category_text = caption
                             
                             if has_category:
                                 # Add asset to Watching album
@@ -405,6 +703,10 @@ class ApplePhotosWatcherAdder:
                                         batch_caption_added += 1
                                     
                                     logger.info(f"Added {media_type} {total_added} ({category_source}): '{category_text}' ({asset_id[:8]}...)")
+                                    
+                                    # Show running totals every 50 additions for progress tracking
+                                    if total_added % 50 == 0:
+                                        logger.info(f"Progress: {total_added} total added (Title: {total_title_added}, Caption: {total_caption_added})")
                                     
                                     # Pause after every 1000 successfully added photos
                                     if total_added % 1000 == 0:
@@ -428,9 +730,9 @@ class ApplePhotosWatcherAdder:
                 
                 # Batch summary with running totals
                 logger.info(f"Batch {batch_number} complete: {batch_added} added, {batch_errors} errors, {batch_skipped} skipped")
-                logger.info(f"Running totals: {total_added} total added (Title: {total_title_added}, Caption: {total_caption_added}), {total_errors} errors, {total_skipped} skipped")
-                print(f"DEBUG: Batch {batch_number} - Added: {batch_added} (Title: {batch_title_added}, Caption: {batch_caption_added})")
-                print(f"DEBUG: Running totals - Added: {total_added} (Title: {total_title_added}, Caption: {total_caption_added}), Errors: {total_errors}, Skipped: {total_skipped}")
+                logger.info(f"Running totals: {total_added} total added (Title matches: {total_title_matches}, Caption matches: {total_caption_matches}), {total_errors} errors, {total_skipped} skipped")
+                print(f"DEBUG: Batch {batch_number} - Added: {batch_added} (Title matches: {batch_title_matches}, Caption matches: {batch_caption_matches})")
+                print(f"DEBUG: Running totals - Added: {total_added} (Title matches: {total_title_matches}, Caption matches: {total_caption_matches}), Errors: {total_errors}, Skipped: {total_skipped}")
                 
                 # Pause between batches
                 if batch_number % 10 == 0:  # Pause every 10 batches
