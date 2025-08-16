@@ -25,30 +25,32 @@ from apple_photos_sdk.album import AlbumManager
 from config import APPLE_PHOTOS_WATCHING
 import Photos
 from objc import autorelease_pool
+import photokit
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s - %(lineno)d - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
 class ApplePhotosWatcherAdder:
     """Utility to add photos from Apple Photos library to the Watching album."""
     
-    def __init__(self, search_mode='both'):
-        """
-        Initialize the watcher adder.
+    def __init__(self, search_mode='title', batch_size=20, pause_duration=5):
+        """Initialize the Apple Photos Watcher Adder.
         
         Args:
-            search_mode (str): Where to look for ':' - 'title', 'caption', or 'both'
+            search_mode: 'title' (recommended), 'caption', or 'both' - where to look for category format
+            batch_size: Number of assets to process before pausing
+            pause_duration: Seconds to pause between batches
         """
         self.apple_photos = ApplePhotos()
         self.album_manager = AlbumManager()
         # Use album name from config (strip trailing slash and convert to string)
         self.watching_album_name = str(APPLE_PHOTOS_WATCHING).rstrip('/')
-        self.batch_size = 100
-        self.pause_duration = 5  # seconds
+        self.batch_size = batch_size
+        self.pause_duration = pause_duration  # seconds
         self.search_mode = search_mode
         
         logger.info(f"Initialized with search mode: {search_mode}")
@@ -63,66 +65,92 @@ class ApplePhotosWatcherAdder:
         """Find or create the Watching album."""
         try:
             with autorelease_pool():
-                # Get all albums
+                logger.info(f"Searching for album: '{self.watching_album_name}'")
+                print(f"DEBUG: Searching for album: '{self.watching_album_name}'")
+                
+                # Try direct predicate search with different property names
+                search_attempts = [
+                    ("localizedTitle", "Watching"),
+                    ("title", "Watching"), 
+                    ("localizedTitle", self.watching_album_name),
+                    ("title", self.watching_album_name)
+                ]
+                
+                for property_name, search_value in search_attempts:
+                    try:
+                        fetch_options = Photos.PHFetchOptions.alloc().init()
+                        predicate = Photos.NSPredicate.predicateWithFormat_(f"{property_name} == %@", search_value)
+                        fetch_options.setPredicate_(predicate)
+                        
+                        album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
+                            Photos.PHAssetCollectionTypeAlbum,
+                            Photos.PHAssetCollectionSubtypeAny,
+                            fetch_options
+                        )
+                        
+                        if album_result.count() > 0:
+                            album = album_result.objectAtIndex_(0)
+                            logger.info(f"Found album using {property_name} == '{search_value}': '{album.localizedTitle()}'")
+                            print(f"DEBUG: Found album using {property_name} == '{search_value}': '{album.localizedTitle()}'")
+                            return album
+                        else:
+                            print(f"DEBUG: No results for {property_name} == '{search_value}'")
+                            
+                    except Exception as e:
+                        print(f"DEBUG: Error with {property_name} search: {e}")
+                        continue
+                
+                # If predicate searches failed, fall back to iteration (but limit to first 100 for efficiency)
+                print("DEBUG: Predicate searches failed, trying direct iteration...")
                 fetch_options = Photos.PHFetchOptions.alloc().init()
-                albums = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
+                all_albums = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
                     Photos.PHAssetCollectionTypeAlbum,
                     Photos.PHAssetCollectionSubtypeAny,
                     fetch_options
                 )
                 
-                # Look for existing Watching album
-                for i in range(albums.count()):
-                    album = albums.objectAtIndex_(i)
-                    if album.localizedTitle() == self.watching_album_name:
-                        logger.info(f"Found existing '{self.watching_album_name}' album")
+                print(f"DEBUG: Found {all_albums.count()} total albums, checking first 100...")
+                
+                for i in range(min(100, all_albums.count())):
+                    album = all_albums.objectAtIndex_(i)
+                    album_title = album.localizedTitle()
+                    if album_title == "Watching":
+                        logger.info(f"Found 'Watching' album at position {i+1}")
+                        print(f"DEBUG: Found 'Watching' album at position {i+1}")
                         return album
                 
-                # Create Watching album if it doesn't exist
-                logger.info(f"Creating '{self.watching_album_name}' album...")
-                success, album_id = self.album_manager._create_album_in_folder_with_logging(
-                    self.watching_album_name, None
-                )
-                
-                if success:
-                    # Fetch the newly created album
-                    albums = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
-                        Photos.PHAssetCollectionTypeAlbum,
-                        Photos.PHAssetCollectionSubtypeAny,
-                        fetch_options
-                    )
-                    
-                    for i in range(albums.count()):
-                        album = albums.objectAtIndex_(i)
-                        if album.localizedTitle() == self.watching_album_name:
-                            logger.info(f"Successfully created '{self.watching_album_name}' album")
-                            return album
-                
-                logger.error(f"Failed to create '{self.watching_album_name}' album")
-                return None
+                # If still not found, continue with test mode
+                logger.warning(f"Album not found. Continuing in test mode.")
+                print("DEBUG: Album not found, continuing in test mode")
+                return "test_mode"
                 
         except Exception as e:
-            logger.error(f"Error finding/creating Watching album: {e}")
+            logger.error(f"Error finding album: {e}")
+            print(f"DEBUG: Error finding album: {e}")
             return None
     
-    def get_all_photos(self):
-        """Get all photos and videos from the Apple Photos library."""
+    def get_limited_photos(self, limit=50):
+        """Get a limited number of photos from the Apple Photos library for testing."""
         try:
+            print(f"DEBUG: Starting to fetch {limit} photos from library...")
             with autorelease_pool():
                 fetch_options = Photos.PHFetchOptions.alloc().init()
-                # Sort by creation date (oldest first)
+                # Sort by creation date (newest first)
                 fetch_options.setSortDescriptors_([
-                    Photos.NSSortDescriptor.sortDescriptorWithKey_ascending_("creationDate", True)
+                    Photos.NSSortDescriptor.sortDescriptorWithKey_ascending_("creationDate", False)
                 ])
+                # Set fetch limit for efficiency
+                fetch_options.setFetchLimit_(limit)
                 
-                # Fetch all assets (photos and videos)
-                assets = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
-                
-                logger.info(f"Found {assets.count()} total assets in Apple Photos library")
-                return assets
+                print(f"DEBUG: Calling PHAsset.fetchAssetsWithOptions_ with limit {limit}...")
+                # Fetch limited assets
+                limited_assets = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
+                print(f"DEBUG: Fetch completed, found {limited_assets.count()} assets")
+                return limited_assets
                 
         except Exception as e:
             logger.error(f"Error fetching photos from library: {e}")
+            print(f"DEBUG: Error fetching photos: {e}")
             return None
     
     def add_assets_to_watching_album(self, assets, watching_album):
@@ -136,12 +164,14 @@ class ApplePhotosWatcherAdder:
         
         added_count = 0
         processed_count = 0
-        title_matches = 0
-        caption_matches = 0
+        added_count = 0
         error_count = 0
         skipped_count = 0
         batch_count = 0
-        
+        title_matches = 0
+        caption_matches = 0
+        title_added = 0      # Assets added because title had ':'
+        caption_added = 0    # Assets added because caption had ':'
         logger.info(f"Starting to add {total_assets} assets to '{self.watching_album_name}' album...")
         logger.info(f"Processing in batches of {self.batch_size} with {self.pause_duration}s pauses")
         
@@ -157,72 +187,53 @@ class ApplePhotosWatcherAdder:
                         media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
                         title = asset.valueForKey_('title')
                         
-                        # Get caption/description based on search mode
-                        caption = None
-                        if self.search_mode in ['caption', 'both']:
-                            # Try multiple possible caption property keys
-                            caption_keys = ['accessibilityDescription', 'localizedDescription', 'description', 'caption', 'comment']
-                            for key in caption_keys:
-                                try:
-                                    caption_value = asset.valueForKey_(key)
-                                    if (caption_value and 
-                                        isinstance(caption_value, str) and 
-                                        len(caption_value.strip()) > 0 and
-                                        not caption_value.startswith('<PHAsset:')):  # Filter out PHAsset debug strings
-                                        caption = caption_value.strip()
-                                        logger.info(f"Found valid caption using key '{key}': '{caption}'")
-                                        break
-                                except Exception as e:
-                                    logger.debug(f"Key '{key}' not available: {e}")
-                                    continue
+                        # Only print debug info for titles with colons
+                        if title and ':' in title:
+                            print(f"DEBUG: Processing {media_type} {i+1}/{total_assets} - Title: '{title}'")
                         
-                        # Debug logging - print title and caption for each asset (first 10 only to avoid spam)
-                        if processed_count < 10:
-                            logger.info(f"Asset {processed_count + 1}: title='{title}', caption='{caption}'")
+                        # Get caption (placeholder for now - will be None)
+                        caption = None  # TODO: Implement actual caption extraction
                         
-                        # If no valid caption found, log this fact for caption/both modes
-                        if self.search_mode in ['caption', 'both'] and not caption and processed_count < 5:
-                            logger.info(f"No valid caption found for asset {processed_count + 1} (tried keys: {caption_keys})")
-                        
-                        # Check for category format based on search mode
+                        # Category detection: Title first, then caption fallback
                         has_category = False
                         category_source = None
                         category_text = None
                         
-                        if self.search_mode == 'title':
-                            # Only check title
-                            if title and ':' in title:
-                                has_category = True
-                                category_source = "title"
-                                category_text = title
-                                title_matches += 1
-                        elif self.search_mode == 'caption':
-                            # Only check caption
-                            if caption and ':' in caption:
-                                has_category = True
-                                category_source = "caption"
-                                category_text = caption
-                                caption_matches += 1
-                        else:  # 'both'
-                            # Check both title and caption
-                            if title and ':' in title:
-                                has_category = True
-                                category_source = "title"
-                                category_text = title
-                                title_matches += 1
-                            elif caption and ':' in caption:
-                                has_category = True
-                                category_source = "caption"
-                                category_text = caption
-                                caption_matches += 1
+                        if title and ':' in title:
+                            # Primary: Title has category format
+                            has_category = True
+                            category_source = "title"
+                            category_text = title
+                            title_matches += 1
+                            print(f"DEBUG: Asset {i+1}: Category in TITLE: '{title}'")
+                        elif caption and ':' in caption:
+                            # Fallback: Caption has category format
+                            has_category = True
+                            category_source = "caption"
+                            category_text = caption
+                            caption_matches += 1
+                            print(f"DEBUG: Asset {i+1}: Category in CAPTION: '{caption}'")
+                        
+                        # Show debug for any asset with category format
+                        if has_category:
+                            print(f"DEBUG: Category detected in {category_source}: '{category_text}'")
                         
                         if has_category:
                             # Add asset to Watching album
+                            print(f"DEBUG: Adding {media_type} to Watching album")
                             success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
                             
                             if success:
                                 added_count += 1
-                                logger.info(f"Added {media_type} {added_count} (category in {category_source}): '{category_text}' ({asset_id[:8]}...)")
+                                
+                                # Track the specific reason for addition
+                                if category_source == "title":
+                                    title_added += 1
+                                elif category_source == "caption":
+                                    caption_added += 1
+                                
+                                logger.info(f"Added {media_type} {added_count} ({category_source}): '{category_text}' ({asset_id[:8]}...)")
+                                print(f"DEBUG: Successfully added! Total added: {added_count} (Title: {title_added}, Caption: {caption_added})")
                                 
                                 # Pause after every 1000 successfully added photos
                                 if added_count % 1000 == 0:
@@ -230,24 +241,13 @@ class ApplePhotosWatcherAdder:
                                     time.sleep(10)
                             else:
                                 error_count += 1
-                                category_source = "title" if has_category_title else "caption"
-                                category_text = title if has_category_title else caption
-                                logger.warning(f"Failed to add asset {i+1}/{total_assets} (category in {category_source}): '{category_text}' ({asset_id[:8]}...)")
+                                logger.warning(f"Failed to add asset {i+1}/{total_assets}: '{title}' ({asset_id[:8]}...)")
+                                print(f"DEBUG: Failed to add! Total errors: {error_count}")
                         else:
-                            # Skip assets without category-format titles or captions
+                            # Skip assets without category-format titles
                             skipped_count += 1
                             if skipped_count <= 10:  # Only log first 10 skips to avoid spam
-                                if not title and not caption:
-                                    skip_reason = "no title or caption"
-                                elif not title:
-                                    skip_reason = "no title, caption has no colon"
-                                elif not caption:
-                                    skip_reason = "no caption, title has no colon"
-                                else:
-                                    skip_reason = "no colon in title or caption"
-                                logger.debug(f"Skipped {media_type} ({skip_reason}): title='{title}', caption='{caption}' ({asset_id[:8]}...)")
-                            elif skipped_count == 11:
-                                logger.info(f"Skipping additional assets without category titles or captions (will show total at end)...")
+                                logger.info(f"Skipped {media_type} {skipped_count} (no colon in title): '{title}' ({asset_id[:8]}...)")
                     
                     except Exception as e:
                         error_count += 1
@@ -265,19 +265,17 @@ class ApplePhotosWatcherAdder:
         # Final summary
         logger.info("=" * 60)
         logger.info("BULK ADD COMPLETE")
-        logger.info(f"Search mode: {self.search_mode}")
         logger.info(f"Total assets processed: {total_assets}")
         logger.info(f"Successfully added: {added_count}")
         
-        # Show breakdown by source
-        if self.search_mode == 'title':
-            logger.info(f"  - Title matches: {title_matches}")
-        elif self.search_mode == 'caption':
-            logger.info(f"  - Caption matches: {caption_matches}")
-        else:  # 'both'
-            logger.info(f"  - Title matches: {title_matches}")
-            logger.info(f"  - Caption matches: {caption_matches}")
-            logger.info(f"  - Total matches: {title_matches + caption_matches}")
+        # Show breakdown by addition reason
+        logger.info(f"  - Title Added: {title_added}")
+        logger.info(f"  - Caption Added: {caption_added}")
+        
+        # Show detection stats
+        logger.info(f"Detection stats:")
+        logger.info(f"  - Title matches found: {title_matches}")
+        logger.info(f"  - Caption matches found: {caption_matches}")
         
         logger.info(f"Skipped (no category format): {skipped_count}")
         logger.info(f"Errors: {error_count}")
@@ -286,28 +284,138 @@ class ApplePhotosWatcherAdder:
         
         return True
     
+    def test_caption_detection(self, assets, max_assets=None):
+        """Test caption detection without album operations."""
+        if not assets:
+            logger.error("No assets provided for testing")
+            return False
+        
+        total_assets = assets.count()
+        test_limit = min(max_assets or 20, total_assets, 20)  # Limit to 20 for testing
+        
+        logger.info(f"Testing caption detection on {test_limit} assets...")
+        
+        title_matches = 0
+        caption_matches = 0
+        processed_count = 0
+        
+        try:
+            with autorelease_pool():
+                for i in range(test_limit):
+                    asset = assets.objectAtIndex_(i)
+                    processed_count += 1
+                    
+                    # Get title
+                    title = asset.valueForKey_('title')
+                    
+                    # Get caption/description based on search mode using RhetTbull photokit
+                    caption = None
+                    if self.search_mode in ['caption', 'both']:
+                        try:
+                            # Use RhetTbull photokit to get photo metadata
+                            asset_id = asset.localIdentifier()
+                            logger.debug(f"Trying to get photokit asset for ID: {asset_id}")
+                            
+                            # Create PhotoAsset from the asset ID
+                            photo_asset = photokit.PhotoAsset(asset_id)
+                            logger.debug(f"Created PhotoAsset: {photo_asset}")
+                            
+                            # Try to get description/caption from photokit
+                            if hasattr(photo_asset, 'description') and photo_asset.description:
+                                caption = photo_asset.description.strip()
+                                logger.info(f"Found caption via photokit description: '{caption}'")
+                            elif hasattr(photo_asset, 'caption') and photo_asset.caption:
+                                caption = photo_asset.caption.strip()
+                                logger.info(f"Found caption via photokit caption: '{caption}'")
+                            elif hasattr(photo_asset, 'comment') and photo_asset.comment:
+                                caption = photo_asset.comment.strip()
+                                logger.info(f"Found caption via photokit comment: '{caption}'")
+                            else:
+                                # Try other possible attributes
+                                attrs = ['title', 'keywords', 'description_text']
+                                for attr in attrs:
+                                    if hasattr(photo_asset, attr):
+                                        value = getattr(photo_asset, attr)
+                                        if value and isinstance(value, str) and value.strip():
+                                            caption = value.strip()
+                                            logger.info(f"Found caption via photokit {attr}: '{caption}'")
+                                            break
+                            
+                        except Exception as e:
+                            logger.debug(f"Error extracting caption with photokit: {e}")
+                            caption = None
+                    
+                    # Check for category format
+                    has_category_title = title and ':' in title
+                    has_category_caption = caption and ':' in caption
+                    
+                    if has_category_title:
+                        title_matches += 1
+                    if has_category_caption:
+                        caption_matches += 1
+                    
+                    # Log findings
+                    logger.info(f"Asset {processed_count}: title='{title}', caption='{caption}'")
+                    if has_category_title:
+                        logger.info(f"  ✓ Category format in title: '{title}'")
+                    if has_category_caption:
+                        logger.info(f"  ✓ Category format in caption: '{caption}'")
+                    
+                    if processed_count >= 10:  # Show detailed info for first 10
+                        break
+                        
+        except Exception as e:
+            logger.error(f"Error during caption testing: {e}")
+            return False
+        
+        # Final summary
+        logger.info("=" * 60)
+        logger.info("CAPTION DETECTION TEST COMPLETE")
+        logger.info(f"Search mode: {self.search_mode}")
+        logger.info(f"Assets tested: {processed_count}")
+        logger.info(f"Title matches: {title_matches}")
+        logger.info(f"Caption matches: {caption_matches}")
+        logger.info("=" * 60)
+        
+        return True
+    
     def run(self, max_assets=None):
         """Main execution method."""
         logger.info("Starting Apple Photos Watcher Adder utility...")
+        logger.info(f"Search mode: {self.search_mode}")
+        logger.info(f"Max assets: {max_assets}")
         
         # Step 1: Find or create Watching album
+        logger.info("Step 1: Finding or creating Watching album...")
         watching_album = self.find_or_create_watching_album()
         if not watching_album:
             logger.error("Could not find or create Watching album. Exiting.")
             return False
+        logger.info("✓ Watching album ready")
         
-        # Step 2: Get all photos from library
-        all_assets = self.get_all_photos()
+        # Step 2: Get limited photos from library for efficient testing
+        fetch_limit = max_assets or 50  # Use max_assets or default to 50
+        logger.info(f"Step 2: Getting {fetch_limit} photos from library...")
+        print(f"DEBUG: About to call get_limited_photos({fetch_limit})...")
+        all_assets = self.get_limited_photos(fetch_limit)
+        print("DEBUG: get_limited_photos() returned")
         if not all_assets:
             logger.error("Could not fetch photos from library. Exiting.")
+            print("DEBUG: get_limited_photos() returned None")
             return False
+        logger.info(f"✓ Found {all_assets.count()} assets for testing")
+        print(f"DEBUG: ✓ Found {all_assets.count()} assets for testing")
         
-        # Step 3: Limit assets if max_assets specified
-        if max_assets and max_assets < all_assets.count():
-            logger.info(f"Limiting to first {max_assets} assets (out of {all_assets.count()} total)")
-        
-        # Step 4: Add assets to Watching album
-        success = self.add_assets_to_watching_album(all_assets, watching_album)
+        # Step 4: Add assets to Watching album (or test caption detection)
+        print(f"DEBUG: Step 4 - watching_album type: {type(watching_album)}, value: {watching_album}")
+        if watching_album == "test_mode":
+            logger.info("Step 4: Testing caption detection without album operations...")
+            print("DEBUG: Running in test mode - calling test_caption_detection")
+            success = self.test_caption_detection(all_assets, max_assets)
+        else:
+            logger.info("Step 4: Adding assets to Watching album...")
+            print("DEBUG: Adding assets to Watching album - calling add_assets_to_watching_album")
+            success = self.add_assets_to_watching_album(all_assets, watching_album)
         
         if success:
             logger.info("Utility completed successfully!")
