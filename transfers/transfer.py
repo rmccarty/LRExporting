@@ -530,13 +530,14 @@ class Transfer:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
     
-    def transfer_asset(self, asset) -> bool:
+    def transfer_asset(self, asset, custom_title=None) -> bool:
         """
         Transfer an Apple Photos asset by applying album placement logic.
         Follows the same pattern as transfer_file() but for Apple Photos assets.
         
         Args:
             asset: Apple Photos PHAsset object
+            custom_title: Optional custom title to use instead of asset's title
             
         Returns:
             bool: True if transfer succeeded, False otherwise
@@ -545,7 +546,7 @@ class Transfer:
             self.logger.info(f"[TRANSFER] transfer_asset called for asset: {asset.localIdentifier()}")
             
             # Extract metadata from Apple Photos asset
-            metadata = self._extract_metadata_from_asset(asset)
+            metadata = self._extract_metadata_from_asset(asset, custom_title)
             self.logger.info(f"[TRANSFER] Extracted metadata: {metadata}")
             
             # Apply existing album placement logic using extracted metadata
@@ -584,16 +585,22 @@ class Transfer:
             self.logger.error(f"Transfer failed for asset {asset.localIdentifier()}: {e}")
             return False
     
-    def _extract_metadata_from_asset(self, asset) -> dict:
+    def _extract_metadata_from_asset(self, asset, custom_title=None) -> dict:
         """Extract title metadata from Apple Photos asset for album placement."""
         try:
             with autorelease_pool():
-                title = asset.valueForKey_('title')
+                # Use custom title if provided, otherwise extract from asset
+                if custom_title:
+                    title = custom_title
+                    self.logger.info(f"Using custom title: '{title}' for asset")
+                else:
+                    title = asset.valueForKey_('title')
+                    self.logger.info(f"Extracted title: '{title}' from asset")
+                
                 metadata = {
                     'title': title,
                     'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video'
                 }
-                self.logger.info(f"Extracted title: '{title}' from asset")
                 return metadata
         except Exception as e:
             self.logger.error(f"Error extracting metadata from asset: {e}")
