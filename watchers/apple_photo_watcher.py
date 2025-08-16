@@ -40,62 +40,89 @@ class ApplePhotoWatcher:
             return None
             
         try:
-            # Get asset ID and extract UUID
-            asset_id = asset.localIdentifier()
-            uuid = asset_id.split('/')[0]
-            self.logger.debug(f"Extracting caption for asset UUID: {uuid}")
-            
-            # Use photokit PhotoLibrary to fetch photo by UUID
-            photo_library = photokit.PhotoLibrary()
-            
-            # Try different methods to get photo by UUID (same as add_to_apple_photos_watcher.py)
-            photo_asset = None
-            methods_to_try = [
-                ('fetch_uuid', lambda: photo_library.fetch_uuid(uuid)),
-                ('get_photo', lambda: photo_library.get_photo(uuid)),
-                ('photo', lambda: photo_library.photo(uuid)),
-                ('asset', lambda: photo_library.asset(uuid)),
-                ('get_asset', lambda: photo_library.get_asset(uuid)),
-                ('fetch_asset', lambda: photo_library.fetch_asset(uuid)),
-            ]
-            
-            for method_name, method_call in methods_to_try:
-                if hasattr(photo_library, method_name):
-                    try:
-                        self.logger.debug(f"Trying PhotoKit method: {method_name}")
-                        photo_asset = method_call()
-                        if photo_asset:
-                            self.logger.debug(f"Success with {method_name}: {photo_asset}")
-                            break
-                    except Exception as e:
-                        self.logger.debug(f"Method {method_name} failed: {e}")
-                        continue
+            uuid = self._extract_asset_uuid(asset)
+            photo_asset = self._fetch_photokit_asset(uuid)
             
             if not photo_asset:
-                self.logger.debug(f"PhotoKit could not find asset for UUID: {uuid} - tried all available methods")
                 return None
-            
-            self.logger.debug(f"PhotoKit found asset: {photo_asset}")
-            
-            # Try different caption attributes in order of preference
-            caption = None
-            if hasattr(photo_asset, 'description') and photo_asset.description:
-                caption = photo_asset.description.strip()
-                self.logger.debug(f"Found caption in description: '{caption}'")
-            elif hasattr(photo_asset, 'caption') and photo_asset.caption:
-                caption = photo_asset.caption.strip()
-                self.logger.debug(f"Found caption in caption field: '{caption}'")
-            elif hasattr(photo_asset, 'comment') and photo_asset.comment:
-                caption = photo_asset.comment.strip()
-                self.logger.debug(f"Found caption in comment: '{caption}'")
-            else:
-                self.logger.debug("No caption found in any field (description, caption, comment)")
-            
-            return caption
+                
+            return self._extract_caption_from_photo_asset(photo_asset)
             
         except Exception as e:
             self.logger.debug(f"PhotoKit caption extraction error: {e}")
             return None
+
+    def _extract_asset_uuid(self, asset):
+        """Extract UUID from PHAsset."""
+        asset_id = asset.localIdentifier()
+        uuid = asset_id.split('/')[0]
+        self.logger.debug(f"Extracting caption for asset UUID: {uuid}")
+        return uuid
+
+    def _fetch_photokit_asset(self, uuid):
+        """Fetch photo asset from photokit using multiple fallback methods."""
+        photo_library = photokit.PhotoLibrary()
+        
+        methods_to_try = [
+            ('fetch_uuid', lambda: photo_library.fetch_uuid(uuid)),
+            ('get_photo', lambda: photo_library.get_photo(uuid)),
+            ('photo', lambda: photo_library.photo(uuid)),
+            ('asset', lambda: photo_library.asset(uuid)),
+            ('get_asset', lambda: photo_library.get_asset(uuid)),
+            ('fetch_asset', lambda: photo_library.fetch_asset(uuid)),
+        ]
+        
+        for method_name, method_call in methods_to_try:
+            photo_asset = self._try_photokit_method(method_name, method_call, photo_library)
+            if photo_asset:
+                self.logger.debug(f"PhotoKit found asset: {photo_asset}")
+                return photo_asset
+        
+        self.logger.debug(f"PhotoKit could not find asset for UUID: {uuid} - tried all available methods")
+        return None
+
+    def _try_photokit_method(self, method_name, method_call, photo_library):
+        """Try a single photokit method and return result or None if failed."""
+        if not hasattr(photo_library, method_name):
+            return None
+            
+        try:
+            self.logger.debug(f"Trying PhotoKit method: {method_name}")
+            photo_asset = method_call()
+            if photo_asset:
+                self.logger.debug(f"Success with {method_name}: {photo_asset}")
+                return photo_asset
+        except Exception as e:
+            self.logger.debug(f"Method {method_name} failed: {e}")
+        
+        return None
+
+    def _extract_caption_from_photo_asset(self, photo_asset):
+        """Extract caption from photo asset by checking multiple fields."""
+        caption_fields = [
+            ('description', 'description'),
+            ('caption', 'caption field'),
+            ('comment', 'comment')
+        ]
+        
+        for field_name, display_name in caption_fields:
+            caption = self._get_caption_from_field(photo_asset, field_name, display_name)
+            if caption:
+                return caption
+        
+        self.logger.debug("No caption found in any field (description, caption, comment)")
+        return None
+
+    def _get_caption_from_field(self, photo_asset, field_name, display_name):
+        """Get caption from a specific field if it exists and has content."""
+        if hasattr(photo_asset, field_name):
+            field_value = getattr(photo_asset, field_name)
+            if field_value:
+                caption = field_value.strip()
+                if caption:  # Only return non-empty captions
+                    self.logger.debug(f"Found caption in {display_name}: '{caption}'")
+                    return caption
+        return None
     
     def _initialize_watching_album(self):
         """Initialize the watching album, creating it if it doesn't exist."""
@@ -203,58 +230,73 @@ class ApplePhotoWatcher:
             
         try:
             with autorelease_pool():
-                # Get the album
-                print(f"   🔍 DEBUG: Fetching album collection with ID: {self.watching_album_id}")
-                album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_(
-                    [self.watching_album_id], None
-                )
-                
-                print(f"   🔍 DEBUG: Album fetch result count: {album_result.count()}")
-                
-                if album_result.count() == 0:
-                    print(f"   ❌ DEBUG: Album not found with ID: {self.watching_album_id}")
-                    self.logger.warning(f"'{self.album_name}' album not found")
+                album = self._fetch_album_collection()
+                if not album:
                     return []
                 
-                album = album_result.objectAtIndex_(0)
-                print(f"   ✅ DEBUG: Found album: {album}")
-                print(f"   🔍 DEBUG: Album title: {album.localizedTitle()}")
-                
-                # Get assets in the album
-                print(f"   🔍 DEBUG: Fetching assets in album...")
-                assets = Photos.PHAsset.fetchAssetsInAssetCollection_options_(album, None)
-                print(f"   📊 DEBUG: Assets fetch result count: {assets.count()}")
-                
-                # Convert to list of asset info
-                asset_list = []
-                for i in range(assets.count()):
-                    asset = assets.objectAtIndex_(i)
-                    
-                    # Get the title from the asset's metadata
-                    title = None
-                    try:
-                        # Try to get the title/caption from the asset
-                        title = asset.valueForKey_('title')
-                        if not title:
-                            # Try alternative methods to get title
-                            title = asset.valueForKey_('localizedTitle')
-                    except:
-                        title = None
-                    
-                    asset_info = {
-                        'id': asset.localIdentifier(),
-                        'filename': asset.valueForKey_('filename') or f"Asset_{i}",
-                        'title': title,
-                        'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video',
-                        'asset_obj': asset  # Include the actual PHAsset object for Transfer
-                    }
-                    asset_list.append(asset_info)
-                
-                return asset_list
+                assets = self._fetch_assets_from_album(album)
+                return self._convert_assets_to_list(assets)
                 
         except Exception as e:
             self.logger.error(f"Error getting assets from album: {e}")
             return []
+
+    def _fetch_album_collection(self):
+        """Fetch the album collection by ID."""
+        print(f"   🔍 DEBUG: Fetching album collection with ID: {self.watching_album_id}")
+        album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_(
+            [self.watching_album_id], None
+        )
+        
+        print(f"   🔍 DEBUG: Album fetch result count: {album_result.count()}")
+        
+        if album_result.count() == 0:
+            print(f"   ❌ DEBUG: Album not found with ID: {self.watching_album_id}")
+            self.logger.warning(f"'{self.album_name}' album not found")
+            return None
+        
+        album = album_result.objectAtIndex_(0)
+        print(f"   ✅ DEBUG: Found album: {album}")
+        print(f"   🔍 DEBUG: Album title: {album.localizedTitle()}")
+        return album
+
+    def _fetch_assets_from_album(self, album):
+        """Fetch assets from the album collection."""
+        print(f"   🔍 DEBUG: Fetching assets in album...")
+        assets = Photos.PHAsset.fetchAssetsInAssetCollection_options_(album, None)
+        print(f"   📊 DEBUG: Assets fetch result count: {assets.count()}")
+        return assets
+
+    def _convert_assets_to_list(self, assets):
+        """Convert PHAsset collection to list of asset info dictionaries."""
+        asset_list = []
+        for i in range(assets.count()):
+            asset = assets.objectAtIndex_(i)
+            asset_info = self._create_asset_info(asset, i)
+            asset_list.append(asset_info)
+        return asset_list
+
+    def _create_asset_info(self, asset, index):
+        """Create asset info dictionary from PHAsset."""
+        title = self._extract_asset_title(asset)
+        
+        return {
+            'id': asset.localIdentifier(),
+            'filename': asset.valueForKey_('filename') or f"Asset_{index}",
+            'title': title,
+            'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video',
+            'asset_obj': asset  # Include the actual PHAsset object for Transfer
+        }
+
+    def _extract_asset_title(self, asset):
+        """Extract title from asset with fallback methods."""
+        try:
+            title = asset.valueForKey_('title')
+            if not title:
+                title = asset.valueForKey_('localizedTitle')
+            return title
+        except:
+            return None
     
     def _remove_asset_from_album(self, asset_id: str) -> bool:
         """Remove an asset from the watching album."""
@@ -263,45 +305,52 @@ class ApplePhotoWatcher:
             
         try:
             with autorelease_pool():
-                success = False
-                
-                def remove_asset():
-                    nonlocal success
-                    # Get the album and asset
-                    album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_(
-                        [self.watching_album_id], None
-                    )
-                    asset_result = Photos.PHAsset.fetchAssetsWithLocalIdentifiers_options_(
-                        [asset_id], None
-                    )
-                    
-                    if album_result.count() > 0 and asset_result.count() > 0:
-                        album = album_result.objectAtIndex_(0)
-                        asset = asset_result.objectAtIndex_(0)
-                        
-                        # Remove asset from album
-                        album_change = Photos.PHAssetCollectionChangeRequest.changeRequestForAssetCollection_(album)
-                        if album_change:
-                            album_change.removeAssets_([asset])
-                            success = True
-                
-                # Perform changes
-                result, error = Photos.PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_(
-                    remove_asset,
-                    None
-                )
-                
-                if not result or not success:
-                    self.logger.error(f"Failed to remove asset {asset_id}")
-                    if error:
-                        self.logger.error(f"Error: {error}")
+                album, asset = self._fetch_album_and_asset_for_removal(asset_id)
+                if not album or not asset:
                     return False
                 
-                return True
+                return self._perform_asset_removal(album, asset, asset_id)
                 
         except Exception as e:
             self.logger.error(f"Error removing asset {asset_id}: {e}")
             return False
+
+    def _fetch_album_and_asset_for_removal(self, asset_id):
+        """Fetch album and asset objects for removal operation."""
+        album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_(
+            [self.watching_album_id], None
+        )
+        asset_result = Photos.PHAsset.fetchAssetsWithLocalIdentifiers_options_(
+            [asset_id], None
+        )
+        
+        album = album_result.objectAtIndex_(0) if album_result.count() > 0 else None
+        asset = asset_result.objectAtIndex_(0) if asset_result.count() > 0 else None
+        
+        return album, asset
+
+    def _perform_asset_removal(self, album, asset, asset_id):
+        """Perform the actual asset removal operation."""
+        success = False
+        
+        def remove_asset():
+            nonlocal success
+            album_change = Photos.PHAssetCollectionChangeRequest.changeRequestForAssetCollection_(album)
+            if album_change:
+                album_change.removeAssets_([asset])
+                success = True
+        
+        result, error = Photos.PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_(
+            remove_asset, None
+        )
+        
+        if not result or not success:
+            self.logger.error(f"Failed to remove asset {asset_id}")
+            if error:
+                self.logger.error(f"Error: {error}")
+            return False
+        
+        return True
     
     def check_album(self):
         """Check the watching album for new assets."""
