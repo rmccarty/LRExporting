@@ -427,22 +427,20 @@ class ApplePhotoWatcher:
         return keywords
 
     def _extract_keywords_from_asset(self, asset_obj):
-        """Extract keywords from PHAsset using multiple methods."""
+        """Extract keywords from PHAsset using photokit only."""
         try:
-            # Try direct PHAsset keyword extraction
-            keywords = self._extract_direct_keywords(asset_obj)
-            
-            # Try alternative keyword fields if direct method failed
-            if not keywords:
-                keywords = self._extract_alternative_keywords(asset_obj)
-            
-            # Try photokit integration if other methods failed
-            if not keywords:
-                keywords = self._extract_photokit_keywords(asset_obj)
-            
-            return keywords
+            # Use photokit exclusively for keyword extraction
+            print(f"   🔍 Using photokit for keyword extraction...")
+            keywords = self._extract_photokit_keywords(asset_obj)
+            if keywords:
+                print(f"   ✅ Photokit found {len(keywords)} keywords: {keywords}")
+                return keywords
+            else:
+                print(f"   ❌ Photokit found no keywords")
+                return []
             
         except Exception as e:
+            print(f"   ❌ Keyword extraction error: {e}")
             self.logger.debug(f"Keyword extraction error: {e}")
             return []
 
@@ -479,38 +477,75 @@ class ApplePhotoWatcher:
     def _extract_photokit_keywords(self, asset_obj):
         """Extract keywords using photokit integration."""
         if not PHOTOKIT_AVAILABLE:
+            print(f"   ❌ Photokit not available")
             return []
             
         try:
             uuid = self._extract_asset_uuid(asset_obj)
+            print(f"   🔍 Asset UUID: {uuid}")
             photo_library = photokit.PhotoLibrary()
-            return self._try_photokit_keyword_methods(photo_library, uuid)
+            keywords = self._try_photokit_keyword_methods(photo_library, uuid)
+            print(f"   📊 Photokit extraction result: {keywords}")
+            return keywords
         except Exception as e:
+            print(f"   ❌ Photokit keyword extraction failed: {e}")
             self.logger.debug(f"Photokit keyword extraction failed: {e}")
             return []
 
     def _try_photokit_keyword_methods(self, photo_library, uuid):
         """Try different photokit methods to extract keywords."""
-        for method_name, method_call in [
+        methods_to_try = [
             ('fetch_uuid', lambda: photo_library.fetch_uuid(uuid)),
             ('get_photo', lambda: photo_library.get_photo(uuid)),
-        ]:
+            ('photo', lambda: photo_library.photo(uuid)),
+            ('asset', lambda: photo_library.asset(uuid)),
+            ('get_asset', lambda: photo_library.get_asset(uuid)),
+            ('fetch_asset', lambda: photo_library.fetch_asset(uuid)),
+        ]
+        
+        for method_name, method_call in methods_to_try:
             if hasattr(photo_library, method_name):
-                keywords = self._extract_keywords_from_photokit_asset(method_call)
+                print(f"   🔍 Trying photokit method: {method_name}")
+                keywords = self._extract_keywords_from_photokit_asset(method_call, method_name)
                 if keywords:
+                    print(f"   ✅ Method {method_name} found keywords: {keywords}")
                     return keywords
+                else:
+                    print(f"   ❌ Method {method_name} found no keywords")
+        
+        print(f"   ⚠️  No photokit methods found keywords")
         return []
 
-    def _extract_keywords_from_photokit_asset(self, method_call):
+    def _extract_keywords_from_photokit_asset(self, method_call, method_name):
         """Extract keywords from a photokit asset using the provided method."""
         try:
+            print(f"   🔍 Calling photokit method: {method_name}")
             photo_asset = method_call()
-            if photo_asset and hasattr(photo_asset, 'keywords'):
-                photo_keywords = photo_asset.keywords
-                if photo_keywords:
-                    return list(photo_keywords)
-        except Exception:
-            pass
+            if photo_asset:
+                print(f"   ✅ Got photo asset from {method_name}")
+                
+                # Try multiple keyword attributes
+                keyword_attrs = ['keywords', 'keyword', 'tags', 'tag_names', 'keywordNames']
+                for attr in keyword_attrs:
+                    if hasattr(photo_asset, attr):
+                        print(f"   🔍 Checking attribute: {attr}")
+                        photo_keywords = getattr(photo_asset, attr)
+                        if photo_keywords:
+                            print(f"   ✅ Found keywords in {attr}: {photo_keywords}")
+                            if isinstance(photo_keywords, (list, tuple)):
+                                return list(photo_keywords)
+                            elif hasattr(photo_keywords, '__iter__') and not isinstance(photo_keywords, str):
+                                return list(photo_keywords)
+                            else:
+                                return [str(photo_keywords)]
+                        else:
+                            print(f"   ❌ No keywords in {attr}")
+                
+                print(f"   ❌ No keyword attributes found in photo asset")
+            else:
+                print(f"   ❌ No photo asset returned from {method_name}")
+        except Exception as e:
+            print(f"   ❌ Error extracting keywords from {method_name}: {e}")
         return []
 
     def _convert_nsarray_to_list(self, nsarray_obj):
@@ -541,12 +576,12 @@ class ApplePhotoWatcher:
             print(f"   💬 Caption: None")
             self.logger.info(f"  Caption: None")
             
-        if keywords:
-            print(f"   🏷️  Keywords: {keywords}")
-            self.logger.info(f"  Keywords: {keywords}")
+        if keywords and len(keywords) > 0:
+            print(f"   🏷️  Keywords ({len(keywords)}): {keywords}")
+            self.logger.info(f"  Keywords ({len(keywords)}): {keywords}")
         else:
-            print(f"   🏷️  Keywords: None")
-            self.logger.info(f"  Keywords: None")
+            print(f"   🏷️  Keywords: None (no keywords found)")
+            self.logger.info(f"  Keywords: None (no keywords found)")
 
     def _detect_categories_from_all_sources(self, title, caption, keywords):
         """Detect category format in title, caption, and keywords."""
