@@ -313,142 +313,196 @@ class ApplePhotoWatcher:
             return
             
         try:
-            print(f"📂 Getting assets from '{self.album_name}' album...")
-            assets = self._get_assets_in_album()
-            
+            assets = self._get_assets_for_processing()
             if not assets:
-                print(f"✅ No assets found in '{self.album_name}' album - nothing to process")
-                self.logger.debug(f"No assets found in '{self.album_name}' album")
                 return
-            
+                
             print(f"📊 Found {len(assets)} asset(s) in '{self.album_name}' album")
             
             for i, asset_data in enumerate(assets, 1):
-                print(f"\n📸 Processing asset {i}/{len(assets)}: {asset_data['filename']}")
-                print(f"   Type: {asset_data['media_type']}")
-                self.logger.info(f"Found {asset_data['media_type']}: {asset_data['filename']}")
-                
-                # Get the actual PHAsset object
-                asset_obj = asset_data['asset_obj']
-                title = asset_data['title']
-                
-                # Extract caption using photokit
-                print(f"   🔍 Extracting caption using photokit...")
-                self.logger.debug(f"Starting caption extraction for {asset_data['filename']}")
-                caption = self._extract_caption_with_photokit(asset_obj)
-                self.logger.debug(f"Caption extraction completed. Result: {repr(caption)}")
-                
-                # Log title and caption if they exist
-                if title:
-                    print(f"   📝 Title: '{title}'")
-                    self.logger.info(f"  Title: {title}")
-                else:
-                    print(f"   📝 Title: None")
-                    self.logger.info(f"  Title: None")
-                    
-                if caption:
-                    print(f"   💬 Caption: '{caption}'")
-                    self.logger.info(f"  Caption: {caption}")
-                else:
-                    print(f"   💬 Caption: None")
-                    self.logger.info(f"  Caption: None")
-                
-                # Check for category format in title and caption
-                has_title_category = title and ':' in title
-                has_caption_category = caption and ':' in caption
-                
-                print(f"   🎯 Category Detection:")
-                print(f"      - Title has colon (:): {has_title_category}")
-                print(f"      - Caption has colon (:): {has_caption_category}")
-                self.logger.debug(f"Category detection - Title has colon: {has_title_category}, Caption has colon: {has_caption_category}")
-                
-                # If either title or caption has category format, let Transfer handle album placement
-                if has_title_category or has_caption_category:
-                    print(f"   ✅ CATEGORY DETECTED - Processing asset:")
-                    if has_title_category:
-                        print(f"      📝 Category in TITLE: '{title}'")
-                        self.logger.info(f"  Category detected in TITLE: '{title}'")
-                    if has_caption_category:
-                        print(f"      💬 Category in CAPTION: '{caption}'")
-                        self.logger.info(f"  Category detected in CAPTION: '{caption}'")
-                    
-                    # Process BOTH title and caption categories by calling transfer_asset for each
-                    print(f"   🔄 Processing categories for dual album placement...")
-                    
-                    success_count = 0
-                    total_attempts = 0
-                    
-                    # Process title category if present
-                    if has_title_category:
-                        total_attempts += 1
-                        category_parts = title.split(':', 1)
-                        category = category_parts[0].strip()
-                        title_album = f"02/{category}/{title}"
-                        print(f"   🎯 Processing title album: '{title_album}'")
-                        
-                        try:
-                            # Use asset's original title (no custom title needed)
-                            success_title = self.transfer.transfer_asset(asset_obj)
-                            if success_title:
-                                success_count += 1
-                                print(f"   ✅ SUCCESS - Added to title-based album: '{title_album}'")
-                            else:
-                                print(f"   ❌ FAILED - Could not add to title-based album: '{title_album}'")
-                        except Exception as e:
-                            print(f"   ❌ ERROR - Title album processing failed: {e}")
-                    
-                    # Process caption category if present
-                    if has_caption_category:
-                        total_attempts += 1
-                        category_parts = caption.split(':', 1)
-                        category = category_parts[0].strip()
-                        caption_album = f"02/{category}/{caption}"
-                        print(f"   🎯 Processing caption album: '{caption_album}'")
-                        
-                        try:
-                            # Use caption as custom title for Transfer processing
-                            success_caption = self.transfer.transfer_asset(asset_obj, custom_title=caption)
-                            if success_caption:
-                                success_count += 1
-                                print(f"   ✅ SUCCESS - Added to caption-based album: '{caption_album}'")
-                            else:
-                                print(f"   ❌ FAILED - Could not add to caption-based album: '{caption_album}'")
-                        except Exception as e:
-                            print(f"   ❌ ERROR - Caption album processing failed: {e}")
-                    
-                    # Overall success if at least one album placement succeeded
-                    success = success_count > 0
-                    print(f"   📊 Album placement summary: {success_count}/{total_attempts} successful")
-                else:
-                    # No category format detected - skip processing
-                    print(f"   ❌ NO CATEGORY DETECTED - Skipping asset (no colon in title or caption)")
-                    self.logger.info(f"  No category format detected (no colon in title or caption) - skipping")
-                    # Remove from Watching album since it doesn't have category format
-                    print(f"   🗑️  Removing from '{self.album_name}' album...")
-                    if self._remove_asset_from_album(asset_data['id']):
-                        print(f"   ✅ Removed '{asset_data['filename']}' from '{self.album_name}' album")
-                        self.logger.info(f"Removed {asset_data['filename']} from '{self.album_name}' album (no category)")
-                    else:
-                        print(f"   ❌ Failed to remove '{asset_data['filename']}' from '{self.album_name}' album")
-                    continue
-                
-                if success:
-                    print(f"   ✅ SUCCESS - Transfer system processed asset successfully")
-                    self.logger.info(f"Successfully processed {asset_data['filename']}")
-                    # Remove asset from album after successful processing
-                    print(f"   🗑️  Removing processed asset from '{self.album_name}' album...")
-                    if self._remove_asset_from_album(asset_data['id']):
-                        print(f"   ✅ Removed '{asset_data['filename']}' from '{self.album_name}' album")
-                        self.logger.info(f"Removed {asset_data['filename']} from '{self.album_name}' album")
-                    else:
-                        print(f"   ❌ Failed to remove '{asset_data['filename']}' from '{self.album_name}' album")
-                        self.logger.error(f"Failed to remove {asset_data['filename']} from album")
-                else:
-                    print(f"   ❌ FAILED - Transfer system could not process asset")
-                    self.logger.error(f"Failed to process {asset_data['filename']}")
+                self._process_single_asset(asset_data, i, len(assets))
                     
         except Exception as e:
             self.logger.error(f"Error checking album: {e}")
+
+    def _get_assets_for_processing(self):
+        """Get assets from the watching album, returning None if no assets to process."""
+        print(f"📂 Getting assets from '{self.album_name}' album...")
+        assets = self._get_assets_in_album()
+        
+        if not assets:
+            print(f"✅ No assets found in '{self.album_name}' album - nothing to process")
+            self.logger.debug(f"No assets found in '{self.album_name}' album")
+            return None
+            
+        return assets
+
+    def _process_single_asset(self, asset_data, index, total):
+        """Process a single asset for category detection and album placement."""
+        print(f"\n📸 Processing asset {index}/{total}: {asset_data['filename']}")
+        print(f"   Type: {asset_data['media_type']}")
+        self.logger.info(f"Found {asset_data['media_type']}: {asset_data['filename']}")
+        
+        # Extract title and caption
+        asset_obj = asset_data['asset_obj']
+        title = asset_data['title']
+        caption = self._extract_caption_with_logging(asset_obj, asset_data['filename'])
+        
+        # Log title and caption
+        self._log_title_and_caption(title, caption)
+        
+        # Detect categories and process accordingly
+        categories = self._detect_categories(title, caption)
+        
+        if categories['has_any']:
+            success = self._process_asset_with_categories(asset_obj, title, caption, categories)
+            self._handle_processing_result(success, asset_data)
+        else:
+            self._handle_asset_without_categories(asset_data)
+
+    def _extract_caption_with_logging(self, asset_obj, filename):
+        """Extract caption with appropriate logging."""
+        print(f"   🔍 Extracting caption using photokit...")
+        self.logger.debug(f"Starting caption extraction for {filename}")
+        caption = self._extract_caption_with_photokit(asset_obj)
+        self.logger.debug(f"Caption extraction completed. Result: {repr(caption)}")
+        return caption
+
+    def _log_title_and_caption(self, title, caption):
+        """Log title and caption information."""
+        if title:
+            print(f"   📝 Title: '{title}'")
+            self.logger.info(f"  Title: {title}")
+        else:
+            print(f"   📝 Title: None")
+            self.logger.info(f"  Title: None")
+            
+        if caption:
+            print(f"   💬 Caption: '{caption}'")
+            self.logger.info(f"  Caption: {caption}")
+        else:
+            print(f"   💬 Caption: None")
+            self.logger.info(f"  Caption: None")
+
+    def _detect_categories(self, title, caption):
+        """Detect category format in title and caption."""
+        has_title_category = title and ':' in title
+        has_caption_category = caption and ':' in caption
+        
+        print(f"   🎯 Category Detection:")
+        print(f"      - Title has colon (:): {has_title_category}")
+        print(f"      - Caption has colon (:): {has_caption_category}")
+        self.logger.debug(f"Category detection - Title has colon: {has_title_category}, Caption has colon: {has_caption_category}")
+        
+        return {
+            'has_title': has_title_category,
+            'has_caption': has_caption_category,
+            'has_any': has_title_category or has_caption_category
+        }
+
+    def _process_asset_with_categories(self, asset_obj, title, caption, categories):
+        """Process asset that has category format in title and/or caption."""
+        print(f"   ✅ CATEGORY DETECTED - Processing asset:")
+        
+        if categories['has_title']:
+            print(f"      📝 Category in TITLE: '{title}'")
+            self.logger.info(f"  Category detected in TITLE: '{title}'")
+        if categories['has_caption']:
+            print(f"      💬 Category in CAPTION: '{caption}'")
+            self.logger.info(f"  Category detected in CAPTION: '{caption}'")
+        
+        return self._perform_dual_album_placement(asset_obj, title, caption, categories)
+
+    def _perform_dual_album_placement(self, asset_obj, title, caption, categories):
+        """Perform dual album placement for title and/or caption categories."""
+        print(f"   🔄 Processing categories for dual album placement...")
+        
+        success_count = 0
+        total_attempts = 0
+        
+        # Process title category if present
+        if categories['has_title']:
+            success_count += self._process_title_category(asset_obj, title)
+            total_attempts += 1
+        
+        # Process caption category if present
+        if categories['has_caption']:
+            success_count += self._process_caption_category(asset_obj, caption)
+            total_attempts += 1
+        
+        success = success_count > 0
+        print(f"   📊 Album placement summary: {success_count}/{total_attempts} successful")
+        return success
+
+    def _process_title_category(self, asset_obj, title):
+        """Process title category and return 1 if successful, 0 if failed."""
+        category_parts = title.split(':', 1)
+        category = category_parts[0].strip()
+        title_album = f"02/{category}/{title}"
+        print(f"   🎯 Processing title album: '{title_album}'")
+        
+        try:
+            success = self.transfer.transfer_asset(asset_obj)
+            if success:
+                print(f"   ✅ SUCCESS - Added to title-based album: '{title_album}'")
+                return 1
+            else:
+                print(f"   ❌ FAILED - Could not add to title-based album: '{title_album}'")
+                return 0
+        except Exception as e:
+            print(f"   ❌ ERROR - Title album processing failed: {e}")
+            return 0
+
+    def _process_caption_category(self, asset_obj, caption):
+        """Process caption category and return 1 if successful, 0 if failed."""
+        category_parts = caption.split(':', 1)
+        category = category_parts[0].strip()
+        caption_album = f"02/{category}/{caption}"
+        print(f"   🎯 Processing caption album: '{caption_album}'")
+        
+        try:
+            success = self.transfer.transfer_asset(asset_obj, custom_title=caption)
+            if success:
+                print(f"   ✅ SUCCESS - Added to caption-based album: '{caption_album}'")
+                return 1
+            else:
+                print(f"   ❌ FAILED - Could not add to caption-based album: '{caption_album}'")
+                return 0
+        except Exception as e:
+            print(f"   ❌ ERROR - Caption album processing failed: {e}")
+            return 0
+
+    def _handle_processing_result(self, success, asset_data):
+        """Handle the result of asset processing (success or failure)."""
+        if success:
+            print(f"   ✅ SUCCESS - Transfer system processed asset successfully")
+            self.logger.info(f"Successfully processed {asset_data['filename']}")
+            self._remove_processed_asset(asset_data)
+        else:
+            print(f"   ❌ FAILED - Transfer system could not process asset")
+            self.logger.error(f"Failed to process {asset_data['filename']}")
+
+    def _handle_asset_without_categories(self, asset_data):
+        """Handle asset that doesn't have category format."""
+        print(f"   ❌ NO CATEGORY DETECTED - Skipping asset (no colon in title or caption)")
+        self.logger.info(f"  No category format detected (no colon in title or caption) - skipping")
+        
+        print(f"   🗑️  Removing from '{self.album_name}' album...")
+        if self._remove_asset_from_album(asset_data['id']):
+            print(f"   ✅ Removed '{asset_data['filename']}' from '{self.album_name}' album")
+            self.logger.info(f"Removed {asset_data['filename']} from '{self.album_name}' album (no category)")
+        else:
+            print(f"   ❌ Failed to remove '{asset_data['filename']}' from '{self.album_name}' album")
+
+    def _remove_processed_asset(self, asset_data):
+        """Remove successfully processed asset from the watching album."""
+        print(f"   🗑️  Removing processed asset from '{self.album_name}' album...")
+        if self._remove_asset_from_album(asset_data['id']):
+            print(f"   ✅ Removed '{asset_data['filename']}' from '{self.album_name}' album")
+            self.logger.info(f"Removed {asset_data['filename']} from '{self.album_name}' album")
+        else:
+            print(f"   ❌ Failed to remove '{asset_data['filename']}' from '{self.album_name}' album")
+            self.logger.error(f"Failed to remove {asset_data['filename']} from album")
 
 if __name__ == '__main__':
     # For standalone testing
