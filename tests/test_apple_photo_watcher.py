@@ -1385,5 +1385,362 @@ with patch('watchers.apple_photo_watcher.Photos'):
             # Note: check_album is a function, not a mock, so we can't check call_count
             # The test passes if no exceptions are raised
 
+    # ===== KEYWORD EXTRACTION TESTS =====
+    
+    def test_when_photokit_not_available_then_keyword_extraction_returns_empty(self):
+        """Should return empty list when photokit is not available."""
+        watcher = self.create_watcher_with_mocks()
+        
+        with patch('watchers.apple_photo_watcher.PHOTOKIT_AVAILABLE', False):
+            mock_asset = MagicMock()
+            keywords = watcher._extract_keywords_from_asset(mock_asset)
+            
+            self.assertEqual(keywords, [])
+
+    @patch('watchers.apple_photo_watcher.PHOTOKIT_AVAILABLE', True)
+    def test_when_photokit_extraction_succeeds_then_returns_keywords(self):
+        """Should return keywords when photokit extraction succeeds."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        mock_asset.localIdentifier.return_value = "test-uuid/L0/001"
+        
+        with patch.object(watcher, '_extract_photokit_keywords') as mock_extract:
+            mock_extract.return_value = ['Christmas: Christmas 2025', 'Family', 'Holiday']
+            
+            keywords = watcher._extract_keywords_from_asset(mock_asset)
+            
+            self.assertEqual(keywords, ['Christmas: Christmas 2025', 'Family', 'Holiday'])
+            mock_extract.assert_called_once_with(mock_asset)
+
+    @patch('watchers.apple_photo_watcher.PHOTOKIT_AVAILABLE', True)
+    def test_when_photokit_extraction_fails_then_returns_empty(self):
+        """Should return empty list when photokit extraction fails."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        
+        with patch.object(watcher, '_extract_photokit_keywords') as mock_extract:
+            mock_extract.return_value = []
+            
+            keywords = watcher._extract_keywords_from_asset(mock_asset)
+            
+            self.assertEqual(keywords, [])
+
+    @patch('watchers.apple_photo_watcher.PHOTOKIT_AVAILABLE', True)
+    def test_when_photokit_extraction_raises_exception_then_returns_empty(self):
+        """Should return empty list when photokit extraction raises exception."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        
+        with patch.object(watcher, '_extract_photokit_keywords') as mock_extract:
+            mock_extract.side_effect = Exception("Photokit error")
+            
+            keywords = watcher._extract_keywords_from_asset(mock_asset)
+            
+            self.assertEqual(keywords, [])
+
+    @patch('watchers.apple_photo_watcher.PHOTOKIT_AVAILABLE', True)
+    @patch('watchers.apple_photo_watcher.photokit')
+    def test_when_photokit_methods_succeed_then_extracts_keywords(self, mock_photokit):
+        """Should extract keywords using photokit methods."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        mock_asset.localIdentifier.return_value = "test-uuid/L0/001"
+        
+        # Mock photokit library
+        mock_photo_library = MagicMock()
+        mock_photokit.PhotoLibrary.return_value = mock_photo_library
+        
+        # Mock successful fetch_uuid method
+        mock_photo_asset = MagicMock()
+        mock_photo_asset.keywords = ['Christmas: Christmas 2025', 'Family']
+        mock_photo_library.fetch_uuid.return_value = mock_photo_asset
+        mock_photo_library.get_photo.return_value = None
+        
+        keywords = watcher._extract_photokit_keywords(mock_asset)
+        
+        self.assertEqual(keywords, ['Christmas: Christmas 2025', 'Family'])
+
+    @patch('watchers.apple_photo_watcher.PHOTOKIT_AVAILABLE', True)
+    @patch('watchers.apple_photo_watcher.photokit')
+    def test_when_photokit_methods_fail_then_returns_empty(self, mock_photokit):
+        """Should return empty list when all photokit methods fail."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        mock_asset.localIdentifier.return_value = "test-uuid/L0/001"
+        
+        # Mock photokit library with failing methods
+        mock_photo_library = MagicMock()
+        mock_photokit.PhotoLibrary.return_value = mock_photo_library
+        mock_photo_library.fetch_uuid.return_value = None
+        mock_photo_library.get_photo.return_value = None
+        
+        keywords = watcher._extract_photokit_keywords(mock_asset)
+        
+        self.assertEqual(keywords, [])
+
+    def test_when_photokit_asset_has_keywords_attribute_then_extracts_keywords(self):
+        """Should extract keywords from photokit asset keywords attribute."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_method_call = MagicMock()
+        mock_photo_asset = MagicMock()
+        mock_photo_asset.keywords = ['Event: Birthday', 'Party', 'Family']
+        mock_method_call.return_value = mock_photo_asset
+        
+        keywords = watcher._extract_keywords_from_photokit_asset(mock_method_call, 'fetch_uuid')
+        
+        self.assertEqual(keywords, ['Event: Birthday', 'Party', 'Family'])
+
+    def test_when_photokit_asset_has_alternative_keyword_attributes_then_extracts_keywords(self):
+        """Should extract keywords from alternative photokit asset attributes."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_method_call = MagicMock()
+        mock_photo_asset = MagicMock()
+        # Configure hasattr to return False for keywords but True for tags
+        def mock_hasattr(obj, attr):
+            if attr == 'keywords':
+                return False
+            elif attr == 'tags':
+                return True
+            else:
+                return False
+        
+        with patch('builtins.hasattr', side_effect=mock_hasattr):
+            mock_photo_asset.tags = ['Home: Frankfurter Str 35', 'Travel']
+            mock_method_call.return_value = mock_photo_asset
+            
+            keywords = watcher._extract_keywords_from_photokit_asset(mock_method_call, 'fetch_uuid')
+            
+            self.assertEqual(keywords, ['Home: Frankfurter Str 35', 'Travel'])
+
+    def test_when_photokit_asset_has_no_keyword_attributes_then_returns_empty(self):
+        """Should return empty list when photokit asset has no keyword attributes."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_method_call = MagicMock()
+        mock_photo_asset = MagicMock()
+        # Remove all keyword-related attributes
+        for attr in ['keywords', 'keyword', 'tags', 'tag_names', 'keywordNames']:
+            if hasattr(mock_photo_asset, attr):
+                delattr(mock_photo_asset, attr)
+        mock_method_call.return_value = mock_photo_asset
+        
+        keywords = watcher._extract_keywords_from_photokit_asset(mock_method_call, 'fetch_uuid')
+        
+        self.assertEqual(keywords, [])
+
+    def test_when_photokit_method_call_fails_then_returns_empty(self):
+        """Should return empty list when photokit method call fails."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_method_call = MagicMock()
+        mock_method_call.side_effect = Exception("Photokit method failed")
+        
+        keywords = watcher._extract_keywords_from_photokit_asset(mock_method_call, 'fetch_uuid')
+        
+        self.assertEqual(keywords, [])
+
+    def test_when_photokit_method_returns_none_then_returns_empty(self):
+        """Should return empty list when photokit method returns None."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_method_call = MagicMock()
+        mock_method_call.return_value = None
+        
+        keywords = watcher._extract_keywords_from_photokit_asset(mock_method_call, 'fetch_uuid')
+        
+        self.assertEqual(keywords, [])
+
+    # ===== KEYWORD CATEGORY DETECTION TESTS =====
+    
+    def test_when_keywords_contain_colon_then_detects_categories(self):
+        """Should detect category format in keywords with colons."""
+        watcher = self.create_watcher_with_mocks()
+        
+        keywords = ['Christmas: Christmas 2025', 'Family', 'Home: Frankfurter Str 35']
+        keyword_categories = watcher._extract_keyword_categories(keywords)
+        
+        self.assertEqual(keyword_categories, ['Christmas: Christmas 2025', 'Home: Frankfurter Str 35'])
+
+    def test_when_keywords_have_no_colon_then_no_categories(self):
+        """Should return empty list when keywords have no colons."""
+        watcher = self.create_watcher_with_mocks()
+        
+        keywords = ['Family', 'Holiday', 'Travel']
+        keyword_categories = watcher._extract_keyword_categories(keywords)
+        
+        self.assertEqual(keyword_categories, [])
+
+    def test_when_keywords_is_empty_then_no_categories(self):
+        """Should return empty list when keywords list is empty."""
+        watcher = self.create_watcher_with_mocks()
+        
+        keywords = []
+        keyword_categories = watcher._extract_keyword_categories(keywords)
+        
+        self.assertEqual(keyword_categories, [])
+
+    def test_when_keywords_is_none_then_no_categories(self):
+        """Should return empty list when keywords is None."""
+        watcher = self.create_watcher_with_mocks()
+        
+        keywords = None
+        keyword_categories = watcher._extract_keyword_categories(keywords)
+        
+        self.assertEqual(keyword_categories, [])
+
+    def test_when_all_sources_have_categories_then_detects_all(self):
+        """Should detect categories from title, caption, and keywords."""
+        watcher = self.create_watcher_with_mocks()
+        
+        title = "Event: Birthday Party"
+        caption = "Family: Celebration"
+        keywords = ['Christmas: Christmas 2025', 'Home: Frankfurter Str 35']
+        
+        categories = watcher._detect_categories_from_all_sources(title, caption, keywords)
+        
+        self.assertTrue(categories['has_title'])
+        self.assertTrue(categories['has_caption'])
+        self.assertTrue(categories['has_keywords'])
+        self.assertTrue(categories['has_any'])
+        self.assertEqual(categories['keyword_categories'], ['Christmas: Christmas 2025', 'Home: Frankfurter Str 35'])
+
+    def test_when_only_keywords_have_categories_then_detects_keywords_only(self):
+        """Should detect categories only from keywords when title and caption have none."""
+        watcher = self.create_watcher_with_mocks()
+        
+        title = "Simple Title"
+        caption = "Simple Caption"
+        keywords = ['Christmas: Christmas 2025']
+        
+        categories = watcher._detect_categories_from_all_sources(title, caption, keywords)
+        
+        self.assertFalse(categories['has_title'])
+        self.assertFalse(categories['has_caption'])
+        self.assertTrue(categories['has_keywords'])
+        self.assertTrue(categories['has_any'])
+        self.assertEqual(categories['keyword_categories'], ['Christmas: Christmas 2025'])
+
+    def test_when_no_sources_have_categories_then_detects_none(self):
+        """Should detect no categories when no source has colons."""
+        watcher = self.create_watcher_with_mocks()
+        
+        title = "Simple Title"
+        caption = "Simple Caption"
+        keywords = ['Family', 'Holiday']
+        
+        categories = watcher._detect_categories_from_all_sources(title, caption, keywords)
+        
+        self.assertFalse(categories['has_title'])
+        self.assertFalse(categories['has_caption'])
+        self.assertFalse(categories['has_keywords'])
+        self.assertFalse(categories['has_any'])
+        self.assertEqual(categories['keyword_categories'], [])
+
+    # ===== KEYWORD ALBUM PLACEMENT TESTS =====
+    
+    def test_when_processing_asset_with_keyword_categories_then_calls_keyword_processing(self):
+        """Should process keyword categories when asset has keyword categories."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        title = "Simple Title"
+        caption = "Simple Caption"
+        keywords = ['Christmas: Christmas 2025', 'Family']
+        categories = {
+            'has_title': False,
+            'has_caption': False,
+            'has_keywords': True,
+            'keyword_categories': ['Christmas: Christmas 2025'],
+            'has_any': True
+        }
+        
+        with patch.object(watcher, '_perform_multi_album_placement') as mock_placement:
+            mock_placement.return_value = True
+            
+            result = watcher._process_asset_with_categories(mock_asset, title, caption, keywords, categories)
+            
+            self.assertTrue(result)
+            mock_placement.assert_called_once_with(mock_asset, title, caption, keywords, categories)
+
+    def test_when_processing_keyword_category_then_calls_transfer_with_keyword_title(self):
+        """Should call transfer with keyword as custom title when processing keyword category."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        keyword = "Christmas: Christmas 2025"
+        
+        with patch.object(watcher, 'transfer') as mock_transfer:
+            mock_transfer.transfer_asset.return_value = True
+            
+            result = watcher._process_keyword_category(mock_asset, keyword)
+            
+            self.assertEqual(result, 1)
+            mock_transfer.transfer_asset.assert_called_once_with(mock_asset, custom_title=keyword)
+
+    def test_when_keyword_transfer_fails_then_returns_zero(self):
+        """Should return 0 when keyword transfer fails."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        keyword = "Christmas: Christmas 2025"
+        
+        with patch.object(watcher, 'transfer') as mock_transfer:
+            mock_transfer.transfer_asset.return_value = False
+            
+            result = watcher._process_keyword_category(mock_asset, keyword)
+            
+            self.assertEqual(result, 0)
+
+    def test_when_keyword_transfer_raises_exception_then_returns_zero(self):
+        """Should return 0 when keyword transfer raises exception."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        keyword = "Christmas: Christmas 2025"
+        
+        with patch.object(watcher, 'transfer') as mock_transfer:
+            mock_transfer.transfer_asset.side_effect = Exception("Transfer failed")
+            
+            result = watcher._process_keyword_category(mock_asset, keyword)
+            
+            self.assertEqual(result, 0)
+
+    def test_when_multi_album_placement_with_keywords_then_processes_all_keyword_categories(self):
+        """Should process all keyword categories in multi-album placement."""
+        watcher = self.create_watcher_with_mocks()
+        
+        mock_asset = MagicMock()
+        title = "Event: Birthday"
+        caption = None
+        keywords = ['Christmas: Christmas 2025', 'Home: Frankfurter Str 35']
+        categories = {
+            'has_title': True,
+            'has_caption': False,
+            'has_keywords': True,
+            'keyword_categories': ['Christmas: Christmas 2025', 'Home: Frankfurter Str 35'],
+            'has_any': True
+        }
+        
+        with patch.object(watcher, '_process_title_category') as mock_title, \
+             patch.object(watcher, '_process_keyword_category') as mock_keyword:
+            mock_title.return_value = 1
+            mock_keyword.return_value = 1
+            
+            result = watcher._perform_multi_album_placement(mock_asset, title, caption, keywords, categories)
+            
+            self.assertTrue(result)
+            mock_title.assert_called_once_with(mock_asset, title)
+            # Should be called twice for two keyword categories
+            self.assertEqual(mock_keyword.call_count, 2)
+            mock_keyword.assert_any_call(mock_asset, 'Christmas: Christmas 2025')
+            mock_keyword.assert_any_call(mock_asset, 'Home: Frankfurter Str 35')
+
 if __name__ == '__main__':
     unittest.main()
