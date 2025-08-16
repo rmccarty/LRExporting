@@ -392,19 +392,20 @@ class ApplePhotoWatcher:
         print(f"   Type: {asset_data['media_type']}")
         self.logger.info(f"Found {asset_data['media_type']}: {asset_data['filename']}")
         
-        # Extract title and caption
+        # Extract title, caption, and keywords
         asset_obj = asset_data['asset_obj']
         title = asset_data['title']
         caption = self._extract_caption_with_logging(asset_obj, asset_data['filename'])
+        keywords = self._extract_keywords_with_logging(asset_obj, asset_data['filename'])
         
-        # Log title and caption
-        self._log_title_and_caption(title, caption)
+        # Log title, caption, and keywords
+        self._log_title_caption_and_keywords(title, caption, keywords)
         
         # Detect categories and process accordingly
-        categories = self._detect_categories(title, caption)
+        categories = self._detect_categories_from_all_sources(title, caption, keywords)
         
         if categories['has_any']:
-            success = self._process_asset_with_categories(asset_obj, title, caption, categories)
+            success = self._process_asset_with_categories(asset_obj, title, caption, keywords, categories)
             self._handle_processing_result(success, asset_data)
         else:
             self._handle_asset_without_categories(asset_data)
@@ -417,8 +418,115 @@ class ApplePhotoWatcher:
         self.logger.debug(f"Caption extraction completed. Result: {repr(caption)}")
         return caption
 
-    def _log_title_and_caption(self, title, caption):
-        """Log title and caption information."""
+    def _extract_keywords_with_logging(self, asset_obj, filename):
+        """Extract keywords with appropriate logging."""
+        print(f"   🏷️  Extracting keywords from asset...")
+        self.logger.debug(f"Starting keyword extraction for {filename}")
+        keywords = self._extract_keywords_from_asset(asset_obj)
+        self.logger.debug(f"Keyword extraction completed. Result: {repr(keywords)}")
+        return keywords
+
+    def _extract_keywords_from_asset(self, asset_obj):
+        """Extract keywords from PHAsset using multiple methods."""
+        try:
+            # Try direct PHAsset keyword extraction
+            keywords = self._extract_direct_keywords(asset_obj)
+            
+            # Try alternative keyword fields if direct method failed
+            if not keywords:
+                keywords = self._extract_alternative_keywords(asset_obj)
+            
+            # Try photokit integration if other methods failed
+            if not keywords:
+                keywords = self._extract_photokit_keywords(asset_obj)
+            
+            return keywords
+            
+        except Exception as e:
+            self.logger.debug(f"Keyword extraction error: {e}")
+            return []
+
+    def _extract_direct_keywords(self, asset_obj):
+        """Extract keywords directly from PHAsset."""
+        keywords = []
+        if not hasattr(asset_obj, 'valueForKey_'):
+            return keywords
+            
+        try:
+            asset_keywords = asset_obj.valueForKey_('keywords')
+            if asset_keywords:
+                keywords = self._convert_nsarray_to_list(asset_keywords)
+        except Exception as e:
+            self.logger.debug(f"Direct keyword extraction failed: {e}")
+        
+        return keywords
+
+    def _extract_alternative_keywords(self, asset_obj):
+        """Extract keywords from alternative PHAsset fields."""
+        keywords = []
+        try:
+            for field in ['tags', 'keywordTitles', 'keywordNames']:
+                field_value = asset_obj.valueForKey_(field)
+                if field_value:
+                    keywords = self._convert_nsarray_to_list(field_value)
+                    if keywords:
+                        break
+        except Exception as e:
+            self.logger.debug(f"Alternative keyword extraction failed: {e}")
+        
+        return keywords
+
+    def _extract_photokit_keywords(self, asset_obj):
+        """Extract keywords using photokit integration."""
+        if not PHOTOKIT_AVAILABLE:
+            return []
+            
+        try:
+            uuid = self._extract_asset_uuid(asset_obj)
+            photo_library = photokit.PhotoLibrary()
+            return self._try_photokit_keyword_methods(photo_library, uuid)
+        except Exception as e:
+            self.logger.debug(f"Photokit keyword extraction failed: {e}")
+            return []
+
+    def _try_photokit_keyword_methods(self, photo_library, uuid):
+        """Try different photokit methods to extract keywords."""
+        for method_name, method_call in [
+            ('fetch_uuid', lambda: photo_library.fetch_uuid(uuid)),
+            ('get_photo', lambda: photo_library.get_photo(uuid)),
+        ]:
+            if hasattr(photo_library, method_name):
+                keywords = self._extract_keywords_from_photokit_asset(method_call)
+                if keywords:
+                    return keywords
+        return []
+
+    def _extract_keywords_from_photokit_asset(self, method_call):
+        """Extract keywords from a photokit asset using the provided method."""
+        try:
+            photo_asset = method_call()
+            if photo_asset and hasattr(photo_asset, 'keywords'):
+                photo_keywords = photo_asset.keywords
+                if photo_keywords:
+                    return list(photo_keywords)
+        except Exception:
+            pass
+        return []
+
+    def _convert_nsarray_to_list(self, nsarray_obj):
+        """Convert NSArray to Python list of keywords."""
+        keywords = []
+        if hasattr(nsarray_obj, 'count'):
+            for i in range(nsarray_obj.count()):
+                keyword = nsarray_obj.objectAtIndex_(i)
+                if keyword:
+                    keywords.append(str(keyword))
+        else:
+            keywords = list(nsarray_obj)
+        return keywords
+
+    def _log_title_caption_and_keywords(self, title, caption, keywords):
+        """Log title, caption, and keywords information."""
         if title:
             print(f"   📝 Title: '{title}'")
             self.logger.info(f"  Title: {title}")
@@ -432,25 +540,55 @@ class ApplePhotoWatcher:
         else:
             print(f"   💬 Caption: None")
             self.logger.info(f"  Caption: None")
+            
+        if keywords:
+            print(f"   🏷️  Keywords: {keywords}")
+            self.logger.info(f"  Keywords: {keywords}")
+        else:
+            print(f"   🏷️  Keywords: None")
+            self.logger.info(f"  Keywords: None")
 
-    def _detect_categories(self, title, caption):
-        """Detect category format in title and caption."""
+    def _detect_categories_from_all_sources(self, title, caption, keywords):
+        """Detect category format in title, caption, and keywords."""
         has_title_category = title and ':' in title
         has_caption_category = caption and ':' in caption
+        keyword_categories = self._extract_keyword_categories(keywords)
+        has_keyword_categories = len(keyword_categories) > 0
         
-        print(f"   🎯 Category Detection:")
-        print(f"      - Title has colon (:): {has_title_category}")
-        print(f"      - Caption has colon (:): {has_caption_category}")
-        self.logger.debug(f"Category detection - Title has colon: {has_title_category}, Caption has colon: {has_caption_category}")
+        self._log_category_detection_results(has_title_category, has_caption_category, has_keyword_categories, keyword_categories)
         
         return {
             'has_title': has_title_category,
             'has_caption': has_caption_category,
-            'has_any': has_title_category or has_caption_category
+            'has_keywords': has_keyword_categories,
+            'keyword_categories': keyword_categories,
+            'has_any': has_title_category or has_caption_category or has_keyword_categories
         }
 
-    def _process_asset_with_categories(self, asset_obj, title, caption, categories):
-        """Process asset that has category format in title and/or caption."""
+    def _extract_keyword_categories(self, keywords):
+        """Extract keywords that contain category format (colon)."""
+        keyword_categories = []
+        if keywords:
+            for keyword in keywords:
+                if keyword and ':' in keyword:
+                    keyword_categories.append(keyword)
+        return keyword_categories
+
+    def _log_category_detection_results(self, has_title_category, has_caption_category, has_keyword_categories, keyword_categories):
+        """Log category detection results for debugging."""
+        print(f"   🎯 Category Detection:")
+        print(f"      - Title has colon (:): {has_title_category}")
+        print(f"      - Caption has colon (:): {has_caption_category}")
+        print(f"      - Keywords with colon (:): {has_keyword_categories}")
+        if has_keyword_categories:
+            print(f"      - Category keywords: {keyword_categories}")
+        
+        self.logger.debug(f"Category detection - Title: {has_title_category}, Caption: {has_caption_category}, Keywords: {has_keyword_categories}")
+        if keyword_categories:
+            self.logger.debug(f"Category keywords found: {keyword_categories}")
+
+    def _process_asset_with_categories(self, asset_obj, title, caption, keywords, categories):
+        """Process asset that has category format in title, caption, and/or keywords."""
         print(f"   ✅ CATEGORY DETECTED - Processing asset:")
         
         if categories['has_title']:
@@ -459,12 +597,15 @@ class ApplePhotoWatcher:
         if categories['has_caption']:
             print(f"      💬 Category in CAPTION: '{caption}'")
             self.logger.info(f"  Category detected in CAPTION: '{caption}'")
+        if categories['has_keywords']:
+            print(f"      🏷️  Category in KEYWORDS: {categories['keyword_categories']}")
+            self.logger.info(f"  Category detected in KEYWORDS: {categories['keyword_categories']}")
         
-        return self._perform_dual_album_placement(asset_obj, title, caption, categories)
+        return self._perform_multi_album_placement(asset_obj, title, caption, keywords, categories)
 
-    def _perform_dual_album_placement(self, asset_obj, title, caption, categories):
-        """Perform dual album placement for title and/or caption categories."""
-        print(f"   🔄 Processing categories for dual album placement...")
+    def _perform_multi_album_placement(self, asset_obj, title, caption, keywords, categories):
+        """Perform multi-album placement for title, caption, and/or keyword categories."""
+        print(f"   🔄 Processing categories for multi-album placement...")
         
         success_count = 0
         total_attempts = 0
@@ -478,6 +619,12 @@ class ApplePhotoWatcher:
         if categories['has_caption']:
             success_count += self._process_caption_category(asset_obj, caption)
             total_attempts += 1
+        
+        # Process keyword categories if present
+        if categories['has_keywords']:
+            for keyword in categories['keyword_categories']:
+                success_count += self._process_keyword_category(asset_obj, keyword)
+                total_attempts += 1
         
         success = success_count > 0
         print(f"   📊 Album placement summary: {success_count}/{total_attempts} successful")
@@ -519,6 +666,25 @@ class ApplePhotoWatcher:
                 return 0
         except Exception as e:
             print(f"   ❌ ERROR - Caption album processing failed: {e}")
+            return 0
+
+    def _process_keyword_category(self, asset_obj, keyword):
+        """Process keyword category and return 1 if successful, 0 if failed."""
+        category_parts = keyword.split(':', 1)
+        category = category_parts[0].strip()
+        keyword_album = f"02/{category}/{keyword}"
+        print(f"   🏷️  Processing keyword album: '{keyword_album}'")
+        
+        try:
+            success = self.transfer.transfer_asset(asset_obj, custom_title=keyword)
+            if success:
+                print(f"   ✅ SUCCESS - Added to keyword-based album: '{keyword_album}'")
+                return 1
+            else:
+                print(f"   ❌ FAILED - Could not add to keyword-based album: '{keyword_album}'")
+                return 0
+        except Exception as e:
+            print(f"   ❌ ERROR - Keyword album processing failed: {e}")
             return 0
 
     def _handle_processing_result(self, success, asset_data):
