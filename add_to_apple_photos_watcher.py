@@ -153,6 +153,43 @@ class ApplePhotosWatcherAdder:
             print(f"DEBUG: Error fetching photos: {e}")
             return None
     
+    def get_all_photos_batched(self, batch_size=1000):
+        """Get all photos from the library, yielding batches for memory efficiency."""
+        try:
+            print(f"DEBUG: Starting to fetch ALL photos from library in batches of {batch_size}...")
+            with autorelease_pool():
+                fetch_options = Photos.PHFetchOptions.alloc().init()
+                # Sort by creation date (newest first) for consistent ordering
+                fetch_options.setSortDescriptors_([
+                    Photos.NSSortDescriptor.sortDescriptorWithKey_ascending_("creationDate", False)
+                ])
+                
+                print(f"DEBUG: Fetching all assets from library...")
+                # Fetch ALL assets (no limit)
+                all_assets = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
+                total_count = all_assets.count()
+                print(f"DEBUG: Found {total_count} total assets in library")
+                
+                # Process in batches
+                for start_index in range(0, total_count, batch_size):
+                    end_index = min(start_index + batch_size, total_count)
+                    batch_count = end_index - start_index
+                    
+                    print(f"DEBUG: Processing batch {start_index//batch_size + 1}: assets {start_index+1}-{end_index} ({batch_count} assets)")
+                    
+                    # Create a list to hold the batch
+                    batch_assets = []
+                    for i in range(start_index, end_index):
+                        asset = all_assets.objectAtIndex_(i)
+                        batch_assets.append((i, asset))  # Include index for progress tracking
+                    
+                    yield batch_assets, start_index, end_index, total_count
+                
+        except Exception as e:
+            logger.error(f"Error fetching photos from library: {e}")
+            print(f"DEBUG: Error fetching photos: {e}")
+            return None
+    
     def add_assets_to_watching_album(self, assets, watching_album):
         """Add assets to the Watching album in batches with pauses."""
         if not assets or not watching_album:
@@ -284,6 +321,148 @@ class ApplePhotosWatcherAdder:
         
         return True
     
+    def process_entire_library_batched(self, watching_album):
+        """Process the entire library in batches for memory efficiency."""
+        logger.info("Starting full library processing...")
+        
+        # Initialize counters
+        total_added = 0
+        total_errors = 0
+        total_skipped = 0
+        total_title_added = 0
+        total_caption_added = 0
+        total_title_matches = 0
+        total_caption_matches = 0
+        
+        batch_number = 0
+        
+        try:
+            # Process library in batches
+            for batch_data in self.get_all_photos_batched(batch_size=self.batch_size):
+                if batch_data is None:
+                    logger.error("Failed to get batch data")
+                    break
+                    
+                batch_assets, start_index, end_index, total_count = batch_data
+                batch_number += 1
+                
+                logger.info(f"Processing batch {batch_number}: assets {start_index+1}-{end_index} of {total_count}")
+                print(f"DEBUG: Batch {batch_number} - processing {len(batch_assets)} assets")
+                
+                # Process each asset in the batch
+                batch_added = 0
+                batch_errors = 0
+                batch_skipped = 0
+                batch_title_added = 0
+                batch_caption_added = 0
+                
+                for asset_index, asset in batch_assets:
+                    try:
+                        with autorelease_pool():
+                            asset_id = asset.localIdentifier()
+                            media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
+                            title = asset.valueForKey_('title')
+                            
+                            # Get caption (placeholder for now - will be None)
+                            caption = None  # TODO: Implement actual caption extraction
+                            
+                            # Category detection: Title first, then caption fallback
+                            has_category = False
+                            category_source = None
+                            category_text = None
+                            
+                            if title and ':' in title:
+                                # Primary: Title has category format
+                                has_category = True
+                                category_source = "title"
+                                category_text = title
+                                total_title_matches += 1
+                                if title and ':' in title:
+                                    print(f"DEBUG: Asset {asset_index+1}: Category in TITLE: '{title}'")
+                            elif caption and ':' in caption:
+                                # Fallback: Caption has category format
+                                has_category = True
+                                category_source = "caption"
+                                category_text = caption
+                                total_caption_matches += 1
+                                print(f"DEBUG: Asset {asset_index+1}: Category in CAPTION: '{caption}'")
+                            
+                            if has_category:
+                                # Add asset to Watching album
+                                print(f"DEBUG: Adding {media_type} to Watching album")
+                                success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
+                                
+                                if success:
+                                    total_added += 1
+                                    batch_added += 1
+                                    
+                                    # Track the specific reason for addition
+                                    if category_source == "title":
+                                        total_title_added += 1
+                                        batch_title_added += 1
+                                    elif category_source == "caption":
+                                        total_caption_added += 1
+                                        batch_caption_added += 1
+                                    
+                                    logger.info(f"Added {media_type} {total_added} ({category_source}): '{category_text}' ({asset_id[:8]}...)")
+                                    
+                                    # Pause after every 1000 successfully added photos
+                                    if total_added % 1000 == 0:
+                                        logger.info(f"Reached {total_added} added photos - pausing for 10 seconds...")
+                                        time.sleep(10)
+                                else:
+                                    total_errors += 1
+                                    batch_errors += 1
+                                    logger.warning(f"Failed to add asset {asset_index+1}: '{category_text}' ({asset_id[:8]}...)")
+                            else:
+                                # Skip assets without category-format titles
+                                total_skipped += 1
+                                batch_skipped += 1
+                                if total_skipped <= 10:  # Only log first 10 skips to avoid spam
+                                    logger.info(f"Skipped {media_type} {total_skipped} (no colon in title): '{title}' ({asset_id[:8]}...)")
+                    
+                    except Exception as e:
+                        total_errors += 1
+                        batch_errors += 1
+                        logger.error(f"Error processing asset {asset_index+1}: {e}")
+                
+                # Batch summary with running totals
+                logger.info(f"Batch {batch_number} complete: {batch_added} added, {batch_errors} errors, {batch_skipped} skipped")
+                logger.info(f"Running totals: {total_added} total added (Title: {total_title_added}, Caption: {total_caption_added}), {total_errors} errors, {total_skipped} skipped")
+                print(f"DEBUG: Batch {batch_number} - Added: {batch_added} (Title: {batch_title_added}, Caption: {batch_caption_added})")
+                print(f"DEBUG: Running totals - Added: {total_added} (Title: {total_title_added}, Caption: {total_caption_added}), Errors: {total_errors}, Skipped: {total_skipped}")
+                
+                # Pause between batches
+                if batch_number % 10 == 0:  # Pause every 10 batches
+                    logger.info(f"Completed {batch_number} batches - pausing for {self.pause_duration} seconds...")
+                    time.sleep(self.pause_duration)
+        
+        except Exception as e:
+            logger.error(f"Error during batch processing: {e}")
+            return False
+        
+        # Final summary
+        logger.info("=" * 60)
+        logger.info("FULL LIBRARY PROCESSING COMPLETE")
+        logger.info(f"Total assets processed: {start_index + len(batch_assets) if 'start_index' in locals() else 0}")
+        logger.info(f"Successfully added: {total_added}")
+        
+        # Show breakdown by addition reason
+        logger.info(f"  - Title Added: {total_title_added}")
+        logger.info(f"  - Caption Added: {total_caption_added}")
+        
+        # Show detection stats
+        logger.info(f"Detection stats:")
+        logger.info(f"  - Title matches found: {total_title_matches}")
+        logger.info(f"  - Caption matches found: {total_caption_matches}")
+        
+        logger.info(f"Skipped (no category format): {total_skipped}")
+        logger.info(f"Errors: {total_errors}")
+        logger.info(f"Batches processed: {batch_number}")
+        logger.info("=" * 60)
+        
+        return True
+    
     def test_caption_detection(self, assets, max_assets=None):
         """Test caption detection without album operations."""
         if not assets:
@@ -391,7 +570,7 @@ class ApplePhotosWatcherAdder:
         if not watching_album:
             logger.error("Could not find or create Watching album. Exiting.")
             return False
-        logger.info("✓ Watching album ready")
+        logger.info("Watching album ready")
         
         # Step 2: Get limited photos from library for efficient testing
         fetch_limit = max_assets or 50  # Use max_assets or default to 50
@@ -403,19 +582,37 @@ class ApplePhotosWatcherAdder:
             logger.error("Could not fetch photos from library. Exiting.")
             print("DEBUG: get_limited_photos() returned None")
             return False
-        logger.info(f"✓ Found {all_assets.count()} assets for testing")
-        print(f"DEBUG: ✓ Found {all_assets.count()} assets for testing")
+        logger.info(f"Found {all_assets.count()} assets for testing")
+        print(f"DEBUG: Found {all_assets.count()} assets for testing")
         
-        # Step 4: Add assets to Watching album (or test caption detection)
-        print(f"DEBUG: Step 4 - watching_album type: {type(watching_album)}, value: {watching_album}")
-        if watching_album == "test_mode":
-            logger.info("Step 4: Testing caption detection without album operations...")
-            print("DEBUG: Running in test mode - calling test_caption_detection")
-            success = self.test_caption_detection(all_assets, max_assets)
+        # Step 3: Process photos from library
+        if max_assets:
+            # Limited processing for testing
+            logger.info(f"Step 3: Processing limited set of {max_assets} assets...")
+            all_assets = self.get_limited_photos(max_assets)
+            print("DEBUG: get_limited_photos() returned")
+            if not all_assets:
+                logger.error("Could not fetch photos from library. Exiting.")
+                print("DEBUG: get_limited_photos() returned None")
+                return False
+            logger.info(f"Found {all_assets.count()} assets for testing")
+            print(f"DEBUG: Found {all_assets.count()} assets for testing")
+            
+            # Step 4: Add assets to Watching album (or test caption detection)
+            print(f"DEBUG: Step 4 - watching_album type: {type(watching_album)}, value: {watching_album}")
+            if watching_album == "test_mode":
+                logger.info("Step 4: Testing caption detection without album operations...")
+                print("DEBUG: Running in test mode - calling test_caption_detection")
+                success = self.test_caption_detection(all_assets, max_assets)
+            else:
+                logger.info("Step 4: Adding assets to Watching album...")
+                print("DEBUG: Adding assets to Watching album - calling add_assets_to_watching_album")
+                success = self.add_assets_to_watching_album(all_assets, watching_album)
         else:
-            logger.info("Step 4: Adding assets to Watching album...")
-            print("DEBUG: Adding assets to Watching album - calling add_assets_to_watching_album")
-            success = self.add_assets_to_watching_album(all_assets, watching_album)
+            # Full library processing in batches
+            logger.info("Step 3: Processing ENTIRE library in batches...")
+            print("DEBUG: Processing entire library using batch method")
+            success = self.process_entire_library_batched(watching_album)
         
         if success:
             logger.info("Utility completed successfully!")
