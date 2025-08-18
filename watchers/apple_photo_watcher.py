@@ -6,7 +6,14 @@ from pathlib import Path
 from objc import autorelease_pool
 import Photos
 
-from config import SLEEP_TIME
+from config import (
+    SLEEP_TIME, 
+    APPLE_PHOTOS_MAX_ASSETS_PER_CHECK, 
+    APPLE_PHOTOS_PROCESS_NEWEST_FIRST,
+    APPLE_PHOTOS_ENABLE_BATCH_PROCESSING,
+    APPLE_PHOTOS_BATCH_ADD_SIZE,
+    APPLE_PHOTOS_BATCH_REMOVE_SIZE
+)
 from transfers.transfer import Transfer
 
 # Import photokit for caption extraction
@@ -261,10 +268,27 @@ class ApplePhotoWatcher:
         return album
 
     def _fetch_assets_from_album(self, album):
-        """Fetch assets from the album collection."""
+        """Fetch assets from the album collection with configurable limit and sort order."""
         print(f"   🔍 DEBUG: Fetching assets in album...")
-        assets = Photos.PHAsset.fetchAssetsInAssetCollection_options_(album, None)
-        print(f"   📊 DEBUG: Assets fetch result count: {assets.count()}")
+        
+        # Create fetch options with limit to prevent performance issues
+        fetch_options = Photos.PHFetchOptions.alloc().init()
+        fetch_options.setFetchLimit_(APPLE_PHOTOS_MAX_ASSETS_PER_CHECK)
+        
+        # Sort by creation date based on configuration
+        # LIFO (newest first) if APPLE_PHOTOS_PROCESS_NEWEST_FIRST=True
+        # FIFO (oldest first) if APPLE_PHOTOS_PROCESS_NEWEST_FIRST=False
+        ascending = not APPLE_PHOTOS_PROCESS_NEWEST_FIRST
+        sort_descriptor = Photos.NSSortDescriptor.sortDescriptorWithKey_ascending_("creationDate", ascending)
+        fetch_options.setSortDescriptors_([sort_descriptor])
+        
+        assets = Photos.PHAsset.fetchAssetsInAssetCollection_options_(album, fetch_options)
+        
+        processing_order = "newest first (LIFO)" if APPLE_PHOTOS_PROCESS_NEWEST_FIRST else "oldest first (FIFO)"
+        print(f"   📊 DEBUG: Assets fetch result count: {assets.count()} (limited batch, {processing_order})")
+        if assets.count() == APPLE_PHOTOS_MAX_ASSETS_PER_CHECK:
+            print(f"   ⚡ DEBUG: Limited to {APPLE_PHOTOS_MAX_ASSETS_PER_CHECK} assets for performance")
+        
         return assets
 
     def _convert_assets_to_list(self, assets):
@@ -300,18 +324,29 @@ class ApplePhotoWatcher:
     
     def _remove_asset_from_album(self, asset_id: str) -> bool:
         """Remove an asset from the watching album."""
+        print(f"     🔍 DEBUG: _remove_asset_from_album called for ID: {asset_id[:20]}...")
+        
         if not self.watching_album_id:
+            print(f"     ❌ DEBUG: No watching_album_id available")
             return False
             
         try:
             with autorelease_pool():
+                print(f"     🔍 DEBUG: About to fetch album and asset...")
                 album, asset = self._fetch_album_and_asset_for_removal(asset_id)
+                print(f"     🔍 DEBUG: Fetch completed - Album: {'✅' if album else '❌'}, Asset: {'✅' if asset else '❌'}")
+                
                 if not album or not asset:
+                    print(f"     ❌ DEBUG: Missing album or asset - cannot proceed with removal")
                     return False
                 
-                return self._perform_asset_removal(album, asset, asset_id)
+                print(f"     🔍 DEBUG: About to perform asset removal...")
+                result = self._perform_asset_removal(album, asset, asset_id)
+                print(f"     🔍 DEBUG: Asset removal completed - Result: {'✅' if result else '❌'}")
+                return result
                 
         except Exception as e:
+            print(f"     ❌ DEBUG: Exception in _remove_asset_from_album: {e}")
             self.logger.error(f"Error removing asset {asset_id}: {e}")
             return False
 
@@ -368,11 +403,342 @@ class ApplePhotoWatcher:
                 
             print(f"📊 Found {len(assets)} asset(s) in '{self.album_name}' album")
             
-            for i, asset_data in enumerate(assets, 1):
-                self._process_single_asset(asset_data, i, len(assets))
+            if APPLE_PHOTOS_ENABLE_BATCH_PROCESSING:
+                print(f"⚡ Using batch processing (add: {APPLE_PHOTOS_BATCH_ADD_SIZE}, remove: {APPLE_PHOTOS_BATCH_REMOVE_SIZE})")
+                self._process_assets_in_batches(assets)
+            else:
+                print(f"🔄 Using individual processing")
+                for i, asset_data in enumerate(assets, 1):
+                    self._process_single_asset(asset_data, i, len(assets))
                     
         except Exception as e:
             self.logger.error(f"Error checking album: {e}")
+
+    def _process_assets_in_batches(self, assets):
+        """Process assets using batch operations to minimize Photos API calls."""
+        import time
+        batch_start_time = time.time()
+        print(f"\n🔄 Processing {len(assets)} assets in batches...")
+        
+        # Collect batch operations
+        batch_operations = {}  # {album_path: [asset_data, ...]}
+        assets_to_remove = []  # Assets successfully processed
+        processing_summary = {"processed": 0, "successful": 0, "failed": 0}
+        
+        # Phase 1: Analyze assets and collect operations
+        phase1_start_time = time.time()
+        print(f"📋 Phase 1: Analyzing assets and collecting operations...")
+        for i, asset_data in enumerate(assets, 1):
+            print(f"\n📸 Analyzing asset {i}/{len(assets)}: {asset_data['filename']}")
+            
+            try:
+                # Extract metadata
+                asset_obj = asset_data['asset_obj']
+                title = asset_data['title']
+                caption = self._extract_caption_with_logging(asset_obj, asset_data['filename'])
+                keywords = self._extract_keywords_with_logging(asset_obj, asset_data['filename'])
+                
+                # Log metadata
+                self._log_title_caption_and_keywords(title, caption, keywords)
+                
+                # Detect categories
+                categories = self._detect_categories_from_all_sources(title, caption, keywords)
+                processing_summary["processed"] += 1
+                
+                if categories['has_any']:
+                    # Collect album operations for this asset
+                    album_paths = self._collect_album_operations(asset_obj, title, caption, keywords, categories)
+                    if album_paths:
+                        for album_path in album_paths:
+                            if album_path not in batch_operations:
+                                batch_operations[album_path] = []
+                            batch_operations[album_path].append(asset_data)
+                        assets_to_remove.append(asset_data)
+                        processing_summary["successful"] += 1
+                        print(f"   ✅ Queued for batch processing: {len(album_paths)} album(s)")
+                    else:
+                        processing_summary["failed"] += 1
+                        print(f"   ❌ Failed to determine album paths")
+                else:
+                    # No categories detected - still remove from watching
+                    assets_to_remove.append(asset_data)
+                    processing_summary["successful"] += 1
+                    print(f"   ℹ️  No categories detected - will remove from Watching")
+                    
+            except Exception as e:
+                processing_summary["failed"] += 1
+                print(f"   ❌ Error analyzing asset: {e}")
+                self.logger.error(f"Error analyzing {asset_data['filename']}: {e}")
+        
+        # Phase 2: Execute batch operations
+        phase1_duration = time.time() - phase1_start_time
+        phase2_start_time = time.time()
+        print(f"\n🚀 Phase 2: Executing batch operations...")
+        print(f"📊 Analysis summary: {processing_summary['processed']} processed, {processing_summary['successful']} successful, {processing_summary['failed']} failed")
+        print(f"⏱️  Phase 1 completed in {phase1_duration:.2f} seconds")
+        
+        if batch_operations:
+            self._execute_batch_additions(batch_operations)
+        
+        if assets_to_remove:
+            self._execute_batch_removals(assets_to_remove)
+        
+        phase2_duration = time.time() - phase2_start_time
+        total_duration = time.time() - batch_start_time
+        
+        # Calculate average time per asset
+        avg_time_per_asset = total_duration / len(assets) if len(assets) > 0 else 0
+        avg_phase1_per_asset = phase1_duration / len(assets) if len(assets) > 0 else 0
+        avg_phase2_per_asset = phase2_duration / len(assets) if len(assets) > 0 else 0
+        
+        print(f"⏱️  Phase 2 completed in {phase2_duration:.2f} seconds")
+        print(f"⏱️  Total batch processing time: {total_duration:.2f} seconds")
+        print(f"\033[1;32m📊 Performance metrics:")
+        print(f"   • Average time per asset: {avg_time_per_asset:.3f} seconds")
+        print(f"   • Phase 1 (analysis) per asset: {avg_phase1_per_asset:.3f} seconds")
+        print(f"   • Phase 2 (operations) per asset: {avg_phase2_per_asset:.3f} seconds\033[0m")
+        print(f"✅ Batch processing complete!")
+
+    def _collect_album_operations(self, asset_obj, title, caption, keywords, categories):
+        """Collect album paths for an asset based on its categories."""
+        album_paths = []
+        
+        try:
+            # Process title categories
+            if categories['has_title']:
+                paths = self._get_album_paths_for_title(title)
+                album_paths.extend(paths)
+            
+            # Process caption categories  
+            if categories['has_caption']:
+                paths = self._get_album_paths_for_caption(caption)
+                album_paths.extend(paths)
+            
+            # Process keyword categories
+            if categories['has_keywords']:
+                for keyword in categories['keyword_categories']:
+                    paths = self._get_album_paths_for_keyword(keyword)
+                    album_paths.extend(paths)
+            
+            # Remove duplicates while preserving order
+            return list(dict.fromkeys(album_paths))
+            
+        except Exception as e:
+            self.logger.error(f"Error collecting album operations: {e}")
+            return []
+
+    def _get_album_paths_for_title(self, title):
+        """Get album paths for title-based categories."""
+        try:
+            normalized_title = self._normalize_category_format(title, "title")
+            return self.transfer._get_category_based_album_paths(normalized_title)
+        except Exception as e:
+            self.logger.error(f"Error getting album paths for title '{title}': {e}")
+            return []
+
+    def _get_album_paths_for_caption(self, caption):
+        """Get album paths for caption-based categories."""
+        try:
+            normalized_caption = self._normalize_category_format(caption, "caption")
+            return self.transfer._get_category_based_album_paths(normalized_caption)
+        except Exception as e:
+            self.logger.error(f"Error getting album paths for caption: {e}")
+            return []
+
+    def _get_album_paths_for_keyword(self, keyword):
+        """Get album paths for keyword-based categories."""
+        try:
+            normalized_keyword = self._normalize_category_format(keyword, "keyword")
+            return self.transfer._get_category_based_album_paths(normalized_keyword)
+        except Exception as e:
+            self.logger.error(f"Error getting album paths for keyword '{keyword}': {e}")
+            return []
+
+    def _execute_batch_additions(self, batch_operations):
+        """Execute batch additions to target albums."""
+        import time
+        additions_start_time = time.time()
+        print(f"\n📤 Executing batch additions for {len(batch_operations)} album(s)...")
+        
+        for album_path, assets in batch_operations.items():
+            print(f"\n🎯 Processing album: '{album_path}' ({len(assets)} assets)")
+            
+            # Split into batches based on APPLE_PHOTOS_BATCH_ADD_SIZE
+            for i in range(0, len(assets), APPLE_PHOTOS_BATCH_ADD_SIZE):
+                batch = assets[i:i + APPLE_PHOTOS_BATCH_ADD_SIZE]
+                batch_num = (i // APPLE_PHOTOS_BATCH_ADD_SIZE) + 1
+                total_batches = ((len(assets) - 1) // APPLE_PHOTOS_BATCH_ADD_SIZE) + 1
+                
+                batch_start = time.time()
+                print(f"   📦 Batch {batch_num}/{total_batches}: Adding {len(batch)} assets to '{album_path}'")
+                
+                try:
+                    # Use Apple Photos SDK directly to add assets (no duplicate keyword extraction)
+                    success_count = 0
+                    for asset_data in batch:
+                        asset_obj = asset_data['asset_obj']
+                        # Use direct album addition - reuses already-extracted metadata from Phase 1
+                        success = self._add_asset_to_album_direct(asset_obj, album_path)
+                        if success:
+                            success_count += 1
+                    
+                    batch_duration = time.time() - batch_start
+                    print(f"   ✅ Successfully added {success_count}/{len(batch)} assets to '{album_path}' in {batch_duration:.2f}s")
+                    self.logger.info(f"Batch added {success_count}/{len(batch)} assets to '{album_path}' in {batch_duration:.2f}s")
+                    
+                    if success_count < len(batch):
+                        print(f"   ⚠️  {len(batch) - success_count} assets failed to add")
+                        
+                except Exception as e:
+                    batch_duration = time.time() - batch_start
+                    print(f"   ❌ Error adding batch to '{album_path}' after {batch_duration:.2f}s: {e}")
+                    self.logger.error(f"Error in batch addition to '{album_path}' after {batch_duration:.2f}s: {e}")
+        
+        additions_duration = time.time() - additions_start_time
+        print(f"📤 All batch additions completed in {additions_duration:.2f} seconds")
+
+    def _add_asset_to_album_direct(self, asset_obj, album_path):
+        """Add an asset directly to an album using Apple Photos SDK, bypassing Transfer system."""
+        try:
+            # Use the album manager from the Apple Photos SDK to add the asset
+            from apple_photos_sdk import ApplePhotos
+            
+            apple_photos = ApplePhotos()
+            asset_id = asset_obj.localIdentifier()
+            
+            # Add the asset to the specified album path
+            success = apple_photos.album_manager.add_asset_to_targeted_albums(asset_id, [album_path])
+            
+            if success:
+                self.logger.debug(f"Successfully added asset {asset_id} to album '{album_path}'")
+                return True
+            else:
+                self.logger.error(f"Failed to add asset {asset_id} to album '{album_path}'")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error adding asset to album '{album_path}': {e}")
+            return False
+
+    def _remove_assets_batch_from_album(self, asset_ids):
+        """Remove multiple assets from the watching album in a single batch operation."""
+        print(f"     🔍 DEBUG: _remove_assets_batch_from_album called for {len(asset_ids)} assets")
+        
+        if not self.watching_album_id:
+            print(f"     ❌ DEBUG: No watching_album_id available for batch removal")
+            return False
+            
+        try:
+            with autorelease_pool():
+                print(f"     🔍 DEBUG: Fetching album for batch removal...")
+                # Fetch the watching album
+                album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_(
+                    [self.watching_album_id], None
+                )
+                
+                if album_result.count() == 0:
+                    print(f"     ❌ DEBUG: Could not find watching album")
+                    return False
+                    
+                album = album_result.objectAtIndex_(0)
+                print(f"     ✅ DEBUG: Found watching album")
+                
+                print(f"     🔍 DEBUG: Fetching {len(asset_ids)} assets for batch removal...")
+                # Fetch all assets in one call
+                assets_result = Photos.PHAsset.fetchAssetsWithLocalIdentifiers_options_(
+                    asset_ids, None
+                )
+                
+                if assets_result.count() == 0:
+                    print(f"     ❌ DEBUG: No assets found for batch removal")
+                    return False
+                    
+                print(f"     ✅ DEBUG: Found {assets_result.count()} assets for removal")
+                
+                # Perform batch removal using change request
+                print(f"     🔍 DEBUG: Executing batch removal change request...")
+                def perform_batch_removal():
+                    change_request = Photos.PHAssetCollectionChangeRequest.changeRequestForAssetCollection_(album)
+                    if change_request:
+                        change_request.removeAssets_(assets_result)
+                    # Must return None for Apple Photos API compatibility
+                    return None
+                
+                # Execute the change request
+                success = Photos.PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_(
+                    perform_batch_removal, None
+                )
+                
+                if success[0]:  # success is a tuple (bool, error)
+                    print(f"     ✅ DEBUG: Batch removal completed successfully")
+                    self.logger.info(f"Successfully removed {assets_result.count()} assets from watching album")
+                    return True
+                else:
+                    error = success[1] if len(success) > 1 else "Unknown error"
+                    print(f"     ❌ DEBUG: Batch removal failed: {error}")
+                    self.logger.error(f"Batch removal failed: {error}")
+                    return False
+                    
+        except Exception as e:
+            print(f"     ❌ DEBUG: Exception in batch removal: {e}")
+            self.logger.error(f"Error in batch removal: {e}")
+            return False
+
+    def _execute_batch_removals(self, assets_to_remove):
+        """Execute batch removals from Watching album."""
+        import time
+        removals_start_time = time.time()
+        print(f"\n🗑️  Executing batch removals from Watching album ({len(assets_to_remove)} assets)...")
+        
+        # Split into batches based on APPLE_PHOTOS_BATCH_REMOVE_SIZE
+        for i in range(0, len(assets_to_remove), APPLE_PHOTOS_BATCH_REMOVE_SIZE):
+            batch = assets_to_remove[i:i + APPLE_PHOTOS_BATCH_REMOVE_SIZE]
+            batch_num = (i // APPLE_PHOTOS_BATCH_REMOVE_SIZE) + 1
+            total_batches = ((len(assets_to_remove) - 1) // APPLE_PHOTOS_BATCH_REMOVE_SIZE) + 1
+            
+            batch_start = time.time()
+            print(f"   📦 Batch {batch_num}/{total_batches}: Removing {len(batch)} assets from Watching")
+            
+            try:
+                success_count = 0
+                asset_ids = [asset_data['id'] for asset_data in batch]
+                
+                print(f"   🔍 DEBUG: Starting removal of {len(asset_ids)} assets")
+                for i, asset_id in enumerate(asset_ids):
+                    print(f"   🔍 DEBUG: Asset {i+1}/{len(asset_ids)} - ID: {asset_id[:20]}...")
+                
+                # Use batch removal if available, otherwise fall back to individual
+                if hasattr(self, '_remove_assets_batch_from_album'):
+                    print(f"   🔍 DEBUG: Using batch removal method")
+                    success = self._remove_assets_batch_from_album(asset_ids)
+                    if success:
+                        success_count = len(batch)
+                else:
+                    # Fall back to individual removals
+                    print(f"   🔍 DEBUG: Using individual removal method")
+                    for i, asset_data in enumerate(batch):
+                        asset_id = asset_data['id']
+                        filename = asset_data.get('filename', 'unknown')
+                        print(f"   🔍 DEBUG: Removing asset {i+1}/{len(batch)} - {filename} (ID: {asset_id[:20]}...)")
+                        
+                        if self._remove_asset_from_album(asset_id):
+                            success_count += 1
+                            print(f"   ✅ DEBUG: Successfully removed {filename}")
+                        else:
+                            print(f"   ❌ DEBUG: Failed to remove {filename}")
+                
+                batch_duration = time.time() - batch_start
+                print(f"   ✅ Successfully removed {success_count}/{len(batch)} assets from Watching in {batch_duration:.2f}s")
+                if success_count < len(batch):
+                    print(f"   ⚠️  {len(batch) - success_count} assets failed to remove")
+                    
+            except Exception as e:
+                batch_duration = time.time() - batch_start
+                print(f"   ❌ Error removing batch from Watching after {batch_duration:.2f}s: {e}")
+                self.logger.error(f"Error in batch removal after {batch_duration:.2f}s: {e}")
+        
+        removals_duration = time.time() - removals_start_time
+        print(f"🗑️  All batch removals completed in {removals_duration:.2f} seconds")
 
     def _get_assets_for_processing(self):
         """Get assets from the watching album, returning None if no assets to process."""
@@ -584,9 +950,9 @@ class ApplePhotoWatcher:
             self.logger.info(f"  Keywords: None (no keywords found)")
 
     def _detect_categories_from_all_sources(self, title, caption, keywords):
-        """Detect category format in title, caption, and keywords."""
-        has_title_category = title and ':' in title
-        has_caption_category = caption and ':' in caption
+        """Detect category format (colon-separated) from title, caption, and keywords."""
+        has_title_category = title and ':' in title and self._is_valid_category_text(title)
+        has_caption_category = caption and ':' in caption and self._is_valid_category_text(caption)
         keyword_categories = self._extract_keyword_categories(keywords)
         has_keyword_categories = len(keyword_categories) > 0
         
@@ -600,12 +966,72 @@ class ApplePhotoWatcher:
             'has_any': has_title_category or has_caption_category or has_keyword_categories
         }
 
+    def _is_valid_category_text(self, text):
+        """Check if text contains valid category format vs technical metadata."""
+        if not text or not isinstance(text, str):
+            return False
+            
+        # Filter out JSON-like technical metadata
+        if text.strip().startswith('{') and text.strip().endswith('}'):
+            return False
+            
+        # Filter out technical metadata patterns
+        technical_patterns = [
+            'cameraPreset',
+            'cameraType', 
+            'macroEnabled',
+            'qualityMode',
+            'deviceTilt',
+            'exposureMode',
+            'whiteBalanceProgram',
+            'shootingMode',
+            'focusMode',
+            'ISO:',
+            'F:',
+            'SS:',
+            'GPS:',
+            '":'  # JSON key-value pairs
+        ]
+        
+        for pattern in technical_patterns:
+            if pattern in text:
+                return False
+                
+        # Valid category format should be human-readable
+        # Example: "Travel: Paris 2024", "Family: Christmas"
+        if ':' in text:
+            parts = text.split(':')
+            if len(parts) == 2:
+                category = parts[0].strip()
+                description = parts[1].strip()
+                # Category should be reasonable length and not technical
+                if (2 <= len(category) <= 50 and 
+                    2 <= len(description) <= 100 and
+                    category.replace(' ', '').isalpha()):  # Category should be mostly letters
+                    return True
+                    
+        return False
+
+    def _normalize_category_format(self, text, source_type="text"):
+        """Normalize category format by ensuring space after colon for Transfer class compatibility."""
+        if not text or ':' not in text:
+            return text
+            
+        # Add space after colon if missing
+        normalized = text.replace(':', ': ') if ': ' not in text else text
+        
+        # Debug output if normalization occurred
+        if normalized != text:
+            print(f"   🔍 DEBUG: Normalized {source_type} '{text}' to '{normalized}'")
+            
+        return normalized
+
     def _extract_keyword_categories(self, keywords):
         """Extract keywords that contain category format (colon)."""
         keyword_categories = []
         if keywords:
             for keyword in keywords:
-                if keyword and ':' in keyword:
+                if keyword and ':' in keyword and self._is_valid_category_text(keyword):
                     keyword_categories.append(keyword)
         return keyword_categories
 
