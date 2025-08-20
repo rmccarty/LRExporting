@@ -19,7 +19,7 @@ SLEEP_TIME = 10
 
 # Apple Photos Watcher configuration
 # Maximum number of assets to fetch from Watching album per check (prevents performance issues with large albums)
-APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 1500 
+APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 5000 
 
 # Processing order for assets in Watching album
 # True = LIFO (newest first) - process recently added photos first
@@ -31,10 +31,10 @@ APPLE_PHOTOS_PROCESS_NEWEST_FIRST = True
 APPLE_PHOTOS_ENABLE_BATCH_PROCESSING = True
 
 # Maximum number of assets to add to a single album in one batch operation
-APPLE_PHOTOS_BATCH_ADD_SIZE = 1500
+APPLE_PHOTOS_BATCH_ADD_SIZE = 5000
 
 # Maximum number of assets to remove from Watching album in one batch operation  
-APPLE_PHOTOS_BATCH_REMOVE_SIZE = 1500
+APPLE_PHOTOS_BATCH_REMOVE_SIZE = 5000
 
 # File patterns
 JPEG_PATTERN = '*.[Jj][Pp][Gg]'
