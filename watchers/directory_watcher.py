@@ -83,14 +83,13 @@ class DirectoryWatcher(BaseWatcher):
                 
                 # Check if title has category format (contains colon) for Watching album
                 if title and ':' in title:
-                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos and adding to Watching album")
-                    # Import to Apple Photos with Watching album for further processing
-                    watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
-                    self.transfer.transfer_file(file_path, album_paths=[watching_album_path])
+                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos Watcher album")
+                    # Import to Apple Photos Watcher album for further processing
+                    self.transfer.transfer_file(file_path)
                 else:
-                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos only")
-                    # Import to Apple Photos without any specific album
-                    self.transfer.transfer_file(file_path, album_paths=[])
+                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos Watcher album")
+                    # Import to Apple Photos Watcher album
+                    self.transfer.transfer_file(file_path)
                 return
                 
             # For files in regular directories, skip if already processed
@@ -123,14 +122,13 @@ class DirectoryWatcher(BaseWatcher):
             if new_path:
                 # Check if title has category format (contains colon) for Watching album
                 if title and ':' in title:
-                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos and adding to Watching album")
-                    # Import to Apple Photos with Watching album for further processing
-                    watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
-                    self.transfer.transfer_file(new_path, album_paths=[watching_album_path])
+                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos Watcher album")
+                    # Import to Apple Photos Watcher album for further processing
+                    self.transfer.transfer_file(new_path)
                 else:
-                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos only")
-                    # Import to Apple Photos without any specific album
-                    self.transfer.transfer_file(new_path, album_paths=[])
+                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos Watcher album")
+                    # Import to Apple Photos Watcher album
+                    self.transfer.transfer_file(new_path)
                 
         except Exception as e:
             self.logger.error(f"Error processing file {file_path}: {e}")

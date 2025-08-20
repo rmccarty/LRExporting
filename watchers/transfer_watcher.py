@@ -31,9 +31,8 @@ class TransferWatcher:
         from config import APPLE_PHOTOS_WATCHING
         self.logger.info(f"Importing {file_path.name} to Apple Photos and adding to Watching album for processing")
         
-        # Import to Apple Photos with Watching album for further processing by Apple Photo Watcher
-        watching_album_path = str(APPLE_PHOTOS_WATCHING).rstrip('/')
-        return self.transfer.transfer_file(file_path, album_paths=[watching_album_path])
+        # Import to Apple Photos Watcher album for further processing by Apple Photo Watcher
+        return self.transfer.transfer_file(file_path)
 
         
     def check_directory(self, directory: Path):

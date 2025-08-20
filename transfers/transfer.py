@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import shutil
 import yaml
 
-from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS, CATEGORY_PREFIX
+from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS, CATEGORY_PREFIX, APPLE_PHOTOS_WATCHING
 from apple_photos_sdk import ApplePhotos
 from apple_photos_sdk.album import AlbumManager
 import Photos
@@ -215,220 +215,33 @@ class Transfer:
             
         return True
         
-    def _get_album_paths_from_keywords(self, keywords: list[str], title: str | None = None) -> list[str]:
-        """Given a list of keywords, return album paths based on patterns:
-        1. Folder/Album: use album.yaml to map 'Folder' and append 'Album'
-        2. Folder/: use album.yaml to map 'Folder' and append photo title
-        3. Plain Folder: use album.yaml to map 'Folder' and append photo title
-        4. Keyword ending with colon (e.g., 'Travel:'): use as category and create {CATEGORY_PREFIX}/category/title path
-        """
-        try:
-            with open("album.yaml", "r") as f:
-                mapping = yaml.safe_load(f)
-        except Exception as e:
-            self.logger.error(f"Error loading album.yaml: {e}")
-            return []
-        album_paths = []
-        for kw in keywords:
-            # Case 4: Keyword with colon (e.g. "Gravestones: McCarty") - create hierarchical album path
-            if ":" in kw and title:
-                # Skip keywords ending with just a colon (e.g., "Wedding:")
-                if kw.endswith(":") and kw.count(":") == 1:
-                    self.logger.debug(f"Ignoring keyword ending with colon: {kw}")
-                    continue  # Skip further processing for this keyword
-                
-                # For all other colon-containing keywords, extract the category and create hierarchical path
-                if ":" in kw and kw.count(":") == 1 and ": " in kw:
-                    category = kw.split(": ")[0].strip()
-                    # Create hierarchical path: CATEGORY_PREFIX/Category/Full Keyword
-                    album_path = f"{CATEGORY_PREFIX}/{category}/{kw}"
-                    self.logger.info(f"Created hierarchical album path from colon-keyword: {album_path}")
-                else:
-                    # Fall back to flat structure for non-standard colons
-                    album_path = f"{CATEGORY_PREFIX}/{kw}"
-                    self.logger.info(f"Created flat album path from non-standard colon-keyword: {album_path}")
-                album_paths.append(album_path)
-                continue  # Skip further processing for this keyword
-                    
-            # Normalize keywords that are a single word ending with a slash (e.g., 'RTPC/')
-            if kw.endswith("/") and "/" not in kw[:-1]:
-                normalized_kw = kw.rstrip("/")
-                if normalized_kw in mapping and title:
-                    base_path = mapping[normalized_kw].rstrip("/")
-                    album_path = f"{base_path}/{title.strip()}"
-                    album_paths.append(album_path)
-                    continue  # Skip further processing for this kw
-            if "/" in kw:
-                folder, album = kw.split("/", 1)
-                folder = folder.strip()
-                album = album.strip()
-                if folder in mapping:
-                    base_path = mapping[folder].rstrip("/")
-                    # Case 1: Folder/Album (album is non-empty)
-                    if album:
-                        album_path = f"{base_path}/{album}"
-                        album_paths.append(album_path)
-                    # Case 2: Folder/ (album is empty)
-                    elif title:
-                        album_path = f"{base_path}/{title.strip()}"
-                        album_paths.append(album_path)
-            # Case 3: Keyword is just a folder (no slash)
-            elif kw in mapping and title:
-                base_path = mapping[kw].rstrip("/")
-                album_path = f"{base_path}/{title.strip()}"
-                album_paths.append(album_path)
-            # End normalization logic
-        # Deduplicate
-        return list(dict.fromkeys(album_paths))
+    # Removed: Album creation logic moved to dedicated watcher
 
-    def _get_album_paths_for_city(self, city: str, title: str = None) -> list[str]:
-        """Load album paths for a given city from album.yaml. If mapping ends with '/', append title as sub-album."""
-        try:
-            with open("album.yaml", "r") as f:
-                mapping = yaml.safe_load(f)
-            if city in mapping:
-                mapped = mapping[city]
-                result = []
-                # If it's a list, handle each entry
-                if isinstance(mapped, list):
-                    for m in mapped:
-                        if isinstance(m, str) and m.endswith("/") and title:
-                            result.append(f"{m}{title.strip()}")
-                        elif isinstance(m, str):
-                            result.append(m)
-                # If it's a string
-                elif isinstance(mapped, str):
-                    if mapped.endswith("/") and title:
-                        result.append(f"{mapped}{title.strip()}")
-                    else:
-                        result.append(mapped)
-                # Deduplicate
-                return list(dict.fromkeys(result))
-            else:
-                self.logger.warning(f"No album mapping found for city: {city}")
-                return []
-        except Exception as e:
-            self.logger.error(f"Error loading album.yaml: {e}")
-            return []
+    # Removed: Album creation logic moved to dedicated watcher
 
-    def _get_album_paths_for_location(self, location: str, title: str = None) -> list[str]:
-        """Load album paths for a given location from album.yaml. If mapping ends with '/', append title as sub-album."""
-        try:
-            with open("album.yaml", "r") as f:
-                mapping = yaml.safe_load(f)
-            if location in mapping:
-                mapped = mapping[location]
-                result = []
-                # If it's a list, handle each entry
-                if isinstance(mapped, list):
-                    for m in mapped:
-                        if isinstance(m, str) and m.endswith("/") and title:
-                            result.append(f"{m}{title.strip()}")
-                        elif isinstance(m, str):
-                            result.append(m)
-                # If it's a string
-                elif isinstance(mapped, str):
-                    if mapped.endswith("/") and title:
-                        result.append(f"{mapped}{title.strip()}")
-                    else:
-                        result.append(mapped)
-                # Deduplicate
-                return list(dict.fromkeys(result))
-            else:
-                self.logger.warning(f"No album mapping found for location: {location}")
-                return []
-        except Exception as e:
-            self.logger.error(f"Error loading album.yaml: {e}")
-            return []
+    # Removed: Album creation logic moved to dedicated watcher
             
-    def _get_album_paths_for_state(self, state: str, title: str = None) -> list[str]:
-        """Load album paths for a given state from album.yaml. If mapping ends with '/', append title as sub-album."""
-        if not state:
-            return []
-            
-        try:
-            with open("album.yaml", "r") as f:
-                mapping = yaml.safe_load(f)
-            if state in mapping:
-                mapped = mapping[state]
-                result = []
-                # If it's a list, handle each entry
-                if isinstance(mapped, list):
-                    for m in mapped:
-                        if isinstance(m, str) and m.endswith("/") and title:
-                            result.append(f"{m}{title.strip()}")
-                        elif isinstance(m, str):
-                            result.append(m)
-                # If it's a string
-                elif isinstance(mapped, str):
-                    if mapped.endswith("/") and title:
-                        result.append(f"{mapped}{title.strip()}")
-                    else:
-                        result.append(mapped)
-                # Deduplicate
-                self.logger.debug(f"Found album paths for state '{state}': {result}")
-                return list(dict.fromkeys(result))
-            else:
-                self.logger.debug(f"No album mapping found for state: {state}")
-                return []
-        except Exception as e:
-            self.logger.error(f"Error loading album.yaml for state lookup: {e}")
-            return []
+    # Removed: Album creation logic moved to dedicated watcher
 
-    def _import_to_photos(self, photo_path: Path, album_paths: list[str] = None) -> bool:
-        """Import a photo into Apple Photos with simplified album logic."""
+    def _import_to_photos(self, photo_path: Path) -> bool:
+        """Import a photo into Apple Photos to Watching album only."""
         
-        # Simply import to Apple Photos with the provided album paths (if any)
-        # No complex metadata extraction or album calculation here
         photo_name = photo_path.name
+        watching_album = [str(APPLE_PHOTOS_WATCHING).rstrip('/')]
         
-        if album_paths:
-            self.logger.info(f"Importing {photo_name} to Apple Photos with album paths: {album_paths}")
-            print(f"\n📸 IMPORTING: {photo_name}")
-            print(f"📁 TO ALBUM(S): {', '.join(album_paths)}")
-        else:
-            self.logger.info(f"Importing {photo_name} to Apple Photos (no specific albums)")
-            print(f"\n📸 IMPORTING: {photo_name} (no specific albums)")
+        self.logger.info(f"Importing {photo_name} to Apple Photos Watching album")
+        print(f"\n📸 IMPORTING: {photo_name}")
+        print(f"📁 TO ALBUM: {watching_album[0]}")
             
-        success = ApplePhotos().import_photo(photo_path, album_paths=album_paths or [])
+        success = ApplePhotos().import_photo(photo_path, album_paths=watching_album)
         if success:
-            self.logger.info(f"Successfully imported {photo_path} to Apple Photos")
+            self.logger.info(f"Successfully imported {photo_path} to Apple Photos Watching album")
             return True
         else:
             self.logger.error(f"Failed to import {photo_path} to Apple Photos")
             return False
 
-    def _get_category_based_album_paths(self, title: str) -> list[str]:
-        """
-        Parse photo title for category-based album paths.
-        If title has format "Category: Details", dynamically create album path
-        in format "02/Category/Full Title" without consulting album.yaml.
-        
-        Args:
-            title: Photo title to parse
-            
-        Returns:
-            list[str]: List of album paths derived from title category
-        """
-        if not title:
-            self.logger.info("No title provided - no album placement")
-            return []
-        
-        # Check for "Category: Details" format (single colon followed by space)
-        if ":" in title and title.count(":") == 1 and ": " in title:
-            category = title.split(": ")[0].strip()
-            self.logger.info(f"Extracted category '{category}' from title '{title}'")
-            
-            if category:
-                # Dynamic path creation - use CATEGORY_PREFIX from config and create folder based on category
-                # Do not consult album.yaml - create this dynamically
-                album_path = f"{CATEGORY_PREFIX}/{category}/{title}"
-                self.logger.info(f"Created dynamic category-based album path: {album_path}")
-                return [album_path]
-        else:
-            self.logger.info(f"Title '{title}' does not match 'Category: Details' format - no album placement")
-                
-        return []
+    # Removed: Album creation logic moved to dedicated watcher
     
     def extract_city_from_exif(self, exif_data: dict) -> str:
         """Try to extract city from all common EXIF fields."""
@@ -441,11 +254,11 @@ class Transfer:
                 return city
         return None
 
-    def _perform_transfer(self, file_path: Path, dest_dir: Path, album_paths: list[str] = None) -> bool:
+    def _perform_transfer(self, file_path: Path, dest_dir: Path) -> bool:
         """
         Transfer a file to its destination.
         """
-        self.logger.info(f"[TRANSFER] _perform_transfer called for {file_path} to {dest_dir} with album_paths: {album_paths}")
+        self.logger.info(f"[TRANSFER] _perform_transfer called for {file_path} to {dest_dir}")
         try:
             # First move file to destination
             dest_dir.mkdir(parents=True, exist_ok=True)
@@ -455,8 +268,8 @@ class Transfer:
             self.logger.info(f"Successfully moved file to {dest_path}")
             
             if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS:
-                self.logger.debug(f"Importing {dest_path} to Apple Photos")
-                return self._import_to_photos(dest_path, album_paths=album_paths)
+                self.logger.debug(f"Importing {dest_path} to Apple Photos Watcher album")
+                return self._import_to_photos(dest_path)
             elif dest_dir in APPLE_PHOTOS_PATHS:
                 self.logger.info(f"Apple Photos processing is disabled. Skipping import of {dest_path}")
             
@@ -465,10 +278,10 @@ class Transfer:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
             return False
 
-    def transfer_file(self, file_path: Path, album_paths: list[str] = None) -> bool:
+    def transfer_file(self, file_path: Path) -> bool:
         """
         Transfer a file to its destination. Has two paths:
-        1. Apple Photos path: Directly imports media files to Photos
+        1. Apple Photos path: Directly imports media files to Photos Watcher album
         2. Regular path: Requires these conditions:
            - File ends with _LRE
            - Source directory has a configured destination
@@ -477,18 +290,17 @@ class Transfer:
         
         Args:
             file_path: Path to the file to transfer
-            album_paths: Optional list of album paths to use for import (city-based mapping)
             
         Returns:
             bool: True if transfer succeeded, False otherwise
         """
-        self.logger.info(f"[TRANSFER] transfer_file called for {file_path} with album_paths: {album_paths}")
+        self.logger.info(f"[TRANSFER] transfer_file called for {file_path}")
         try:
             # Check if source is an Apple Photos directory
             if ENABLE_APPLE_PHOTOS and any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 # Skip validation for Apple Photos imports
-                self.logger.info(f"Importing to Apple Photos: {file_path}")
-                return self._import_to_photos(file_path, album_paths=album_paths)
+                self.logger.info(f"Importing to Apple Photos Watcher album: {file_path}")
+                return self._import_to_photos(file_path)
             elif any(file_path.parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
                 self.logger.info(f"Apple Photos processing is disabled. Skipping import of {file_path}")
                 return True
@@ -515,7 +327,7 @@ class Transfer:
             except Exception as ex:
                 self.logger.warning(f"Could not log EXIF before move: {ex}")
             # Move file
-            result = self._perform_transfer(file_path, dest_dir, album_paths=album_paths)
+            result = self._perform_transfer(file_path, dest_dir)
             # Log EXIF data after moving
             try:
                 if file_path.suffix.lower() in ['.jpg', '.jpeg']:
@@ -532,12 +344,12 @@ class Transfer:
     
     def transfer_asset(self, asset, custom_title=None) -> bool:
         """
-        Transfer an Apple Photos asset by applying album placement logic.
-        Follows the same pattern as transfer_file() but for Apple Photos assets.
+        Transfer an Apple Photos asset to Watching album only.
+        Simplified - no complex album placement logic.
         
         Args:
             asset: Apple Photos PHAsset object
-            custom_title: Optional custom title to use instead of asset's title
+            custom_title: Optional custom title (ignored - for compatibility)
             
         Returns:
             bool: True if transfer succeeded, False otherwise
@@ -545,351 +357,30 @@ class Transfer:
         try:
             self.logger.info(f"[TRANSFER] transfer_asset called for asset: {asset.localIdentifier()}")
             
-            # Extract metadata from Apple Photos asset
-            metadata = self._extract_metadata_from_asset(asset, custom_title)
-            self.logger.info(f"[TRANSFER] Extracted metadata: {metadata}")
+            # Simply add asset to Watching album
+            asset_id = asset.localIdentifier()
+            watching_album = [str(APPLE_PHOTOS_WATCHING).rstrip('/')]
             
-            # Apply existing album placement logic using extracted metadata
-            album_paths = self._get_album_paths_for_asset_metadata(metadata)
+            self.logger.info(f"[TRANSFER] Adding asset to Watching album: {asset_id}")
+            success = self.album_manager.add_to_albums(asset_id, watching_album)
             
-            if album_paths:
-                self.logger.info(f"[TRANSFER] Calculated album paths: {album_paths}")
-                self.logger.info(f"[TRANSFER] Album paths type check: {[type(path) for path in album_paths]}")
-                
-                # Validate album paths are strings
-                validated_paths = []
-                for path in album_paths:
-                    if isinstance(path, str):
-                        validated_paths.append(path)
-                    else:
-                        self.logger.error(f"[TRANSFER] Invalid album path type: {type(path)} - {path}")
-                        return False
-                
-                # Actually create albums and add asset to them
-                asset_id = asset.localIdentifier()
-                self.logger.info(f"[TRANSFER] Asset ID: {asset_id}")
-                self.logger.info(f"[TRANSFER] Validated album paths: {validated_paths}")
-                success = self.album_manager.add_to_albums(asset_id, validated_paths)
-                
-                if success:
-                    self.logger.info(f"[TRANSFER] Successfully added asset to albums: {album_paths}")
-                    return True
-                else:
-                    self.logger.error(f"[TRANSFER] Failed to add asset to some albums: {album_paths}")
-                    return False
+            if success:
+                self.logger.info(f"[TRANSFER] Successfully added asset to Watching album")
+                return True
             else:
-                self.logger.info(f"[TRANSFER] No album paths generated for asset")
-                return True  # Not an error - just no placement rules matched
+                self.logger.error(f"[TRANSFER] Failed to add asset to Watching album")
+                return False
                 
         except Exception as e:
             self.logger.error(f"Transfer failed for asset {asset.localIdentifier()}: {e}")
             return False
     
-    def _extract_metadata_from_asset(self, asset, custom_title=None) -> dict:
-        """Extract title metadata from Apple Photos asset for album placement."""
-        try:
-            with autorelease_pool():
-                # Use custom title if provided, otherwise extract from asset
-                if custom_title:
-                    title = custom_title
-                    self.logger.info(f"Using custom title: '{title}' for asset")
-                else:
-                    title = asset.valueForKey_('title')
-                    self.logger.info(f"Extracted title: '{title}' from asset")
-                
-                metadata = {
-                    'title': title,
-                    'media_type': 'photo' if asset.mediaType() == Photos.PHAssetMediaTypeImage else 'video'
-                }
-                return metadata
-        except Exception as e:
-            self.logger.error(f"Error extracting metadata from asset: {e}")
-            return {}
+    # Removed: Metadata extraction no longer needed for simplified transfer
     
-    def _get_asset_keywords(self, asset) -> list[str]:
-        """Extract keywords from Apple Photos asset using PhotoKit."""
-        try:
-            # Try to extract real keywords from Apple Photos
-            real_keywords = self._extract_real_keywords_from_asset(asset)
-            if real_keywords:
-                self.logger.info(f"[PHOTOKIT] Extracted real keywords from asset: {real_keywords}")
-                return real_keywords
-            
-            # FALLBACK TESTING: Simulate keywords based on title for testing category-based keywords
-            # This allows us to test the keyword-based category logic when PhotoKit doesn't find keywords
-            title = asset.valueForKey_('title')
-            if title:
-                # For testing: if title contains category patterns, simulate as keyword too
-                # This demonstrates how keyword-based categories would work
-                if title.startswith(("Party:", "Travel:", "Event:", "RTPC:", "Work:", "Family:", "Birthday:")):
-                    self.logger.info(f"[TESTING] Simulating keyword from title: {title}")
-                    return [title]  # Simulate the title as a keyword for testing
-                
-                # Enhanced: Also detect category words in titles (without colon requirement)
-                category_words = ["Birthday", "Party", "Travel", "Event", "Work", "Family", "Wedding", "Vacation"]
-                for category in category_words:
-                    if category.lower() in title.lower():
-                        simulated_keyword = f"{category}: {title}"
-                        self.logger.info(f"[TESTING] Simulating category keyword from title: {simulated_keyword}")
-                        return [simulated_keyword]
-            
-            return []
-        except Exception as e:
-            self.logger.debug(f"Could not extract keywords from asset: {e}")
-            return []
+    # Removed: Keyword extraction no longer needed for simplified transfer
     
-    def _extract_real_keywords_from_asset(self, asset) -> list[str]:
-        """Extract real keywords from Apple Photos database."""
-        try:
-            asset_uuid = asset.localIdentifier().split('/')[0]  # Extract UUID from identifier
-            self.logger.debug(f"Asset UUID for keyword lookup: {asset_uuid}")
-            
-            # Find the Photos library database
-            photos_db_path = self._find_photos_database()
-            if not photos_db_path:
-                self.logger.debug("Could not find Photos database")
-                return []
-            
-            # Query the database for keywords
-            keywords = self._query_keywords_from_database(photos_db_path, asset_uuid)
-            if keywords:
-                self.logger.debug(f"Found keywords in database: {keywords}")
-                return keywords
-            
-            return []
-                
-        except Exception as e:
-            self.logger.debug(f"Real keyword extraction failed: {e}")
-            return []
+    # Removed: Real keyword extraction no longer needed for simplified transfer
     
-    def _find_photos_database(self) -> str | None:
-        """Find the Apple Photos database file."""
-        try:
-            # Common Photos library locations
-            home = Path.home()
-            possible_paths = [
-                home / "Pictures" / "Photos Library.photoslibrary" / "database" / "Photos.sqlite",
-                home / "Pictures" / "Photos Library.photoslibrary" / "database" / "photos.db",
-            ]
-            
-            for path in possible_paths:
-                if path.exists():
-                    self.logger.debug(f"Found Photos database at: {path}")
-                    return str(path)
-            
-            # Try to find any .photoslibrary directory
-            pictures_dir = home / "Pictures"
-            if pictures_dir.exists():
-                for item in pictures_dir.iterdir():
-                    if item.is_dir() and item.name.endswith('.photoslibrary'):
-                        db_path = item / "database" / "Photos.sqlite"
-                        if db_path.exists():
-                            self.logger.debug(f"Found Photos database at: {db_path}")
-                            return str(db_path)
-            
-            return None
-            
-        except Exception as e:
-            self.logger.debug(f"Error finding Photos database: {e}")
-            return None
+    # Removed: Photos database access no longer needed for simplified transfer
     
-    def _query_keywords_from_database(self, db_path: str, asset_uuid: str) -> list[str]:
-        """Query keywords from Photos database for a specific asset."""
-        try:
-            keywords = []
-            
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                
-                # First, explore the database schema to find the correct table names
-                self.logger.debug("Exploring Photos database schema...")
-                
-                # Get all table names
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-                tables = cursor.fetchall()
-                
-                keyword_tables = []
-                asset_tables = []
-                
-                for table in tables:
-                    table_name = table[0]
-                    if 'keyword' in table_name.lower():
-                        keyword_tables.append(table_name)
-                    if 'asset' in table_name.lower():
-                        asset_tables.append(table_name)
-                
-                self.logger.debug(f"Found keyword-related tables: {keyword_tables}")
-                self.logger.debug(f"Found asset-related tables: {asset_tables}")
-                
-                # Explore the structure of the Z_1KEYWORDS table
-                if 'Z_1KEYWORDS' in keyword_tables:
-                    try:
-                        cursor.execute("PRAGMA table_info(Z_1KEYWORDS)")
-                        columns = cursor.fetchall()
-                        self.logger.debug(f"Z_1KEYWORDS table structure: {[col[1] for col in columns]}")
-                    except Exception as e:
-                        self.logger.debug(f"Could not get Z_1KEYWORDS structure: {e}")
-                
-                # Explore the structure of the ZKEYWORD table
-                if 'ZKEYWORD' in keyword_tables:
-                    try:
-                        cursor.execute("PRAGMA table_info(ZKEYWORD)")
-                        columns = cursor.fetchall()
-                        self.logger.debug(f"ZKEYWORD table structure: {[col[1] for col in columns]}")
-                    except Exception as e:
-                        self.logger.debug(f"Could not get ZKEYWORD structure: {e}")
-                
-                # Try different possible table name combinations based on discovered schema
-                possible_queries = [
-                    # Query based on discovered schema: Z_1KEYWORDS has Z_1ASSETATTRIBUTES and Z_51KEYWORDS
-                    """
-                    SELECT DISTINCT k.ZTITLE
-                    FROM ZKEYWORD k
-                    JOIN Z_1KEYWORDS ak ON k.Z_PK = ak.Z_51KEYWORDS
-                    JOIN ZADDITIONALASSETATTRIBUTES attr ON ak.Z_1ASSETATTRIBUTES = attr.Z_PK
-                    JOIN ZASSET a ON attr.ZASSET = a.Z_PK
-                    WHERE a.ZUUID = ?
-                    """,
-                    # Alternative: try direct asset connection
-                    """
-                    SELECT DISTINCT k.ZTITLE
-                    FROM ZKEYWORD k
-                    JOIN Z_1KEYWORDS ak ON k.Z_PK = ak.Z_51KEYWORDS
-                    JOIN ZASSET a ON ak.Z_1ASSETATTRIBUTES = a.Z_PK
-                    WHERE a.ZUUID = ?
-                    """,
-                    # Fallback: original patterns
-                    """
-                    SELECT DISTINCT k.ZTITLE
-                    FROM ZKEYWORD k
-                    JOIN Z_1KEYWORDS ak ON k.Z_PK = ak.Z_51KEYWORDS
-                    JOIN ZASSET a ON ak.Z_1ASSETATTRIBUTES = a.ZADDITIONALATTRIBUTES
-                    WHERE a.ZUUID = ?
-                    """
-                ]
-                
-                # Try each query until one works
-                for i, query in enumerate(possible_queries):
-                    try:
-                        self.logger.debug(f"Trying query variant {i+1}")
-                        cursor.execute(query, (asset_uuid,))
-                        results = cursor.fetchall()
-                        
-                        for row in results:
-                            if row[0]:  # ZTITLE is not null
-                                keywords.append(row[0])
-                        
-                        if keywords:
-                            self.logger.debug(f"Query variant {i+1} succeeded, found {len(keywords)} keywords")
-                            break
-                            
-                    except sqlite3.Error as e:
-                        self.logger.debug(f"Query variant {i+1} failed: {e}")
-                        continue
-                
-                return keywords
-                
-        except sqlite3.Error as e:
-            self.logger.debug(f"SQLite error querying keywords: {e}")
-            return []
-        except Exception as e:
-            self.logger.debug(f"Error querying keywords from database: {e}")
-            return []
-    
-    def _extract_keywords_from_photokit(self, asset) -> list[str]:
-        """Extract keywords using PhotoKit's PHContentEditingInput and metadata."""
-        try:
-            with autorelease_pool():
-                keywords = []
-                
-                # Method 1: Try PHAssetResource for metadata
-                resources = Photos.PHAssetResource.assetResourcesForAsset_(asset)
-                for resource in resources:
-                    if resource.type() == Photos.PHAssetResourceTypePhoto:
-                        # Try to get metadata from resource
-                        # Note: This might require additional API calls that aren't directly available
-                        pass
-                
-                # Method 2: Try to use PHContentEditingInput (requires async handling)
-                # This is more complex and might need to be implemented differently
-                # For now, we'll focus on the simpler approaches
-                
-                # Method 3: Check if keywords are stored in any accessible properties
-                # Try various potential keyword properties
-                potential_keyword_properties = [
-                    'keywords', 'tags', 'subject', 'description', 'caption'
-                ]
-                
-                for prop in potential_keyword_properties:
-                    try:
-                        value = asset.valueForKey_(prop)
-                        if value:
-                            # Filter out non-string values and PHAsset objects
-                            if isinstance(value, list):
-                                for item in value:
-                                    if isinstance(item, str) and not item.startswith('<PHAsset'):
-                                        keywords.append(item)
-                            elif isinstance(value, str) and not value.startswith('<PHAsset'):
-                                # Split on common delimiters
-                                keywords.extend([kw.strip() for kw in value.split(',') if kw.strip()])
-                    except:
-                        continue  # Property doesn't exist or isn't accessible
-                
-                return list(set(keywords))  # Remove duplicates
-                
-        except Exception as e:
-            self.logger.debug(f"PhotoKit keyword extraction failed: {e}")
-            return []
-    
-    def _get_asset_city(self, asset) -> str | None:
-        """Extract city from Apple Photos asset location."""
-        try:
-            location = asset.location()
-            if location:
-                return location.locality()
-            return None
-        except Exception as e:
-            self.logger.debug(f"Could not extract city from asset: {e}")
-            return None
-    
-    def _get_album_paths_for_asset_metadata(self, metadata: dict) -> list[str]:
-        """Apply title/category-based album placement logic to Apple Photos asset metadata."""
-        album_paths = []
-        
-        try:
-            # Apply ONLY title-based rules (handles "Category: Details" format)
-            if metadata.get('title'):
-                title_paths = self._get_category_based_album_paths(
-                    metadata['title']
-                )
-                album_paths.extend(title_paths)
-                self.logger.info(f"Title-based album paths: {title_paths}")
-            else:
-                self.logger.info("No title found - no album placement")
-            
-            # Remove duplicates while preserving order (though should only be one path now)
-            return list(dict.fromkeys(album_paths))
-            
-        except Exception as e:
-            self.logger.error(f"Error calculating album paths for metadata: {e}")
-            return []
-    
-    def _get_category_paths_from_keywords(self, keywords: list[str]) -> list[str]:
-        """Extract category-based album paths from keywords (e.g., 'Party: Bday 1924')."""
-        album_paths = []
-        
-        try:
-            for keyword in keywords:
-                # Check if keyword follows "Category: Details" format
-                if ":" in keyword and keyword.count(":") == 1 and ": " in keyword:
-                    category = keyword.split(": ")[0].strip()
-                    album_path = f"{CATEGORY_PREFIX}/{category}/{keyword}"
-                    album_paths.append(album_path)
-                    self.logger.info(f"Extracted category '{category}' from keyword '{keyword}'")
-                    self.logger.info(f"Created dynamic category-based album path: {album_path}")
-            
-            return album_paths
-            
-        except Exception as e:
-            self.logger.error(f"Error extracting category paths from keywords: {e}")
-            return []
+    # Removed: All album creation logic moved to dedicated watcher
