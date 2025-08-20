@@ -1180,20 +1180,21 @@ class ApplePhotoWatcher:
             print(f"   ❌ Failed to remove '{asset_data['filename']}' from '{self.album_name}' album")
             self.logger.error(f"Failed to remove {asset_data['filename']} from album")
 
-if __name__ == '__main__':
-    # For standalone testing
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    
-    watcher = ApplePhotoWatcher()
-    watcher.running = True
-    
-    try:
-        while watcher.running:
-            watcher.check_album()
-            time.sleep(watcher.sleep_time)
-    except KeyboardInterrupt:
-        logging.info("Stopping Apple Photos watcher...")
-        watcher.running = False
+# Removed standalone main block - this watcher is controlled by lrexport.py
+# if __name__ == '__main__':
+#     # For standalone testing
+#     logging.basicConfig(
+#         level=logging.INFO,
+#         format='%(asctime)s - %(levelname)s - %(message)s'
+#     )
+#     
+#     watcher = ApplePhotoWatcher()
+#     watcher.running = True
+#     
+#     try:
+#         while watcher.running:
+#             watcher.check_album()
+#             time.sleep(watcher.sleep_time)
+#     except KeyboardInterrupt:
+#         logging.info("Stopping Apple Photos watcher...")
+#         watcher.running = False
