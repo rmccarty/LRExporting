@@ -15,6 +15,7 @@ import sys
 import time
 import logging
 import argparse
+import yaml
 from pathlib import Path
 
 # Add the project root to Python path
@@ -38,6 +39,19 @@ try:
 except ImportError as e:
     logger.error(f"Failed to import required modules: {e}")
     sys.exit(1)
+
+def load_config():
+    """Load configuration from YAML file."""
+    config_path = Path(__file__).parent / "add_to_apple_photos_watcher_config.yaml"
+    try:
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found: {config_path}")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        logger.error(f"Error parsing configuration file: {e}")
+        sys.exit(1)
 
 class SimpleApplePhotosAdder:
     """Utility to add photos from Apple Photos library to the Watching album."""
@@ -353,8 +367,8 @@ class SimpleApplePhotosAdder:
                                 
                                 # Pause after every 1000 successfully added photos
                                 if added_count % 1000 == 0:
-                                    logger.info(f"Reached {added_count} added photos - pausing for 10 seconds...")
-                                    time.sleep(10)
+                                    logger.info(f"Reached {added_count} added photos - pausing for 60 seconds...")
+                                    time.sleep(60)
                             else:
                                 error_count += 1
                                 logger.warning(f"Failed to add asset {i+1}/{total_assets}: '{title}' ({asset_id[:8]}...)")
@@ -928,7 +942,7 @@ Examples:
     args = parser.parse_args()
     
     # Create and configure the adder with search mode
-    adder = ApplePhotosWatcherAdder(search_mode=args.search_mode)
+    adder = SimpleApplePhotosAdder(search_mode=args.search_mode)
     if args.batch_size:
         adder.batch_size = args.batch_size
     if args.pause_duration:

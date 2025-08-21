@@ -1,264 +1,250 @@
 #!/usr/bin/env python3
 """
-Simplified utility script to add images from Apple Photos library to the "Watching" album.
+Utility script to add images from Apple Photos library to the "Watching" album
+for processing by the Apple Photos watcher system.
 
 This script:
 1. Connects to the Apple Photos library
 2. Iterates through all photos/videos
 3. Adds them to the "Watching" album in batches
-4. Provides progress updates and error handling
-
-All smart category detection and album placement is handled by the Apple Photos Watcher.
+4. Pauses for 5 seconds after every 20 images
+5. Provides progress updates and error handling
 """
 
 import sys
 import time
 import logging
-import argparse
 from pathlib import Path
 
 # Add the project root to Python path
 sys.path.append(str(Path(__file__).parent))
 
-# Set up logging
+from apple_photos_sdk import ApplePhotos
+from apple_photos_sdk.album import AlbumManager
+from config import APPLE_PHOTOS_WATCHING
+import Photos
+from objc import autorelease_pool
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Import Apple Photos SDK and related modules
-try:
-    from apple_photos_sdk import ApplePhotos
-    from apple_photos_sdk.album import AlbumManager
-    from config import APPLE_PHOTOS_WATCHING
-    import Photos
-    from objc import autorelease_pool
-        
-except ImportError as e:
-    logger.error(f"Failed to import required modules: {e}")
-    sys.exit(1)
-
-class SimpleApplePhotosAdder:
-    """Simplified utility to add photos from Apple Photos library to the Watching album."""
+class ApplePhotosWatcherAdder:
+    """Utility to add photos from Apple Photos library to the Watching album."""
     
-    def __init__(self, batch_size=100, pause_duration=2):
-        """Initialize the Simple Apple Photos Adder.
-        
-        Args:
-            batch_size: Number of assets to process before pausing
-            pause_duration: Seconds to pause between batches
-        """
-        self.batch_size = batch_size
-        self.pause_duration = pause_duration
-        
+    def __init__(self):
         self.apple_photos = ApplePhotos()
         self.album_manager = AlbumManager()
+        # Use album name from config (strip trailing slash and convert to string)
         self.watching_album_name = str(APPLE_PHOTOS_WATCHING).rstrip('/')
-        
-        logger.info(f"Initialized Simple Apple Photos Adder")
-        logger.info(f"Batch size: {batch_size}, Pause duration: {pause_duration}s")
+        self.batch_size = 100
+        self.pause_duration = 5  # seconds
         
     def find_or_create_watching_album(self):
         """Find or create the Watching album."""
         try:
             with autorelease_pool():
-                logger.info(f"Searching for album: '{self.watching_album_name}'")
-                
-                # Search for the Watching album
+                # Get all albums
                 fetch_options = Photos.PHFetchOptions.alloc().init()
-                predicate = Photos.NSPredicate.predicateWithFormat_("localizedTitle == %@", self.watching_album_name)
-                fetch_options.setPredicate_(predicate)
-                
-                album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
+                albums = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
                     Photos.PHAssetCollectionTypeAlbum,
                     Photos.PHAssetCollectionSubtypeAny,
                     fetch_options
                 )
                 
-                if album_result.count() > 0:
-                    album = album_result.objectAtIndex_(0)
-                    logger.info(f"Found existing album: '{self.watching_album_name}'")
-                    return album
-                else:
-                    # Create the album if it doesn't exist
-                    logger.info(f"Album '{self.watching_album_name}' not found, creating it...")
-                    success, album_id = self.album_manager.create_album(self.watching_album_name)
-                    if success:
-                        logger.info(f"Successfully created album: '{self.watching_album_name}'")
-                        # Fetch the newly created album
-                        album_result = Photos.PHAssetCollection.fetchAssetCollectionsWithLocalIdentifiers_options_([album_id], None)
-                        if album_result.count() > 0:
-                            return album_result.objectAtIndex_(0)
-                    
-                    logger.error(f"Failed to create album: '{self.watching_album_name}'")
-                    return None
-                    
-        except Exception as e:
-            logger.error(f"Error finding/creating album: {e}")
-            return None
-
-    def get_all_photos_batched(self, batch_size=1000):
-        """Get all photos from the library, yielding batches for memory efficiency."""
-        try:
-            with autorelease_pool():
-                # Fetch all assets (photos and videos)
-                fetch_options = Photos.PHFetchOptions.alloc().init()
-                fetch_options.setSortDescriptors_([
-                    Photos.NSSortDescriptor.sortDescriptorWithKey_ascending_("creationDate", False)
-                ])
+                # Look for existing Watching album
+                for i in range(albums.count()):
+                    album = albums.objectAtIndex_(i)
+                    if album.localizedTitle() == self.watching_album_name:
+                        logger.info(f"Found existing '{self.watching_album_name}' album")
+                        return album
                 
-                all_assets = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
-                total_count = all_assets.count()
-                logger.info(f"Found {total_count} total assets in library")
-                
-                # Process in batches
-                for start_idx in range(0, total_count, batch_size):
-                    end_idx = min(start_idx + batch_size, total_count)
-                    batch_assets = []
-                    
-                    for i in range(start_idx, end_idx):
-                        asset = all_assets.objectAtIndex_(i)
-                        batch_assets.append(asset)
-                    
-                    logger.info(f"Yielding batch {start_idx//batch_size + 1}: assets {start_idx+1}-{end_idx} of {total_count}")
-                    yield batch_assets
-                    
-        except Exception as e:
-            logger.error(f"Error fetching photos: {e}")
-            yield []
-
-    def add_assets_to_watching_album(self, assets, watching_album):
-        """Add assets to the Watching album in batches."""
-        if not watching_album or not assets:
-            return 0
-            
-        added_count = 0
-        try:
-            with autorelease_pool():
-                # Add assets to the album using Photos API directly
-                success = False
-                
-                def add_assets():
-                    nonlocal success
-                    try:
-                        # Create change request for the album
-                        change_request = Photos.PHAssetCollectionChangeRequest.changeRequestForAssetCollection_(watching_album)
-                        if change_request:
-                            change_request.addAssets_(assets)
-                            success = True
-                    except Exception as e:
-                        logger.error(f"Error in add_assets change request: {e}")
-                        success = False
-                
-                # Perform the changes
-                result, error = Photos.PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_(
-                    add_assets, None
+                # Create Watching album if it doesn't exist
+                logger.info(f"Creating '{self.watching_album_name}' album...")
+                success, album_id = self.album_manager._create_album_in_folder_with_logging(
+                    self.watching_album_name, None
                 )
                 
-                if result and success:
-                    added_count = len(assets)
-                    logger.info(f"Successfully added {added_count} assets to '{self.watching_album_name}' album")
-                else:
-                    logger.warning(f"Failed to add assets to '{self.watching_album_name}' album")
-                    if error:
-                        logger.error(f"Photos API error: {error}")
+                if success:
+                    # Fetch the newly created album
+                    albums = Photos.PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_(
+                        Photos.PHAssetCollectionTypeAlbum,
+                        Photos.PHAssetCollectionSubtypeAny,
+                        fetch_options
+                    )
                     
+                    for i in range(albums.count()):
+                        album = albums.objectAtIndex_(i)
+                        if album.localizedTitle() == self.watching_album_name:
+                            logger.info(f"Successfully created '{self.watching_album_name}' album")
+                            return album
+                
+                logger.error(f"Failed to create '{self.watching_album_name}' album")
+                return None
+                
         except Exception as e:
-            logger.error(f"Error adding assets to album: {e}")
-            
-        return added_count
-
-    def process_entire_library(self, max_assets=None):
-        """Process the entire library, adding all assets to the Watching album."""
-        logger.info("Starting to process entire Apple Photos library...")
+            logger.error(f"Error finding/creating Watching album: {e}")
+            return None
+    
+    def get_all_photos(self):
+        """Get all photos and videos from the Apple Photos library."""
+        try:
+            with autorelease_pool():
+                fetch_options = Photos.PHFetchOptions.alloc().init()
+                # Sort by creation date (oldest first)
+                fetch_options.setSortDescriptors_([
+                    Photos.NSSortDescriptor.sortDescriptorWithKey_ascending_("creationDate", True)
+                ])
+                
+                # Fetch all assets (photos and videos)
+                assets = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
+                
+                logger.info(f"Found {assets.count()} total assets in Apple Photos library")
+                return assets
+                
+        except Exception as e:
+            logger.error(f"Error fetching photos from library: {e}")
+            return None
+    
+    def add_assets_to_watching_album(self, assets, watching_album):
+        """Add assets to the Watching album in batches with pauses."""
+        if not assets or not watching_album:
+            logger.error("Invalid assets or watching album")
+            return False
         
-        # Find or create the Watching album
+        total_assets = assets.count()
+        added_count = 0
+        error_count = 0
+        batch_count = 0
+        
+        logger.info(f"Starting to add {total_assets} assets to '{self.watching_album_name}' album...")
+        logger.info(f"Processing in batches of {self.batch_size} with {self.pause_duration}s pauses")
+        
+        try:
+            with autorelease_pool():
+                for i in range(total_assets):
+                    asset = assets.objectAtIndex_(i)
+                    
+                    try:
+                        # Get asset info for logging
+                        asset_id = asset.localIdentifier()
+                        creation_date = asset.creationDate()
+                        media_type = "photo" if asset.mediaType() == Photos.PHAssetMediaTypeImage else "video"
+                        
+                        # Add asset to Watching album
+                        success = self.album_manager._add_to_album(asset_id, watching_album.localIdentifier())
+                        
+                        if success:
+                            added_count += 1
+                            logger.info(f"Added {media_type} {added_count}/{total_assets}: {asset_id[:8]}... (created: {creation_date})")
+                        else:
+                            error_count += 1
+                            logger.warning(f"Failed to add asset {i+1}/{total_assets}: {asset_id[:8]}...")
+                    
+                    except Exception as e:
+                        error_count += 1
+                        logger.error(f"Error processing asset {i+1}/{total_assets}: {e}")
+                    
+                    # Pause after every batch_size assets
+                    if (added_count + error_count) % self.batch_size == 0:
+                        batch_count += 1
+                        logger.info(f"Completed batch {batch_count} ({added_count} added, {error_count} errors)")
+                        logger.info(f"Pausing for {self.pause_duration} seconds...")
+                        time.sleep(self.pause_duration)
+        
+        except Exception as e:
+            logger.error(f"Error during batch processing: {e}")
+            return False
+        
+        # Final summary
+        logger.info("=" * 60)
+        logger.info("BULK ADD COMPLETE")
+        logger.info(f"Total assets processed: {total_assets}")
+        logger.info(f"Successfully added: {added_count}")
+        logger.info(f"Errors: {error_count}")
+        logger.info(f"Batches processed: {batch_count}")
+        logger.info("=" * 60)
+        
+        return True
+    
+    def run(self, max_assets=None):
+        """Main execution method."""
+        logger.info("Starting Apple Photos Watcher Adder utility...")
+        
+        # Step 1: Find or create Watching album
         watching_album = self.find_or_create_watching_album()
         if not watching_album:
             logger.error("Could not find or create Watching album. Exiting.")
-            return
+            return False
         
-        total_added = 0
-        total_processed = 0
-        batch_count = 0
+        # Step 2: Get all photos from library
+        all_assets = self.get_all_photos()
+        if not all_assets:
+            logger.error("Could not fetch photos from library. Exiting.")
+            return False
         
-        try:
-            for batch_assets in self.get_all_photos_batched(self.batch_size):
-                if not batch_assets:
-                    continue
-                    
-                batch_count += 1
-                batch_size = len(batch_assets)
-                
-                # Check if we've reached the max assets limit
-                if max_assets and total_processed + batch_size > max_assets:
-                    # Trim the batch to not exceed max_assets
-                    remaining = max_assets - total_processed
-                    batch_assets = batch_assets[:remaining]
-                    batch_size = len(batch_assets)
-                
-                logger.info(f"Processing batch {batch_count} with {batch_size} assets...")
-                
-                # Add all assets in this batch to the Watching album
-                added_count = self.add_assets_to_watching_album(batch_assets, watching_album)
-                
-                total_added += added_count
-                total_processed += batch_size
-                
-                logger.info(f"Batch {batch_count} complete: {added_count}/{batch_size} assets added")
-                logger.info(f"Total progress: {total_processed} processed, {total_added} added to Watching album")
-                
-                # Check if we've reached the max assets limit
-                if max_assets and total_processed >= max_assets:
-                    logger.info(f"Reached maximum asset limit of {max_assets}")
-                    break
-                
-                # Pause between batches to avoid overwhelming the system
-                if self.pause_duration > 0:
-                    logger.info(f"Pausing for {self.pause_duration} seconds...")
-                    time.sleep(self.pause_duration)
-                    
-        except KeyboardInterrupt:
-            logger.info("Process interrupted by user")
-        except Exception as e:
-            logger.error(f"Error during processing: {e}")
+        # Step 3: Limit assets if max_assets specified
+        if max_assets and max_assets < all_assets.count():
+            logger.info(f"Limiting to first {max_assets} assets (out of {all_assets.count()} total)")
         
-        logger.info(f"Processing complete!")
-        logger.info(f"Total assets processed: {total_processed}")
-        logger.info(f"Total assets added to Watching album: {total_added}")
-        logger.info(f"The Apple Photos Watcher will now handle smart album placement based on categories")
+        # Step 4: Add assets to Watching album
+        success = self.add_assets_to_watching_album(all_assets, watching_album)
+        
+        if success:
+            logger.info("Utility completed successfully!")
+            logger.info(f"Assets are now in the '{self.watching_album_name}' album and will be processed by the watcher.")
+        else:
+            logger.error("Utility completed with errors.")
+        
+        return success
 
-    def run(self, max_assets=None):
-        """Main execution method."""
-        logger.info("=== Simple Apple Photos Adder ===")
-        logger.info("This script adds photos to the Watching album for processing by Apple Photos Watcher")
-        
-        try:
-            self.process_entire_library(max_assets)
-        except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            sys.exit(1)
 
 def main():
     """Main entry point with command line argument support."""
-    parser = argparse.ArgumentParser(description='Add Apple Photos library assets to Watching album')
-    parser.add_argument('--max-assets', type=int, default=None,
-                        help='Maximum number of assets to process (default: all)')
-    parser.add_argument('--batch-size', type=int, default=100,
-                        help='Number of assets to process in each batch (default: 100)')
-    parser.add_argument('--pause-duration', type=float, default=2.0,
-                        help='Seconds to pause between batches (default: 2.0)')
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Add Apple Photos library images to Watching album")
+    parser.add_argument(
+        "--max-assets", 
+        type=int, 
+        help="Maximum number of assets to process (for testing)"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=100,
+        help="Number of assets to process before pausing (default: 20)"
+    )
+    parser.add_argument(
+        "--pause-duration",
+        type=int,
+        default=5,
+        help="Seconds to pause between batches (default: 5)"
+    )
     
     args = parser.parse_args()
     
-    # Create and run the adder
-    adder = SimpleApplePhotosAdder(
-        batch_size=args.batch_size,
-        pause_duration=args.pause_duration
-    )
+    # Create and configure the adder
+    adder = ApplePhotosWatcherAdder()
+    if args.batch_size:
+        adder.batch_size = args.batch_size
+    if args.pause_duration:
+        adder.pause_duration = args.pause_duration
     
-    adder.run(max_assets=args.max_assets)
+    # Run the utility
+    try:
+        success = adder.run(max_assets=args.max_assets)
+        sys.exit(0 if success else 1)
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user. Exiting...")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
