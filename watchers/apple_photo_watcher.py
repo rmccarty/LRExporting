@@ -531,7 +531,7 @@ class ApplePhotoWatcher:
         """Get album paths for title-based categories."""
         try:
             normalized_title = self._normalize_category_format(title, "title")
-            return self.transfer._get_category_based_album_paths(normalized_title)
+            return self._get_category_based_album_paths(normalized_title)
         except Exception as e:
             self.logger.error(f"Error getting album paths for title '{title}': {e}")
             return []
@@ -540,7 +540,7 @@ class ApplePhotoWatcher:
         """Get album paths for caption-based categories."""
         try:
             normalized_caption = self._normalize_category_format(caption, "caption")
-            return self.transfer._get_category_based_album_paths(normalized_caption)
+            return self._get_category_based_album_paths(normalized_caption)
         except Exception as e:
             self.logger.error(f"Error getting album paths for caption: {e}")
             return []
@@ -549,10 +549,42 @@ class ApplePhotoWatcher:
         """Get album paths for keyword-based categories."""
         try:
             normalized_keyword = self._normalize_category_format(keyword, "keyword")
-            return self.transfer._get_category_based_album_paths(normalized_keyword)
+            return self._get_category_based_album_paths(normalized_keyword)
         except Exception as e:
             self.logger.error(f"Error getting album paths for keyword '{keyword}': {e}")
             return []
+    
+    def _get_category_based_album_paths(self, title: str) -> list[str]:
+        """
+        Parse photo title for category-based album paths.
+        If title has format "Category: Details", dynamically create album path
+        in format "02/Category/Full Title".
+        
+        Args:
+            title: Photo title to parse
+            
+        Returns:
+            list[str]: List of album paths derived from title category
+        """
+        if not title:
+            self.logger.info("No title provided - no album placement")
+            return []
+        
+        # Check for "Category: Details" format (single colon followed by space)
+        if ":" in title and title.count(":") == 1 and ": " in title:
+            category = title.split(": ")[0].strip()
+            self.logger.info(f"Extracted category '{category}' from title '{title}'")
+            
+            if category:
+                # Dynamic path creation - use CATEGORY_PREFIX from config and create folder based on category
+                from config import CATEGORY_PREFIX
+                album_path = f"{CATEGORY_PREFIX}/{category}/{title}"
+                self.logger.info(f"Created dynamic category-based album path: {album_path}")
+                return [album_path]
+        else:
+            self.logger.info(f"Title '{title}' does not match 'Category: Details' format - no album placement")
+                
+        return []
 
     def _execute_batch_additions(self, batch_operations):
         """Execute batch additions to target albums."""

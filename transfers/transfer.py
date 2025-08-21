@@ -7,7 +7,7 @@ import fcntl
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import shutil
-import yaml
+# Removed: import yaml - no longer needed after album creation logic removal
 
 from config import MIN_FILE_AGE, TRANSFER_PATHS, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS, CATEGORY_PREFIX, APPLE_PHOTOS_WATCHING
 from apple_photos_sdk import ApplePhotos
