@@ -28,3 +28,5 @@ build/
 *.swo
 .coverage
 .DS_Store
+security-audit.json
+sbom.json

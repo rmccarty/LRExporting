@@ -12,6 +12,9 @@ coverage = "*"
 radon = "*"
 pyobjc-framework-photos = "*"
 photokit = "*"
+cyclonedx-py = "*"
+cyclonedx-python-lib = "*"
+pip-audit = "*"
 
 [dev-packages]
 radon = "*"
