@@ -160,7 +160,7 @@ class ExifTool:
             
     def update_keywords(self, file_path: Union[str, Path], keywords: List[str]) -> bool:
         """
-        Update keywords metadata field.
+        Update keywords metadata field using Keys:Keywords for Apple Photos compatibility.
         
         Args:
             file_path: Path to the file
@@ -174,10 +174,12 @@ class ExifTool:
             keywords = [str(k) for k in keywords]
             keywords_str = ','.join(keywords)
             
-            # Write to both IPTC:Keywords and XMP:Subject
-            cmd = ['exiftool'] + self.default_flags + [
-                f'-IPTC:Keywords={keywords_str}',
-                f'-XMP:Subject={keywords_str}',
+            # Comprehensive approach with QuickTimeHandler and dual keyword fields
+            cmd = [
+                'exiftool', '-m', '-P', '-overwrite_original_in_place', 
+                '-api', 'QuickTimeHandler=1',
+                f'-Keys:Keywords={keywords_str}',
+                f'-ItemList:Keyword={keywords_str}',
                 str(file_path)
             ]
             result = subprocess.run(cmd, capture_output=True, text=True)

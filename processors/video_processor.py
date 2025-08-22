@@ -69,6 +69,14 @@ class VideoProcessor(MediaProcessor):
             caption = self.get_caption_from_rdf(description)
             location = self.get_location_from_rdf(description)
             
+            # Log extracted XMP data
+            self.logger.warning("XMP metadata extracted:")
+            self.logger.warning(f"  ┌─ Title:    '{title}'")
+            self.logger.warning(f"  ├─ Keywords: {keywords}")
+            self.logger.warning(f"  ├─ Date:     '{date_str}'")
+            self.logger.warning(f"  ├─ Caption:  '{caption}'")
+            self.logger.warning(f"  └─ Location: {location}")
+            
             return (title, keywords, date_str, caption, location)
             
         except ET.ParseError as e:
@@ -142,16 +150,26 @@ class VideoProcessor(MediaProcessor):
         """Extract location data from IPTC Core fields."""
         ns = XML_NAMESPACES
         for desc in rdf.iter('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'):
-            location = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}Location')
-            city = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}City')
-            country = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}CountryName')
+            # Check for attributes first (your XMP format)
+            location = desc.get(f'{{{ns["Iptc4xmpCore"]}}}Location')
+            city = desc.get(f'{{{ns["Iptc4xmpCore"]}}}City')
+            country = desc.get(f'{{{ns["Iptc4xmpCore"]}}}CountryName')
             
-            location_text = location.text if location is not None else None
-            city_text = city.text if city is not None else None
-            country_text = country.text if country is not None else None
+            if any([location, city, country]):
+                self.logger.debug(f"Found IPTC location attributes: {location} ({city}, {country})")
+                return location, city, country
+            
+            # Fallback to elements if no attributes found
+            location_elem = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}Location')
+            city_elem = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}City')
+            country_elem = desc.find(f'.//{{{ns["Iptc4xmpCore"]}}}CountryName')
+            
+            location_text = location_elem.text if location_elem is not None else None
+            city_text = city_elem.text if city_elem is not None else None
+            country_text = country_elem.text if country_elem is not None else None
             
             if any([location_text, city_text, country_text]):
-                self.logger.debug(f"Found IPTC location data: {location_text} ({city_text}, {country_text})")
+                self.logger.debug(f"Found IPTC location elements: {location_text} ({city_text}, {country_text})")
                 return location_text, city_text, country_text
                 
         return None, None, None
@@ -593,14 +611,102 @@ class VideoProcessor(MediaProcessor):
                 return True
                 
             # Log metadata fields being written
-            self.logger.debug(f"Writing metadata fields: {metadata_fields}")
+            self.logger.warning("Writing metadata to video file:")
+            for field, value in metadata_fields.items():
+                self.logger.warning(f"  {field}: '{value}'")
             
-            # Write metadata using exiftool
-            return self.exiftool.write_metadata(self.file_path, metadata_fields)
+            # Execute ExifTool metadata write
+            self.logger.warning("📝 Executing ExifTool metadata write...")
+            result = self.exiftool.write_metadata(self.file_path, metadata_fields)
+            
+            if result:
+                self.logger.warning("✅ ExifTool metadata write completed successfully")
+                
+                # Verify metadata was written by reading it back
+                self._verify_written_metadata(metadata)
+            else:
+                self.logger.warning("❌ ExifTool metadata write failed")
+            return result
             
         except Exception as e:
             self.logger.error(f"Error writing metadata: {e}")
             return False
+
+    def _verify_written_metadata(self, original_metadata: tuple) -> None:
+        """
+        Verify metadata was written correctly by reading it back from the video file.
+        
+        Args:
+            original_metadata (tuple): Original metadata that was written
+        """
+        try:
+            self.logger.warning("🔍 Verifying written metadata by reading back from video file...")
+            
+            # Read all metadata from the video file
+            video_metadata = self.exiftool.read_all_metadata(self.file_path)
+            
+            title, keywords, date_str, caption, location_data = original_metadata
+            
+            # Check title fields
+            title_found = False
+            for field in ['-XMP:Title', '-DC:Title', '-QuickTime:Title', '-ItemList:Title']:
+                clean_field = field.replace('-', '')
+                for key in video_metadata:
+                    if clean_field.lower() in key.lower():
+                        self.logger.warning(f"  📄 Title field {key}: '{video_metadata[key]}'")
+                        if video_metadata[key] == title:
+                            title_found = True
+            
+            # Check keyword fields  
+            keywords_found = False
+            self.logger.warning(f"  🔍 Looking for keywords: {keywords}")
+            
+            # Show ALL metadata fields that might contain keywords
+            keyword_related_fields = []
+            for key in video_metadata:
+                if any(term in key.lower() for term in ['keyword', 'subject', 'tag', 'category']):
+                    keyword_related_fields.append(f"{key}: '{video_metadata[key]}'")
+                    
+                    # Check if keywords match (handle both list and comma-separated string formats)
+                    if keywords:
+                        video_value = str(video_metadata[key])
+                        if isinstance(keywords, list):
+                            # Convert list to comma-separated string for comparison
+                            keywords_str = ','.join(keywords)
+                            # Check if all keywords are present in the video value
+                            if all(keyword in video_value for keyword in keywords):
+                                keywords_found = True
+                                self.logger.warning(f"    ✅ MATCH: {key} contains expected keywords")
+                        else:
+                            if str(keywords) in video_value:
+                                keywords_found = True
+                                self.logger.warning(f"    ✅ MATCH: {key} contains expected keywords")
+            
+            if keyword_related_fields:
+                self.logger.warning("  🏷️  Found keyword-related fields in video:")
+                for field in keyword_related_fields:
+                    self.logger.warning(f"    {field}")
+            else:
+                self.logger.warning("  ❌ No keyword-related fields found in video metadata")
+            
+            # Check caption fields
+            caption_found = False
+            for field in ['-QuickTime:Description', '-ItemList:Description']:
+                clean_field = field.replace('-', '')
+                for key in video_metadata:
+                    if 'description' in key.lower():
+                        self.logger.warning(f"  💬 Caption field {key}: '{video_metadata[key]}'")
+                        if video_metadata[key] == caption:
+                            caption_found = True
+            
+            # Summary
+            self.logger.warning("📊 Metadata verification summary:")
+            self.logger.warning(f"  ✅ Title: {'FOUND' if title_found else '❌ NOT FOUND'}")
+            self.logger.warning(f"  ✅ Keywords: {'FOUND' if keywords_found else '❌ NOT FOUND'}")
+            self.logger.warning(f"  ✅ Caption: {'FOUND' if caption_found else '❌ NOT FOUND'}")
+            
+        except Exception as e:
+            self.logger.error(f"Error verifying metadata: {e}")
 
     def _build_expected_fields(self, expected_metadata: tuple) -> dict:
         """
@@ -792,23 +898,36 @@ class VideoProcessor(MediaProcessor):
             Path: Path to the renamed file
         """
         # Generate filename from metadata
+        self.logger.warning("🏷️  Starting file renaming process...")
         new_name = self.generate_filename()
         if not new_name:
+            self.logger.warning("❌ No filename generated - keeping original name")
             return self.file_path
             
-        # Log filename assembly
-        self.logger.info("Final filename assembly:")
-        self.logger.info(f"  Original: {self.file_path.name}")
-        self.logger.info(f"  New:      {new_name}")
+        # Log filename assembly details
+        self.logger.warning("📝 Filename generation complete:")
+        self.logger.warning(f"  📂 Directory:  {self.file_path.parent}")
+        self.logger.warning(f"  📄 Original:   {self.file_path.name}")
+        self.logger.warning(f"  ✨ Generated:  {new_name}")
+        
+        # Check if rename is needed
+        if self.file_path.name == new_name:
+            self.logger.warning("✅ Filename already matches - no rename needed")
+            return self.file_path
         
         # Rename file
         new_path = self.file_path.parent / new_name
+        self.logger.warning(f"🔄 Renaming file...")
+        self.logger.warning(f"   From: {self.file_path}")
+        self.logger.warning(f"   To:   {new_path}")
+        
         try:
             self.file_path.rename(new_path)
-            self.logger.info(f"Successfully renamed file to: {new_path}")
+            self.logger.warning(f"✅ Successfully renamed file to: {new_path.name}")
             return new_path
         except Exception as e:
-            self.logger.error(f"Error renaming file: {e}")
+            self.logger.error(f"❌ Error renaming file: {e}")
+            self.logger.error(f"   Keeping original name: {self.file_path.name}")
             return self.file_path
 
     def _get_title_from_dc_alt(self, rdf) -> str | None:
@@ -880,10 +999,16 @@ class VideoProcessor(MediaProcessor):
         """Extract caption from RDF data."""
         try:
             ns = XML_NAMESPACES
-            caption_path = f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li'
-            caption_elem = rdf.find(caption_path)
-            if caption_elem is not None:
-                self.logger.debug(f"Found caption: {caption_elem.text}")
+            # First try with x-default language
+            caption_elem = rdf.find(f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li[@{{{ns["xml"]}}}lang="x-default"]')
+            if caption_elem is not None and caption_elem.text:
+                self.logger.debug(f"Found caption in dc:description with x-default: {caption_elem.text}")
+                return caption_elem.text
+                
+            # If no x-default, try without language
+            caption_elem = rdf.find(f'.//{{{ns["dc"]}}}description/{{{ns["rdf"]}}}Alt/{{{ns["rdf"]}}}li')
+            if caption_elem is not None and caption_elem.text:
+                self.logger.debug(f"Found caption in dc:description: {caption_elem.text}")
                 return caption_elem.text
         except Exception as e:
             self.logger.error(f"Error getting caption from RDF: {e}")

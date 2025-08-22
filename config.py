@@ -63,30 +63,39 @@ XML_NAMESPACES = {
 
 # Metadata field mappings
 METADATA_FIELDS = {
-    'title': ['-ItemList:Title', '-QuickTime:Title'],
+    'title': ['-XMP-dc:Title', '-DC:Title'],  # Revert to working XMP title fields
     'date': [
         '-CreateDate',
-        '-ModifyDate',
-        '-TrackCreateDate',
-        '-TrackModifyDate',
         '-MediaCreateDate',
         '-MediaModifyDate',
         '-QuickTime:CreateDate',
-        '-QuickTime:MediaCreateDate'
+        '-QuickTime:MediaCreateDate',
+        '-Photoshop:DateCreated'
     ],
-    'keywords': ['-QuickTime:Keywords', '-XMP:Subject'],  # These are the fields that actually work
+    'keywords': ['-Keys:Keywords', '-ItemList:Keyword'],  # Dual keyword approach for Apple Photos video compatibility
     'location': ['-Location', '-XMP:Location', '-LocationName'],
     'city': ['-City', '-XMP:City'],
     'state': ['-State', '-XMP:State'],
     'country': ['-Country', '-XMP:Country'],
-    'gps': ['-GPSLatitude', '-GPSLongitude'],
-    'caption': ['-ItemList:Description', '-Description']
+    'gps': [
+        '-GPSLatitude', '-GPSLongitude',
+        '-EXIF:GPSLatitude', '-EXIF:GPSLongitude',
+        '-EXIF:GPSLatitudeRef', '-EXIF:GPSLongitudeRef',
+        '-EXIF:GPSAltitude', '-EXIF:GPSAltitudeRef',
+        '-EXIF:GPSImgDirection', '-EXIF:GPSImgDirectionRef',
+        '-EXIF:GPSSpeed', '-EXIF:GPSSpeedRef',
+        '-EXIF:GPSTimeStamp', '-EXIF:GPSHPositioningError'
+    ],
+    'caption': ['-QuickTime:Description', '-ItemList:Description'],  # Revert to working QuickTime caption fields
 }
 
 # Verification fields to check
 VERIFY_FIELDS = [
-    'Title',
+    'XMP:Title',
+    'DC:Title', 
+    'QuickTime:Title',
     'Keywords',
+    'XMP:Subject',
     'CreateDate',
     'Location',
     'City',
