@@ -19,7 +19,14 @@ SLEEP_TIME = 10
 
 # Apple Photos Watcher configuration
 # Maximum number of assets to fetch from Watching album per check (prevents performance issues with large albums)
-APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 5000 
+APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 5000
+
+# Watching album size management
+# Maximum number of assets allowed in Watching album before pausing additions
+APPLE_PHOTOS_WATCHING_MAX_SIZE = 1000
+
+# Watermark threshold - resume adding assets when count drops below this number
+APPLE_PHOTOS_WATCHING_WATERMARK = 800 
 
 # Processing order for assets in Watching album
 # True = LIFO (newest first) - process recently added photos first
