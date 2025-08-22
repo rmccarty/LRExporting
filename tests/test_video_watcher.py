@@ -91,5 +91,136 @@ class TestVideoWatcher(unittest.TestCase):
             except Exception:
                 pass
 
+    def test_when_checking_directory_with_videos_then_processes_them(self):
+        """Test the main happy path - processing video files with XMP"""
+        watcher = VideoWatcher(directories=self.test_dirs)
+        
+        # Create mock video files
+        mock_video1 = MagicMock(spec=Path)
+        mock_video1.name = 'video1.mp4'
+        mock_video2 = MagicMock(spec=Path)
+        mock_video2.name = 'video2.MP4'
+        
+        with patch('watchers.video_watcher.Path') as mock_path_cls:
+            mock_dir = MagicMock(spec=Path)
+            mock_dir.exists.return_value = True
+            mock_dir.__str__.return_value = '/test/dir'
+            mock_path_cls.return_value = mock_dir
+            
+            # Mock glob to return video files for both patterns
+            def glob_side_effect(pattern):
+                if pattern == '*.mp4':
+                    return [mock_video1]
+                elif pattern == '*.MP4':
+                    return [mock_video2]
+                else:
+                    return []
+            
+            mock_dir.glob.side_effect = glob_side_effect
+            
+            with patch('watchers.video_watcher.VIDEO_PATTERN', ['*.mp4']), \
+                 patch.object(watcher, '_has_xmp_file', return_value=True), \
+                 patch.object(watcher, '_get_next_sequence', return_value=42), \
+                 patch('watchers.video_watcher.VideoProcessor') as mock_processor, \
+                 patch.object(watcher.logger, 'info') as mock_log:
+                
+                watcher.check_directory('/test/dir')
+                
+                # Verify logging
+                mock_log.assert_any_call("\nChecking /test/dir for new video files...")
+                mock_log.assert_any_call("Found new video: video1.mp4")
+                mock_log.assert_any_call("Found new video: video2.MP4")
+                
+                # Verify processor was called for both videos
+                self.assertEqual(mock_processor.call_count, 2)
+                mock_processor.assert_any_call(str(mock_video1), sequence=42)
+                mock_processor.assert_any_call(str(mock_video2), sequence=42)
+
+    def test_when_checking_directory_with_videos_but_no_xmp_then_skips(self):
+        """Test that videos without XMP files are skipped"""
+        watcher = VideoWatcher(directories=self.test_dirs)
+        
+        mock_video = MagicMock(spec=Path)
+        mock_video.name = 'video.mp4'
+        
+        with patch('watchers.video_watcher.Path') as mock_path_cls:
+            mock_dir = MagicMock(spec=Path)
+            mock_dir.exists.return_value = True
+            mock_dir.__str__.return_value = '/test/dir'
+            mock_dir.glob.return_value = [mock_video]
+            mock_path_cls.return_value = mock_dir
+            
+            with patch('watchers.video_watcher.VIDEO_PATTERN', ['*.mp4']), \
+                 patch.object(watcher, '_has_xmp_file', return_value=False), \
+                 patch('watchers.video_watcher.VideoProcessor') as mock_processor, \
+                 patch.object(watcher.logger, 'info') as mock_log:
+                
+                watcher.check_directory('/test/dir')
+                
+                # Should log checking but not processing
+                mock_log.assert_any_call("\nChecking /test/dir for new video files...")
+                
+                # Processor should not be called
+                mock_processor.assert_not_called()
+
+    def test_when_checking_directory_with_no_videos_then_logs_appropriately(self):
+        """Test directory with no video files"""
+        watcher = VideoWatcher(directories=self.test_dirs)
+        
+        with patch('watchers.video_watcher.Path') as mock_path_cls:
+            mock_dir = MagicMock(spec=Path)
+            mock_dir.exists.return_value = True
+            mock_dir.__str__.return_value = '/test/dir'
+            mock_dir.glob.return_value = []  # No video files
+            mock_path_cls.return_value = mock_dir
+            
+            with patch('watchers.video_watcher.VIDEO_PATTERN', ['*.mp4']), \
+                 patch('watchers.video_watcher.VideoProcessor') as mock_processor, \
+                 patch.object(watcher.logger, 'info') as mock_log:
+                
+                watcher.check_directory('/test/dir')
+                
+                # Should only log checking
+                mock_log.assert_called_once_with("\nChecking /test/dir for new video files...")
+                
+                # Processor should not be called
+                mock_processor.assert_not_called()
+
+    def test_when_checking_directory_with_mixed_case_extensions_then_handles_both(self):
+        """Test that both upper and lower case extensions are handled"""
+        watcher = VideoWatcher(directories=self.test_dirs)
+        
+        mock_video_lower = MagicMock(spec=Path)
+        mock_video_lower.name = 'video.mov'
+        mock_video_upper = MagicMock(spec=Path)
+        mock_video_upper.name = 'VIDEO.MOV'
+        
+        with patch('watchers.video_watcher.Path') as mock_path_cls:
+            mock_dir = MagicMock(spec=Path)
+            mock_dir.exists.return_value = True
+            mock_dir.__str__.return_value = '/test/dir'
+            mock_path_cls.return_value = mock_dir
+            
+            def glob_side_effect(pattern):
+                if pattern == '*.mov':
+                    return [mock_video_lower]
+                elif pattern == '*.MOV':
+                    return [mock_video_upper]
+                else:
+                    return []
+            
+            mock_dir.glob.side_effect = glob_side_effect
+            
+            with patch('watchers.video_watcher.VIDEO_PATTERN', ['*.mov']), \
+                 patch.object(watcher, '_has_xmp_file', return_value=True), \
+                 patch.object(watcher, '_get_next_sequence', return_value=1), \
+                 patch('watchers.video_watcher.VideoProcessor') as mock_processor, \
+                 patch.object(watcher.logger, 'info'):
+                
+                watcher.check_directory('/test/dir')
+                
+                # Both files should be processed
+                self.assertEqual(mock_processor.call_count, 2)
+
 if __name__ == '__main__':
     unittest.main()
