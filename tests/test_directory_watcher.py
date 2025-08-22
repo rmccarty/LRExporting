@@ -230,5 +230,273 @@ class TestDirectoryWatcher(unittest.TestCase):
             self.assertIn('INFO:watchers.directory_watcher:Checking /test/photos1 for new media files...', log.output)
             self.assertIn('INFO:watchers.directory_watcher:Checking /test/photos2 for new media files...', log.output)
 
+    def test_when_processing_non_file_then_returns_early(self):
+        """Should return early when path is not a file."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        mock_path = MagicMock(spec=Path)
+        mock_path.is_file.return_value = False
+        
+        with patch.object(self.watcher.logger, 'info') as mock_log:
+            self.watcher.process_file(mock_path)
+            mock_log.assert_not_called()
+
+    @patch('watchers.directory_watcher.ENABLE_APPLE_PHOTOS', True)
+    @patch('watchers.directory_watcher.APPLE_PHOTOS_PATHS', [Path('/test/photos')])
+    def test_when_processing_apple_photos_jpeg_with_category_then_transfers(self):
+        """Should process JPEG in Apple Photos directory with category format."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = 'test.jpg'
+        mock_file.suffix = '.jpg'
+        mock_file.__str__.return_value = '/test/photos/test.jpg'
+        mock_file.parent = Path('/test/photos')
+        
+        with patch('watchers.directory_watcher.JPEGExifProcessor') as mock_processor_cls, \
+             patch.object(self.watcher.transfer, 'transfer_file') as mock_transfer, \
+             self.assertLogs(level='INFO') as log:
+            
+            # Mock processor to return title with category format
+            mock_processor = MagicMock()
+            mock_processor.get_metadata_components.return_value = (None, 'US CA: Test Title', None, None, None, None)
+            mock_processor_cls.return_value = mock_processor
+            
+            self.watcher.process_file(mock_file)
+            
+            # Should extract metadata
+            mock_processor_cls.assert_called_once_with(str(mock_file))
+            mock_processor.get_metadata_components.assert_called_once()
+            
+            # Should transfer file
+            mock_transfer.assert_called_once_with(mock_file)
+            
+            # Verify logging
+            self.assertIn('INFO:watchers.directory_watcher:Found file in Apple Photos directory: /test/photos/test.jpg', log.output)
+            self.assertIn("INFO:watchers.directory_watcher:Extracted title: 'US CA: Test Title'", log.output)
+            self.assertIn("INFO:watchers.directory_watcher:Title 'US CA: Test Title' has category format - importing to Apple Photos Watcher album", log.output)
+
+    @patch('watchers.directory_watcher.ENABLE_APPLE_PHOTOS', True)
+    @patch('watchers.directory_watcher.APPLE_PHOTOS_PATHS', [Path('/test/photos')])
+    def test_when_processing_apple_photos_jpeg_without_category_then_transfers(self):
+        """Should process JPEG in Apple Photos directory without category format."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = 'test.jpg'
+        mock_file.suffix = '.jpg'
+        mock_file.__str__.return_value = '/test/photos/test.jpg'
+        mock_file.parent = Path('/test/photos')
+        
+        with patch('watchers.directory_watcher.JPEGExifProcessor') as mock_processor_cls, \
+             patch.object(self.watcher.transfer, 'transfer_file') as mock_transfer, \
+             self.assertLogs(level='INFO') as log:
+            
+            # Mock processor to return title without category format
+            mock_processor = MagicMock()
+            mock_processor.get_metadata_components.return_value = (None, 'Regular Title', None, None, None, None)
+            mock_processor_cls.return_value = mock_processor
+            
+            self.watcher.process_file(mock_file)
+            
+            # Should transfer file
+            mock_transfer.assert_called_once_with(mock_file)
+            
+            # Verify logging
+            self.assertIn("INFO:watchers.directory_watcher:Title 'Regular Title' does not have category format - importing to Apple Photos Watcher album", log.output)
+
+    @patch('watchers.directory_watcher.ENABLE_APPLE_PHOTOS', True)
+    @patch('watchers.directory_watcher.APPLE_PHOTOS_PATHS', [Path('/test/photos')])
+    def test_when_processing_apple_photos_video_then_transfers_without_metadata(self):
+        """Should process video in Apple Photos directory without metadata extraction."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = 'test.mp4'
+        mock_file.suffix = '.mp4'
+        mock_file.__str__.return_value = '/test/photos/test.mp4'
+        mock_file.parent = Path('/test/photos')
+        
+        with patch('watchers.directory_watcher.JPEGExifProcessor') as mock_processor_cls, \
+             patch.object(self.watcher.transfer, 'transfer_file') as mock_transfer, \
+             self.assertLogs(level='INFO') as log:
+            
+            self.watcher.process_file(mock_file)
+            
+            # Should not extract metadata for video
+            mock_processor_cls.assert_not_called()
+            
+            # Should transfer file
+            mock_transfer.assert_called_once_with(mock_file)
+            
+            # Verify logging
+            self.assertIn('INFO:watchers.directory_watcher:Video file - no metadata extraction in this flow', log.output)
+
+    def test_when_processing_regular_jpeg_with_category_title_then_transfers_processed_file(self):
+        """Should process regular JPEG file and transfer with category format."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = 'test.jpg'
+        mock_file.suffix = '.jpg'
+        mock_file.__str__.return_value = '/test/dir/test.jpg'
+        mock_file.parent = Path('/test/dir')
+        
+        new_path = Path('/test/dir/test__LRE.jpg')
+        
+        with patch('watchers.directory_watcher.JPEGExifProcessor') as mock_processor_cls, \
+             patch.object(self.watcher, '_get_next_sequence', return_value=42), \
+             patch.object(self.watcher.transfer, 'transfer_file') as mock_transfer, \
+             self.assertLogs(level='INFO') as log:
+            
+            # First processor for processing
+            mock_processor1 = MagicMock()
+            mock_processor1.process_image.return_value = new_path
+            
+            # Second processor for title extraction
+            mock_processor2 = MagicMock()
+            mock_processor2.get_metadata_components.return_value = (None, 'US TX: Category Title', None, None, None, None)
+            
+            mock_processor_cls.side_effect = [mock_processor1, mock_processor2]
+            
+            self.watcher.process_file(mock_file)
+            
+            # Should process and extract metadata
+            self.assertEqual(mock_processor_cls.call_count, 2)
+            mock_processor_cls.assert_any_call(str(mock_file), sequence=42)
+            mock_processor_cls.assert_any_call(str(new_path))
+            
+            # Should transfer processed file
+            mock_transfer.assert_called_once_with(new_path)
+            
+            # Verify logging
+            self.assertIn("INFO:watchers.directory_watcher:Extracted title: 'US TX: Category Title'", log.output)
+            self.assertIn("INFO:watchers.directory_watcher:Title 'US TX: Category Title' has category format - importing to Apple Photos Watcher album", log.output)
+
+    def test_when_processing_regular_jpeg_without_category_title_then_transfers(self):
+        """Should process regular JPEG file and transfer without category format."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = 'test.jpg'
+        mock_file.suffix = '.jpg'
+        mock_file.__str__.return_value = '/test/dir/test.jpg'
+        mock_file.parent = Path('/test/dir')
+        
+        new_path = Path('/test/dir/test__LRE.jpg')
+        
+        with patch('watchers.directory_watcher.JPEGExifProcessor') as mock_processor_cls, \
+             patch.object(self.watcher, '_get_next_sequence', return_value=42), \
+             patch.object(self.watcher.transfer, 'transfer_file') as mock_transfer, \
+             self.assertLogs(level='INFO') as log:
+            
+            # First processor for processing
+            mock_processor1 = MagicMock()
+            mock_processor1.process_image.return_value = new_path
+            
+            # Second processor for title extraction
+            mock_processor2 = MagicMock()
+            mock_processor2.get_metadata_components.return_value = (None, 'No Category', None, None, None, None)
+            
+            mock_processor_cls.side_effect = [mock_processor1, mock_processor2]
+            
+            self.watcher.process_file(mock_file)
+            
+            # Should transfer processed file
+            mock_transfer.assert_called_once_with(new_path)
+            
+            # Verify logging
+            self.assertIn("INFO:watchers.directory_watcher:Title 'No Category' does not have category format - importing to Apple Photos Watcher album", log.output)
+
+    def test_when_processing_regular_video_then_transfers_without_processing(self):
+        """Should transfer video files without processing."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_file = MagicMock(spec=Path)
+        mock_file.is_file.return_value = True
+        mock_file.stat.return_value = Mock(st_size=100)
+        mock_file.name = 'test.mp4'
+        mock_file.suffix = '.mp4'
+        mock_file.__str__.return_value = '/test/dir/test.mp4'
+        mock_file.parent = Path('/test/dir')
+        
+        with patch('watchers.directory_watcher.JPEGExifProcessor') as mock_processor_cls, \
+             patch.object(self.watcher.transfer, 'transfer_file') as mock_transfer, \
+             self.assertLogs(level='INFO') as log:
+            
+            self.watcher.process_file(mock_file)
+            
+            # Should not process video
+            mock_processor_cls.assert_not_called()
+            
+            # Should transfer original file
+            mock_transfer.assert_called_once_with(mock_file)
+            
+            # Verify logging
+            self.assertIn('INFO:watchers.directory_watcher:Video file - no metadata extraction in this flow', log.output)
+
+    @patch('watchers.directory_watcher.ENABLE_APPLE_PHOTOS', False)
+    def test_when_apple_photos_disabled_then_logs_and_returns(self):
+        """Should log and return when Apple Photos is disabled."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        with patch.object(self.watcher, 'check_directory') as mock_check, \
+             self.assertLogs(level='INFO') as log:
+            
+            self.watcher.check_apple_photos_dirs()
+            
+            # Should not check any directories
+            mock_check.assert_not_called()
+            
+            # Verify logging
+            self.assertIn('INFO:watchers.directory_watcher:Apple Photos processing is disabled. Skipping checks.', log.output)
+
+    @patch('watchers.directory_watcher.APPLE_PHOTOS_PATHS', [Path('/test/photos')])
+    @patch('watchers.directory_watcher.ALL_PATTERN', ['*.jpg', '*.mp4'])
+    def test_when_checking_apple_photos_directory_then_processes_all_patterns(self):
+        """Should process all file patterns in Apple Photos directories."""
+        self.watcher = DirectoryWatcher(self.test_dirs, self.both_incoming)
+        
+        mock_jpg = MagicMock(spec=Path)
+        mock_jpg.name = 'photo.jpg'
+        mock_mp4 = MagicMock(spec=Path)
+        mock_mp4.name = 'video.mp4'
+        
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('pathlib.Path.glob') as mock_glob, \
+             patch.object(self.watcher, 'process_file') as mock_process, \
+             self.assertLogs(level='DEBUG') as log:
+            
+            def glob_side_effect(pattern):
+                if pattern == '*.jpg':
+                    return [mock_jpg]
+                elif pattern == '*.mp4':
+                    return [mock_mp4]
+                return []
+            
+            mock_glob.side_effect = glob_side_effect
+            
+            self.watcher.check_directory(Path('/test/photos'))
+            
+            # Should process both files
+            self.assertEqual(mock_process.call_count, 2)
+            mock_process.assert_any_call(mock_jpg)
+            mock_process.assert_any_call(mock_mp4)
+            
+            # Verify debug logging
+            self.assertIn('DEBUG:watchers.directory_watcher:Looking for patterns: [\'*.jpg\', \'*.mp4\']', log.output)
+            # Should log found files (using mock objects)
+            found_files = [msg for msg in log.output if 'Found file:' in msg]
+            self.assertEqual(len(found_files), 2)
+
 if __name__ == '__main__':
     unittest.main()
