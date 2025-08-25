@@ -557,8 +557,9 @@ class ApplePhotoWatcher:
     def _get_category_based_album_paths(self, title: str) -> list[str]:
         """
         Parse photo title for category-based album paths.
-        If title has format "Category: Details", dynamically create album path
-        in format "02/Category/Full Title".
+        If title has format "Category: Details", check if category exists in album.yaml.
+        If mapped, use the mapping path + full title as album name.
+        Otherwise, dynamically create album path in format "02/Category/Full Title".
         
         Args:
             title: Photo title to parse
@@ -576,15 +577,62 @@ class ApplePhotoWatcher:
             self.logger.info(f"Extracted category '{category}' from title '{title}'")
             
             if category:
-                # Dynamic path creation - use CATEGORY_PREFIX from config and create folder based on category
-                from config import CATEGORY_PREFIX
-                album_path = f"{CATEGORY_PREFIX}/{category}/{title}"
-                self.logger.info(f"Created dynamic category-based album path: {album_path}")
-                return [album_path]
+                # Check if category exists in album mappings
+                album_mappings = self._load_album_mappings()
+                if category in album_mappings:
+                    # Use the mapped path + full title as album name
+                    mapped_path = album_mappings[category].rstrip('/')
+                    album_path = f"{mapped_path}/{title}"
+                    self.logger.info(f"Found mapping for '{category}' -> using mapped path: {album_path}")
+                    return [album_path]
+                else:
+                    # Dynamic path creation - pluralize category and create at top level
+                    plural_category = self._pluralize_category(category)
+                    album_path = f"{plural_category}/{title}"
+                    self.logger.info(f"No mapping found for '{category}' -> using top-level plural folder: {album_path}")
+                    return [album_path]
         else:
             self.logger.info(f"Title '{title}' does not match 'Category: Details' format - no album placement")
                 
         return []
+    
+    def _pluralize_category(self, category: str) -> str:
+        """
+        Simple pluralization - just add 's' to the category name.
+        
+        Args:
+            category: The singular category name
+            
+        Returns:
+            str: The category name with 's' added
+        """
+        return category + 's'
+    
+    def _load_album_mappings(self) -> dict:
+        """
+        Load album mappings from album.yaml file.
+        
+        Returns:
+            dict: Dictionary of category to album path mappings
+        """
+        try:
+            import yaml
+            
+            # Check if we already loaded the mappings (cache them)
+            if hasattr(self, '_album_mappings_cache'):
+                return self._album_mappings_cache
+            
+            with open("album.yaml", "r") as f:
+                mappings = yaml.safe_load(f) or {}
+            
+            self.logger.info(f"Loaded {len(mappings)} album mappings from album.yaml")
+            self._album_mappings_cache = mappings
+            return mappings
+            
+        except Exception as e:
+            self.logger.error(f"Error loading album.yaml: {e}")
+            self._album_mappings_cache = {}
+            return {}
 
     def _execute_batch_additions(self, batch_operations):
         """Execute batch additions to target albums."""
