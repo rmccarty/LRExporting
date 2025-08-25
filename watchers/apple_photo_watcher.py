@@ -579,17 +579,20 @@ class ApplePhotoWatcher:
             if category:
                 # Check if category exists in album mappings
                 album_mappings = self._load_album_mappings()
+                self.logger.info(f"DEBUG: Checking category '{category}' in {len(album_mappings)} mappings")
                 if category in album_mappings:
                     # Use the mapped path + full title as album name
                     mapped_path = album_mappings[category].rstrip('/')
                     album_path = f"{mapped_path}/{title}"
                     self.logger.info(f"Found mapping for '{category}' -> using mapped path: {album_path}")
+                    print(f"   🔍 DEBUG: Category '{category}' mapped to '{mapped_path}' -> Album path: '{album_path}'")
                     return [album_path]
                 else:
                     # Dynamic path creation - pluralize category and create at top level
                     plural_category = self._pluralize_category(category)
                     album_path = f"{plural_category}/{title}"
                     self.logger.info(f"No mapping found for '{category}' -> using top-level plural folder: {album_path}")
+                    print(f"   🔍 DEBUG: Category '{category}' not mapped -> Using plural '{plural_category}' -> Album path: '{album_path}'")
                     return [album_path]
         else:
             self.logger.info(f"Title '{title}' does not match 'Category: Details' format - no album placement")
@@ -611,6 +614,7 @@ class ApplePhotoWatcher:
     def _load_album_mappings(self) -> dict:
         """
         Load album mappings from album.yaml file.
+        Always reads fresh from file to pick up any changes.
         
         Returns:
             dict: Dictionary of category to album path mappings
@@ -618,20 +622,15 @@ class ApplePhotoWatcher:
         try:
             import yaml
             
-            # Check if we already loaded the mappings (cache them)
-            if hasattr(self, '_album_mappings_cache'):
-                return self._album_mappings_cache
-            
+            # Always read fresh from file (no caching) to pick up changes
             with open("album.yaml", "r") as f:
                 mappings = yaml.safe_load(f) or {}
             
-            self.logger.info(f"Loaded {len(mappings)} album mappings from album.yaml")
-            self._album_mappings_cache = mappings
+            self.logger.debug(f"Loaded {len(mappings)} album mappings from album.yaml")
             return mappings
             
         except Exception as e:
             self.logger.error(f"Error loading album.yaml: {e}")
-            self._album_mappings_cache = {}
             return {}
 
     def _execute_batch_additions(self, batch_operations):

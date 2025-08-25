@@ -1,0 +1,40 @@
+
+Birthday: Events/Birthdays/
+Funeral: Events/Deaths/
+Gravestones: Events/Deaths/
+Hospice: Events/Deaths/
+Obituary: Events/Deaths/
+Tribute: Events/Deaths/
+
+Baptism: Events/Faith/
+Communion: Events/Faith/
+Confirmation: Events/Faith/
+
+Christmas: Events/Holidays/
+Easter: Events/Holidays/
+Fathers Day: Events/Holidays/
+Halloween: Events/Holidays/
+Independence Day: Events/Holidays/
+Mothers Day: Events/Holidays/
+New Years: Events/Holidays/
+Thanksgiving: Events/Holidays/
+Valentines Day: Events/Holidays/ 
+
+Medical: Events/Medical/
+
+Anniversary: Events/Relationships/
+Dating: Events/Relationships/
+Engagement: Events/Relationships/
+Honeymoon: Events/Relationships/
+Wedding: Events/Relationships/ 
+
+School: Events/School/
+
+Ancestors: Groups/Family/
+Band: Groups/Bands/
+Family: Groups/Family/
+Employer: Groups/Employers/
+Friends: Groups/Friends/
+RTPC: Groups/RTPC/
+Stranger: Groups/Strangers/
+Strangers: Groups/Strangers/
