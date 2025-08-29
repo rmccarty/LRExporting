@@ -47,8 +47,14 @@ class TransferWatcher:
             return
             
         try:
+            print(f"🔄 TRANSFER WATCHER: Checking {directory} for __LRE files...")
+            found_count = 0
             for file_path in directory.glob('*__LRE.*'):
+                found_count += 1
+                print(f"   📦 Found __LRE file: {file_path.name}")
                 self.process_file(file_path)
+            if found_count == 0:
+                print(f"   ✅ No __LRE files to transfer in {directory.name}")
                 
         except Exception as e:
             self.logger.error(f"Error checking directory {directory}: {e}")

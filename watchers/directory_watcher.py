@@ -30,30 +30,40 @@ class DirectoryWatcher(BaseWatcher):
         if not self.both_incoming:
             return False
             
+        print(f"🔍 BOTH_INCOMING: Checking {self.both_incoming} for files to distribute...")
         found_files = False
+        file_count = 0
         try:
             # Iterate through all files in the Both_Incoming directory
             for file in self.both_incoming.glob("*"):
                 found_files = True  # Mark as found even if locked
+                file_count += 1
                 # Check if the file is open
                 try:
                     with open(file, 'r+'):
                         # File is not open, proceed to copy
+                        print(f"   📤 Distributing: {file.name}")
                         # Copy the file to all incoming directories
                         for incoming_dir in self.directories:
                             shutil.copy(file, incoming_dir / file.name)
                             self.logger.info(f"Copied {file.name} to {incoming_dir.name} directory.")
+                            print(f"      → Copied to {incoming_dir.name}")
                         
                         # Delete the original file
                         file.unlink()
                         self.logger.info(f"Deleted {file.name} from Both_Incoming.")
+                        print(f"      ✓ Deleted from Both_Incoming")
                 except IOError:
                     self.logger.warning(f"File {file.name} is currently open. Skipping copy.")
+                    print(f"   ⏳ File {file.name} is locked - will retry later")
                     continue  # Skip to the next file
         
         except Exception as e:
             self.logger.error(f"Error processing Both_Incoming: {e}")
             found_files = False
+        
+        if file_count == 0:
+            print(f"   ✅ No files to distribute from Both_Incoming")
         
         return found_files
     
@@ -99,6 +109,7 @@ class DirectoryWatcher(BaseWatcher):
                 
             # For files in regular directories, process and transfer
             self.logger.info(f"Processing file: {file_path}")
+            print(f"   🎨 PROCESSING: {file_path.name}")
             
             # Process the file based on type
             if file_path.suffix.lower() in ['.jpg', '.jpeg']:
@@ -106,6 +117,7 @@ class DirectoryWatcher(BaseWatcher):
                 processor = JPEGExifProcessor(str(file_path), sequence=sequence)
                 new_path = processor.process_image()
                 self.logger.info(f"Image processed successfully: {new_path}")
+                print(f"      ✓ Processed to: {Path(new_path).name}")
                 
                 # Extract title to check for category format
                 post_processor = JPEGExifProcessor(str(new_path))
@@ -142,9 +154,15 @@ class DirectoryWatcher(BaseWatcher):
         # Don't log for Apple Photos directories since check_apple_photos_dirs already does
         if not any(Path(directory) == photos_path for photos_path in APPLE_PHOTOS_PATHS):
             self.logger.info(f"Checking {directory} for new JPEG files...")
+            print(f"🔍 DIRECTORY WATCHER: Checking {directory} for new JPEG files...")
             # Regular directory - only process JPG files
+            found_count = 0
             for file in directory.glob(JPEG_PATTERN):
+                found_count += 1
+                print(f"   📷 Found JPEG: {file.name}")
                 self.process_file(file)
+            if found_count == 0:
+                print(f"   ✅ No new JPEGs to process in {directory.name}")
         else:
             # Apple Photos directory - process all supported files
             self.logger.debug(f"Looking for patterns: {ALL_PATTERN}")
