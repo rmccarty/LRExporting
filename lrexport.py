@@ -78,11 +78,12 @@ if __name__ == '__main__':
                 # Check for transfers
                 transfer_watcher.check_directory(directory)
                 
-            # Check Apple Photos directories
-            jpeg_watcher.check_apple_photos_dirs()
-            
             # End ImageWatcher cycle
             jpeg_watcher.end_cycle()
+            
+            # Reset TransferWatcher queue and check Apple Photos directories
+            transfer_watcher.reset_queue_counter()
+            transfer_watcher.check_apple_photos_dirs()
             
             # Check Apple Photos watching album
             apple_photo_watcher.check_album()

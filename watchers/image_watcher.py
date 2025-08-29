@@ -104,28 +104,9 @@ class ImageWatcher(BaseWatcher):
             return
             
         try:
-            # For files in Apple Photos directories, process regardless of suffix
-            if ENABLE_APPLE_PHOTOS and any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
-                self.logger.info(f"Found file in Apple Photos directory: {file_path}")
-                
-                # Extract title to check for category format
-                title = None
-                if file_path.suffix.lower() in ['.jpg', '.jpeg']:
-                    processor = JPEGExifProcessor(str(file_path))
-                    _, title, _, _, _, _ = processor.get_metadata_components()
-                    self.logger.info(f"Extracted title: '{title}'")
-                else:
-                    self.logger.info("Video file - no metadata extraction in this flow")
-                
-                # Check if title has category format (contains colon) for Watching album
-                if title and ':' in title:
-                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos Watcher album")
-                    # Import to Apple Photos Watcher album for further processing
-                    self.transfer.transfer_file(file_path)
-                else:
-                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos Watcher album")
-                    # Import to Apple Photos Watcher album
-                    self.transfer.transfer_file(file_path)
+            # Skip Apple Photos directories - let TransferWatcher handle them
+            if any(Path(str(file_path)).parent == photos_path for photos_path in APPLE_PHOTOS_PATHS):
+                self.logger.debug(f"Skipping Apple Photos directory file - TransferWatcher will handle: {file_path}")
                 return
                 
             # For files in regular directories, skip if already processed
@@ -151,22 +132,12 @@ class ImageWatcher(BaseWatcher):
                 self.logger.info(f"Extracted title: '{title}'")
                 
             else:
-                # For videos, just transfer without processing
-                new_path = file_path
-                title = None
-                self.logger.info("Video file - no metadata extraction in this flow")
+                # For videos, skip - VideoWatcher handles videos
+                self.logger.debug("Video file - skipping (VideoWatcher handles videos)")
+                return
                 
-            # Transfer to Apple Photos
-            if new_path:
-                # Check if title has category format (contains colon) for Watching album
-                if title and ':' in title:
-                    self.logger.info(f"Title '{title}' has category format - importing to Apple Photos Watcher album")
-                    # Import to Apple Photos Watcher album for further processing
-                    self.transfer.transfer_file(new_path)
-                else:
-                    self.logger.info(f"Title '{title}' does not have category format - importing to Apple Photos Watcher album")
-                    # Import to Apple Photos Watcher album
-                    self.transfer.transfer_file(new_path)
+            # No transfer - let TransferWatcher handle the __LRE files
+            self.logger.info(f"Image processed - TransferWatcher will handle transfer: {new_path}")
                 
         except Exception as e:
             self.logger.error(f"Error processing file {file_path}: {e}")
@@ -199,25 +170,6 @@ class ImageWatcher(BaseWatcher):
             if found_count == 0:
                 print(f"   ✅ No new JPEGs to process in {directory.name}")
         else:
-            # Apple Photos directory - process all supported files
-            self.logger.debug(f"Looking for patterns: {ALL_PATTERN}")
-            for pattern in ALL_PATTERN:
-                self.logger.debug(f"Searching with pattern: {pattern}")
-                for file in directory.glob(pattern):
-                    if self.processed_count >= self.queue_size:
-                        print(f"   ⚠️  Queue limit reached ({self.queue_size} files) - more files pending in Apple Photos directory")
-                        return
-                    self.logger.debug(f"Found file: {file}")
-                    print(f"   📷 [{self.processed_count + 1}/{self.queue_size}] Found media file: {file.name}")
-                    self.process_file(file)
-                    self.processed_count += 1
+            # Apple Photos directory - skip, let TransferWatcher handle
+            self.logger.debug(f"Skipping Apple Photos directory {directory} - TransferWatcher will handle")
     
-    def check_apple_photos_dirs(self):
-        """Check Apple Photos directories for media files and transfer them."""
-        if not ENABLE_APPLE_PHOTOS:
-            self.logger.info("Apple Photos processing is disabled. Skipping checks.")
-            return
-
-        for photos_path in APPLE_PHOTOS_PATHS:
-            self.logger.info(f"Checking {photos_path} for new media files...")
-            self.check_directory(photos_path)

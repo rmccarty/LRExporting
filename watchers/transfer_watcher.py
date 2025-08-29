@@ -3,11 +3,11 @@
 from pathlib import Path
 import logging
 
-from config import WATCH_DIRS, SLEEP_TIME
+from config import WATCH_DIRS, SLEEP_TIME, APPLE_PHOTOS_PATHS, ENABLE_APPLE_PHOTOS, WATCHER_QUEUE_SIZE
 from transfers import Transfer
 
 class TransferWatcher:
-    """Watches for _LRE files and transfers them to their destination directories."""
+    """Watches for _LRE files and transfers them to their destination directories, including Apple Photos imports."""
     
     def __init__(self, directories=None):
         self.directories = [Path(d) for d in (directories or WATCH_DIRS)]
@@ -15,6 +15,21 @@ class TransferWatcher:
         self.sleep_time = SLEEP_TIME
         self.logger = logging.getLogger(__name__)
         self.transfer = Transfer()
+        self.queue_size = WATCHER_QUEUE_SIZE
+        self.processed_count = 0  # Track files processed in current cycle
+    
+    def reset_queue_counter(self):
+        """Reset the processed count for a new cycle."""
+        self.processed_count = 0
+    
+    def check_apple_photos_dirs(self):
+        """Check Apple Photos directories for media files and transfer them."""
+        if not ENABLE_APPLE_PHOTOS:
+            return
+
+        for photos_path in APPLE_PHOTOS_PATHS:
+            print(f"🔄 TRANSFER WATCHER: Checking {photos_path} for media files...")
+            self.check_directory(photos_path)
         
     def process_file(self, file_path: Path) -> bool:
         """
@@ -47,12 +62,17 @@ class TransferWatcher:
             return
             
         try:
-            print(f"🔄 TRANSFER WATCHER: Checking {directory} for __LRE files...")
+            # Check for __LRE files only (both regular and Apple Photos directories)
+            print(f"🔄 TRANSFER WATCHER: Checking {directory} for __LRE files... (Queue: {self.processed_count}/{self.queue_size})")
             found_count = 0
             for file_path in directory.glob('*__LRE.*'):
+                if self.processed_count >= self.queue_size:
+                    print(f"   ⚠️  Queue limit reached ({self.queue_size} files) - {found_count} files processed, more files pending")
+                    break
                 found_count += 1
-                print(f"   📦 Found __LRE file: {file_path.name}")
+                print(f"   📦 [{self.processed_count + 1}/{self.queue_size}] Found __LRE file: {file_path.name}")
                 self.process_file(file_path)
+                self.processed_count += 1
             if found_count == 0:
                 print(f"   ✅ No __LRE files to transfer in {directory.name}")
                 
