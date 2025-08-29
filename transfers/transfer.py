@@ -260,6 +260,18 @@ class Transfer:
         """
         self.logger.info(f"[TRANSFER] _perform_transfer called for {file_path} to {dest_dir}")
         try:
+            # Read EXIF before moving (for Apple Photos imports)
+            exif_data_before = None
+            if ENABLE_APPLE_PHOTOS and dest_dir in APPLE_PHOTOS_PATHS and file_path.suffix.lower() in ['.jpg', '.jpeg']:
+                try:
+                    from processors.jpeg_processor import JPEGExifProcessor
+                    exif_logger = JPEGExifProcessor(str(file_path))
+                    exif_logger.read_exif()
+                    exif_data_before = exif_logger.exif_data
+                    self.logger.info(f"[EXIF BEFORE IMPORT] {file_path}: {exif_data_before}")
+                except Exception as ex:
+                    self.logger.warning(f"Could not read EXIF before import: {ex}")
+            
             # First move file to destination
             dest_dir.mkdir(parents=True, exist_ok=True)
             dest_path = dest_dir / file_path.name
@@ -328,15 +340,7 @@ class Transfer:
                 self.logger.warning(f"Could not log EXIF before move: {ex}")
             # Move file
             result = self._perform_transfer(file_path, dest_dir)
-            # Log EXIF data after moving
-            try:
-                if file_path.suffix.lower() in ['.jpg', '.jpeg']:
-                    moved_path = dest_dir / file_path.name
-                    exif_logger_after = JPEGExifProcessor(str(moved_path))
-                    exif_logger_after.read_exif()
-                    self.logger.info(f"[EXIF AFTER MOVE] {moved_path}: {exif_logger_after.exif_data}")
-            except Exception as ex:
-                self.logger.warning(f"Could not log EXIF after move: {ex}")
+            # Note: EXIF logging after move removed - file may be imported to Apple Photos and no longer exist
             return result
         except Exception as e:
             self.logger.error(f"Transfer failed for {file_path}: {e}")
