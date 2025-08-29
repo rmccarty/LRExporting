@@ -10,7 +10,7 @@ LRExporting is a macOS-specific photo and video management system that processes
 
 ### Core Components
 1. **Watchers** (`/watchers/`) - Monitor directories for different file types:
-   - `DirectoryWatcher` - Monitors for JPEG files
+   - `ImageWatcher` - Monitors for JPEG files
    - `VideoWatcher` - Monitors for video files (MP4, MOV, M4V)
    - `TransferWatcher` - Handles file transfers between directories
    - `ApplePhotoWatcher` - Manages Apple Photos integration with watermark-based throttling

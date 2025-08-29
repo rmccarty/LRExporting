@@ -14,13 +14,13 @@ from .base_watcher import BaseWatcher
 from transfers.transfer import Transfer
 from processors.jpeg_processor import JPEGExifProcessor
 
-class DirectoryWatcher(BaseWatcher):
+class ImageWatcher(BaseWatcher):
     """
-    A class to watch directories for new files and process them.
+    A class to watch directories for new image files (JPEGs) and process them.
     """
     
     def __init__(self, watch_dirs=None, both_incoming_dir=None):
-        """Initialize the directory watcher."""
+        """Initialize the image watcher."""
         super().__init__(directories=watch_dirs)
         self.both_incoming = Path(both_incoming_dir) if both_incoming_dir else None
         self.transfer = Transfer()
@@ -31,20 +31,20 @@ class DirectoryWatcher(BaseWatcher):
     def reset_queue_counter(self):
         """Reset the processed count for a new cycle."""
         if self.processed_count > 0:
-            print(f"📊 DIRECTORY WATCHER: Processed {self.processed_count} files in this cycle")
+            print(f"📊 IMAGE WATCHER: Processed {self.processed_count} files in this cycle")
         self.processed_count = 0
     
     def start_cycle(self):
-        """Called at the start of each DirectoryWatcher cycle."""
+        """Called at the start of each ImageWatcher cycle."""
         print(f"\n{'='*60}")
-        print(f"🚀 DIRECTORY WATCHER: Starting new cycle (Queue limit: {self.queue_size})")
+        print(f"🚀 IMAGE WATCHER: Starting new cycle (Queue limit: {self.queue_size})")
         print(f"{'='*60}")
         self.reset_queue_counter()
     
     def end_cycle(self):
-        """Called at the end of each DirectoryWatcher cycle."""
+        """Called at the end of each ImageWatcher cycle."""
         print(f"{'='*60}")
-        print(f"✅ DIRECTORY WATCHER: Cycle complete")
+        print(f"✅ IMAGE WATCHER: Cycle complete")
         if self.processed_count > 0:
             print(f"   📊 Processed {self.processed_count} files in this cycle")
         else:
@@ -185,7 +185,7 @@ class DirectoryWatcher(BaseWatcher):
         # Don't log for Apple Photos directories since check_apple_photos_dirs already does
         if not any(Path(directory) == photos_path for photos_path in APPLE_PHOTOS_PATHS):
             self.logger.info(f"Checking {directory} for new JPEG files...")
-            print(f"🔍 DIRECTORY WATCHER: Checking {directory} for new JPEG files... (Queue: {self.processed_count}/{self.queue_size})")
+            print(f"🔍 IMAGE WATCHER: Checking {directory} for new JPEG files... (Queue: {self.processed_count}/{self.queue_size})")
             # Regular directory - only process JPG files
             found_count = 0
             for file in directory.glob(JPEG_PATTERN):
