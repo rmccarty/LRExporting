@@ -7,7 +7,8 @@ import shutil
 
 from config import (
     WATCH_DIRS, BOTH_INCOMING, APPLE_PHOTOS_PATHS,
-    JPEG_PATTERN, ALL_PATTERN, ENABLE_APPLE_PHOTOS, APPLE_PHOTOS_WATCHING
+    JPEG_PATTERN, ALL_PATTERN, ENABLE_APPLE_PHOTOS, APPLE_PHOTOS_WATCHING,
+    WATCHER_QUEUE_SIZE
 )
 from .base_watcher import BaseWatcher
 from transfers.transfer import Transfer
@@ -24,6 +25,14 @@ class DirectoryWatcher(BaseWatcher):
         self.both_incoming = Path(both_incoming_dir) if both_incoming_dir else None
         self.transfer = Transfer()
         self.logger = logging.getLogger(__name__)  # Override base logger
+        self.queue_size = WATCHER_QUEUE_SIZE
+        self.processed_count = 0  # Track files processed in current cycle
+    
+    def reset_queue_counter(self):
+        """Reset the processed count for a new cycle."""
+        if self.processed_count > 0:
+            print(f"📊 DIRECTORY WATCHER: Processed {self.processed_count} files in this cycle")
+        self.processed_count = 0
     
     def process_both_incoming(self):
         """Check Both_Incoming directory and copy files to individual incoming directories."""
@@ -109,7 +118,7 @@ class DirectoryWatcher(BaseWatcher):
                 
             # For files in regular directories, process and transfer
             self.logger.info(f"Processing file: {file_path}")
-            print(f"   🎨 PROCESSING: {file_path.name}")
+            print(f"      🎨 PROCESSING: {file_path.name}")
             
             # Process the file based on type
             if file_path.suffix.lower() in ['.jpg', '.jpeg']:
@@ -117,7 +126,7 @@ class DirectoryWatcher(BaseWatcher):
                 processor = JPEGExifProcessor(str(file_path), sequence=sequence)
                 new_path = processor.process_image()
                 self.logger.info(f"Image processed successfully: {new_path}")
-                print(f"      ✓ Processed to: {Path(new_path).name}")
+                print(f"         ✓ Processed to: {Path(new_path).name}")
                 
                 # Extract title to check for category format
                 post_processor = JPEGExifProcessor(str(new_path))
@@ -151,16 +160,25 @@ class DirectoryWatcher(BaseWatcher):
         if not directory.exists():
             return
             
+        # Check if we've hit the queue limit
+        if self.processed_count >= self.queue_size:
+            print(f"   ⚠️  Queue limit reached ({self.queue_size} files) - yielding to other watchers")
+            return
+            
         # Don't log for Apple Photos directories since check_apple_photos_dirs already does
         if not any(Path(directory) == photos_path for photos_path in APPLE_PHOTOS_PATHS):
             self.logger.info(f"Checking {directory} for new JPEG files...")
-            print(f"🔍 DIRECTORY WATCHER: Checking {directory} for new JPEG files...")
+            print(f"🔍 DIRECTORY WATCHER: Checking {directory} for new JPEG files... (Queue: {self.processed_count}/{self.queue_size})")
             # Regular directory - only process JPG files
             found_count = 0
             for file in directory.glob(JPEG_PATTERN):
+                if self.processed_count >= self.queue_size:
+                    print(f"   ⚠️  Queue limit reached ({self.queue_size} files) - {found_count} files processed, more files pending")
+                    break
                 found_count += 1
-                print(f"   📷 Found JPEG: {file.name}")
+                print(f"   📷 [{self.processed_count + 1}/{self.queue_size}] Found JPEG: {file.name}")
                 self.process_file(file)
+                self.processed_count += 1
             if found_count == 0:
                 print(f"   ✅ No new JPEGs to process in {directory.name}")
         else:
@@ -169,8 +187,13 @@ class DirectoryWatcher(BaseWatcher):
             for pattern in ALL_PATTERN:
                 self.logger.debug(f"Searching with pattern: {pattern}")
                 for file in directory.glob(pattern):
+                    if self.processed_count >= self.queue_size:
+                        print(f"   ⚠️  Queue limit reached ({self.queue_size} files) - more files pending in Apple Photos directory")
+                        return
                     self.logger.debug(f"Found file: {file}")
+                    print(f"   📷 [{self.processed_count + 1}/{self.queue_size}] Found media file: {file.name}")
                     self.process_file(file)
+                    self.processed_count += 1
     
     def check_apple_photos_dirs(self):
         """Check Apple Photos directories for media files and transfer them."""

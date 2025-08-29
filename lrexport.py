@@ -63,6 +63,9 @@ if __name__ == '__main__':
         apple_photo_watcher.running = True
         
         while jpeg_watcher.running and video_watcher.running and transfer_watcher.running and apple_photo_watcher.running:
+            # Reset queue counter for new cycle
+            jpeg_watcher.reset_queue_counter()
+            
             # Process both incoming directory first for JPEGs
             jpeg_watcher.process_both_incoming()
             

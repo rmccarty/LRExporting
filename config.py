@@ -17,6 +17,10 @@ LOG_LEVEL = "DEBUG"  # Temporarily set to DEBUG for more info
 # Sleep time when no files are found (in seconds)
 SLEEP_TIME = 10
 
+# Queue size limit - process only N items per cycle to prevent blocking
+# All watchers will process up to this many items per cycle before yielding to the next watcher
+WATCHER_QUEUE_SIZE = 5
+
 # Apple Photos Watcher configuration
 # Maximum number of assets to fetch from Watching album per check (prevents performance issues with large albums)
 APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 5000
