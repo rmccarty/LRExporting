@@ -1,10 +1,14 @@
 
 Birthday: Events/Birthdays/
-Funeral: Events/Deaths/
+Pregnancy: Events/Birthdays/
+Event: Events/
+Funeral: Events/Deaths/ 
 Gravestones: Events/Deaths/
+Gravestone: Events/Deaths/
 Hospice: Events/Deaths/
 Obituary: Events/Deaths/
 Tribute: Events/Deaths/
+Vacation: Events/Vacation/
 
 Baptism: Events/Faith/
 Communion: Events/Faith/
@@ -29,12 +33,58 @@ Honeymoon: Events/Relationships/
 Wedding: Events/Relationships/ 
 
 School: Events/School/
+Yearbook: Events/School/
+Graduation: Events/School/
 
 Ancestors: Groups/Family/
 Band: Groups/Bands/
 Family: Groups/Family/
 Employer: Groups/Employers/
+Army: Groups/Employers/
+Aigner: Groups/Employers/
+First American: Groups/Employers/
+Freinet: Groups/Employers/
+Iomega: Groups/Employers/
+Lucent: Groups/Employers/
+Sonus: Groups/Employers/
+USO: Groups/Employers/
 Friends: Groups/Friends/
 RTPC: Groups/RTPC/
 Stranger: Groups/Strangers/
 Strangers: Groups/Strangers/
+
+US: Locations/US/
+DE: Locations/DE/
+DE Berlin: Locations/DE/Berlin/
+Berlin: Locations/DE/Berlin/
+Hohernzollern: Locations/DE/Hohernzollern/
+Ludwigsburg: Locations/DE/Ludwigsburg/
+Monrepos: Locations/DE/Ludwigsburg/Monrepos/
+Stuttgart: Locations/DE/Stuttgart/
+DE Stuttgart: Locations/DE/Stuttgart/
+Wildbad: Locations/DE/Wildbad/
+Kelly Barracks: Locations/DE/Stuttgart/Kelly Barracks/
+US AR: Locations/US/AR/
+US LA: Locations/US/LA/
+US NM: Locations/US/NM/
+US NY: Locations/US/NY/
+US TX: Locations/US/TX/
+US UT: Locations/US/UT/
+US OK: Locations/US/OK/
+
+BS: Locations/BS/
+CZ: Locations/CZ/
+ES: Locations/ES/
+FR: Locations/FR/
+HU: Locations/HU/
+MX: Locations/MX/
+IE: Locations/IE/ 
+IT: Locations/IT/
+UK: Locations/UK/
+Trip: /Locations/Trips/
+Germany: Locations/DE/
+Childhood: Groups/Family/Childhood/
+
+ECHPTA: Groups/ECHPTA/
+
+AT: Locations/AT/

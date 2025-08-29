@@ -588,29 +588,16 @@ class ApplePhotoWatcher:
                     print(f"   🔍 DEBUG: Category '{category}' mapped to '{mapped_path}' -> Album path: '{album_path}'")
                     return [album_path]
                 else:
-                    # Dynamic path creation - pluralize category and create at top level
-                    plural_category = self._pluralize_category(category)
-                    album_path = f"{plural_category}/{title}"
-                    self.logger.info(f"No mapping found for '{category}' -> using top-level plural folder: {album_path}")
-                    print(f"   🔍 DEBUG: Category '{category}' not mapped -> Using plural '{plural_category}' -> Album path: '{album_path}'")
+                    # Dynamic path creation - use category as-is and place in TBD folder
+                    from config import TBD_FOLDER
+                    album_path = f"{TBD_FOLDER}/{category}/{title}"
+                    self.logger.info(f"No mapping found for '{category}' -> using TBD folder: {album_path}")
+                    print(f"   🔍 DEBUG: Category '{category}' not mapped -> Using TBD/{category} -> Album path: '{album_path}'")
                     return [album_path]
         else:
             self.logger.info(f"Title '{title}' does not match 'Category: Details' format - no album placement")
                 
         return []
-    
-    def _pluralize_category(self, category: str) -> str:
-        """
-        Simple pluralization - just add 's' to the category name.
-        
-        Args:
-            category: The singular category name
-            
-        Returns:
-            str: The category name with 's' added
-        """
-        return category + 's'
-    
     def _load_album_mappings(self) -> dict:
         """
         Load album mappings from album.yaml file.

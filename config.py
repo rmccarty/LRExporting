@@ -129,3 +129,6 @@ MCCARTYS_REPLACEMENT = 'The McCartys: '
 
 # Dynamic category-based album prefix
 CATEGORY_PREFIX = '02'
+
+# Folder for unmapped category albums
+TBD_FOLDER = 'TBD'
