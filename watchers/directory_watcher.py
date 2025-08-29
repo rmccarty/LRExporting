@@ -34,6 +34,23 @@ class DirectoryWatcher(BaseWatcher):
             print(f"📊 DIRECTORY WATCHER: Processed {self.processed_count} files in this cycle")
         self.processed_count = 0
     
+    def start_cycle(self):
+        """Called at the start of each DirectoryWatcher cycle."""
+        print(f"\n{'='*60}")
+        print(f"🚀 DIRECTORY WATCHER: Starting new cycle (Queue limit: {self.queue_size})")
+        print(f"{'='*60}")
+        self.reset_queue_counter()
+    
+    def end_cycle(self):
+        """Called at the end of each DirectoryWatcher cycle."""
+        print(f"{'='*60}")
+        print(f"✅ DIRECTORY WATCHER: Cycle complete")
+        if self.processed_count > 0:
+            print(f"   📊 Processed {self.processed_count} files in this cycle")
+        else:
+            print(f"   📊 No files processed in this cycle")
+        print(f"{'='*60}\n")
+    
     def process_both_incoming(self):
         """Check Both_Incoming directory and copy files to individual incoming directories."""
         if not self.both_incoming:
