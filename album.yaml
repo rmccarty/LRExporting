@@ -1,90 +1,140 @@
+# Attractions
 
-Birthday: Events/Birthdays/
-Pregnancy: Events/Birthdays/
-Event: Events/
-Funeral: Events/Deaths/ 
-Gravestones: Events/Deaths/
-Gravestone: Events/Deaths/
-Hospice: Events/Deaths/
-Obituary: Events/Deaths/
-Tribute: Events/Deaths/
-Vacation: Events/Vacation/
+Aquarium: 1-Events/Attractions/Aquariums/
+Arboretum: 1-Events/Attractions/Arboretums/
+Burg: 1-Events/Attractions/Castles/
+Fest: 1-Events/Attractions/Festivals/
+Festival: 1-Events/Attractions/Festivals/
+Palace: 1-Events/Attractions/Castles/
+Residence: 1-Events/Attractions/Castles/
+Schloss: 1-Events/Attractions/Castles/
+Fair: 1-Events/Attractions/Fairs/
+Faire: 1-Events/Attractions/Fairs/
+Destination: 1-Events/Attractions/Destinations/
+Rodeo: 1-Events/Attractions/Rodeos/
+Zoo: 1-Events/Attractions/Zoos/
 
-Baptism: Events/Faith/
-Communion: Events/Faith/
-Confirmation: Events/Faith/
+Birthday: 1-Events/Birthdays/
+Pregnancy: 1-Events/Birthdays/
+Event: 1-Events/
+Funeral: 1-Events/Deaths/ 
+Gravestones: 1-Events/Deaths/
+Gravestone: 1-Events/Deaths/
 
-Christmas: Events/Holidays/
-Easter: Events/Holidays/
-Fathers Day: Events/Holidays/
-Halloween: Events/Holidays/
-Independence Day: Events/Holidays/
-Mothers Day: Events/Holidays/
-New Years: Events/Holidays/
-Thanksgiving: Events/Holidays/
-Valentines Day: Events/Holidays/ 
 
-Medical: Events/Medical/
+Hospice: 1-Events/Deaths/
+Obituary: 1-Events/Deaths/
+Tribute: 1-Events/Deaths/
+Vacation: 1-Events/Vacation/
 
-Anniversary: Events/Relationships/
-Dating: Events/Relationships/
-Engagement: Events/Relationships/
-Honeymoon: Events/Relationships/
-Wedding: Events/Relationships/ 
+Baptism: 1-Events/Faith/
+Communion: 1-Events/Faith/
+Confirmation: 1-Events/Faith/
 
-School: Events/School/
-Yearbook: Events/School/
-Graduation: Events/School/
+Christmas: 1-Events/Holidays/
+Easter: 1-Events/Holidays/
+Fathers Day: 1-Events/Holidays/
+Halloween: 1-Events/Holidays/
+Independence Day: 1-Events/Holidays/
+Mothers Day: 1-Events/Holidays/
+New Years: 1-Events/Holidays/
+Thanksgiving: 1-Events/Holidays/
+Valentines Day: 1-Events/Holidays/ 
 
-Ancestors: Groups/Family/
-Band: Groups/Bands/
-Family: Groups/Family/
-Employer: Groups/Employers/
-Army: Groups/Employers/
-Aigner: Groups/Employers/
-First American: Groups/Employers/
-Freinet: Groups/Employers/
-Iomega: Groups/Employers/
-Lucent: Groups/Employers/
-Sonus: Groups/Employers/
-USO: Groups/Employers/
-Friends: Groups/Friends/
-RTPC: Groups/RTPC/
-Stranger: Groups/Strangers/
-Strangers: Groups/Strangers/
+Medical: 1-Events/Medical/
 
-US: Locations/US/
-DE: Locations/DE/
-DE Berlin: Locations/DE/Berlin/
-Berlin: Locations/DE/Berlin/
-Hohernzollern: Locations/DE/Hohernzollern/
-Ludwigsburg: Locations/DE/Ludwigsburg/
-Monrepos: Locations/DE/Ludwigsburg/Monrepos/
-Stuttgart: Locations/DE/Stuttgart/
-DE Stuttgart: Locations/DE/Stuttgart/
-Wildbad: Locations/DE/Wildbad/
-Kelly Barracks: Locations/DE/Stuttgart/Kelly Barracks/
-US AR: Locations/US/AR/
-US LA: Locations/US/LA/
-US NM: Locations/US/NM/
-US NY: Locations/US/NY/
-US TX: Locations/US/TX/
-US UT: Locations/US/UT/
-US OK: Locations/US/OK/
+Portrait: 1-Events/Portraits
 
-BS: Locations/BS/
-CZ: Locations/CZ/
-ES: Locations/ES/
-FR: Locations/FR/
-HU: Locations/HU/
-MX: Locations/MX/
-IE: Locations/IE/ 
-IT: Locations/IT/
-UK: Locations/UK/
-Trip: /Locations/Trips/
-Germany: Locations/DE/
-Childhood: Groups/Family/Childhood/
+Anniversary: 1-Events/Relationships/
+Dating: 1-Events/Relationships/
+Engagement: 1-Events/Relationships/
+Honeymoon: 1-Events/Relationships/
+Wedding: 1-Events/Relationships/ 
 
-ECHPTA: Groups/ECHPTA/
+School: 1-Events/School/
+Yearbook: 1-Events/School/
+Graduation: 1-Events/School/
 
-AT: Locations/AT/
+Ancestors: 2-Groups/Family/
+Otto: 2-Groups/Family/Otto/
+Band: 2-Groups/Bands/
+Family: 2-Groups/Family/
+Employer: 2-Groups/Employers/
+Army: 2-Groups/Employers/Army/
+Aigner: 2-Groups/Employers/
+First American: 2-Groups/Employers/
+Iomega: 2-Groups/Employers/
+Lucent: 2-Groups/Employers/
+Sonus: 2-Groups/Employers/
+USO: 2-Groups/Employers/
+Friends: 2-Groups/Friends/
+RTPC: 2-Groups/RTPC/
+RTPC Street: 2-Groups/RTPC Street/
+Stranger: 2-Groups/Strangers/
+Strangers: 2-Groups/Strangers/
+
+US: 3-Locations/US/
+DE: 3-Locations/DE/
+DE Berlin: 3-Locations/DE/Berlin/
+Berlin: 3-Locations/DE/Berlin/
+Castle: 3-Locations/Castles/
+Castles: 3-Locations/Attractions/
+
+
+Move: 3-Locations/Moves/
+Home: 3-Locations/Home/
+Hohernzollern: 3-Locations/DE/Hohernzollern/
+Ludwigsburg: 3-Locations/DE/Ludwigsburg/
+Monrepos: 3-Locations/DE/Ludwigsburg/Monrepos/
+Stuttgart: 3-Locations/DE/Stuttgart/
+DE Stuttgart: 3-Locations/DE/Stuttgart/
+Wildbad: 3-Locations/DE/Wildbad/
+Kelley Barracks: 3-Locations/DE/Stuttgart/Kelly Barracks/
+US AR: 3-Locations/US/AR/
+AR: 3-Locations/US/AR/
+US CO: 3-Locations/US/CO/
+CO: 3-Locations/US/CO/
+US FL: 3-Locations/US/FL/
+FL: 3-Locations/US/FL/
+
+US LA: 3-Locations/US/LA/ 
+LA: 3-Locations/US/LA/
+US NM: 3-Locations/US/NM/
+US NY: 3-Locations/US/NY/
+US TX: 3-Locations/US/TX/
+
+US UT: 3-Locations/US/UT/
+US OK: 3-Locations/US/OK/
+OK: 3-Locations/US/OK/
+
+Davis: 3-Locations/US/OK/Davis/
+Turner Falls: 3-Locations/US/OK/Turner Falls/
+Sulphur: 3-Locations/US/OK/Sulphur/
+MS: 3-Locations/US/MS/
+TX: 3-Locations/US/TX/
+
+BS: 3-Locations/BS/
+CZ: 3-Locations/CZ/
+ES: 3-Locations/ES/
+FR: 3-Locations/FR/
+HU: 3-Locations/HU/
+MX: 3-Locations/MX/
+IE: 3-Locations/IE/ 
+IT: 3-Locations/IT/
+UK: 3-Locations/UK/
+Trip: 3-Locations/Trips/
+Germany: 3-Locations/DE/
+
+Postcards: 3-Locations/Postcards/
+
+Childhood: 2-Groups/Family/Childhood/
+
+ECHPTA: 2-Groups/ECHPTA/
+
+AT: 3-Locations/AT/
+
+#series 
+
+The McCartys: Series/Videos/The McCartys/
+McCartys: Series/Videos/The McCartys/
+
