@@ -89,7 +89,7 @@ Monrepos: 3-Locations/DE/Ludwigsburg/Monrepos/
 Stuttgart: 3-Locations/DE/Stuttgart/
 DE Stuttgart: 3-Locations/DE/Stuttgart/
 Wildbad: 3-Locations/DE/Wildbad/
-Kelley Barracks: 3-Locations/DE/Stuttgart/Kelly Barracks/
+Kelley Barracks: 3-Locations/DE/Stuttgart/Kelley Barracks/
 US AR: 3-Locations/US/AR/
 AR: 3-Locations/US/AR/
 US CO: 3-Locations/US/CO/
@@ -112,7 +112,8 @@ Turner Falls: 3-Locations/US/OK/Turner Falls/
 Sulphur: 3-Locations/US/OK/Sulphur/
 MS: 3-Locations/US/MS/
 TX: 3-Locations/US/TX/
-
+Rowlett: 3-Locations/US/TX/Rowlett/
+Bobbie Lane: 3-Locations/US/TX/Rowlett/Bobbie Lane/
 BS: 3-Locations/BS/
 CZ: 3-Locations/CZ/
 ES: 3-Locations/ES/
@@ -135,6 +136,6 @@ AT: 3-Locations/AT/
 
 #series 
 
-The McCartys: Series/Videos/The McCartys/
+The McCartys: 04-Series/Videos/The McCartys/
 McCartys: Series/Videos/The McCartys/
 
