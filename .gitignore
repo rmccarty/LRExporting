@@ -30,3 +30,6 @@ build/
 .DS_Store
 security-audit.json
 sbom.json
+
+# Log files
+*.log
