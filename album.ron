@@ -1,0 +1,109 @@
+
+Birthday: Events/Birthdays/
+Pregnancy: Events/Birthdays/
+Event: Events/
+Funeral: Events/Deaths/ 
+Gravestones: Events/Deaths/
+Gravestone: Events/Deaths/
+Hospice: Events/Deaths/
+Obituary: Events/Deaths/
+Tribute: Events/Deaths/
+Vacation: Events/Vacation/
+
+Baptism: Events/Faith/
+Communion: Events/Faith/
+Confirmation: Events/Faith/
+
+Christmas: Events/Holidays/
+Easter: Events/Holidays/
+Fathers Day: Events/Holidays/
+Halloween: Events/Holidays/
+Independence Day: Events/Holidays/
+Mothers Day: Events/Holidays/
+New Years: Events/Holidays/
+Thanksgiving: Events/Holidays/
+Valentines Day: Events/Holidays/ 
+
+Medical: Events/Medical/
+
+Anniversary: Events/Relationships/
+Dating: Events/Relationships/
+Engagement: Events/Relationships/
+Honeymoon: Events/Relationships/
+Wedding: Events/Relationships/ 
+
+School: Events/School/
+Yearbook: Events/School/
+Graduation: Events/School/
+Drill Team: Events/School/Drill Team 
+School Band: Events/School/School Band
+
+Ancestors: Groups/Family/
+Band: Groups/Bands/
+Family: Groups/Family/
+Employer: Groups/Employers/
+Army: Groups/Employers/
+Aigner: Groups/Employers/
+First American: Groups/Employers/
+Freinet: Groups/Employers/
+Iomega: Groups/Employers/
+Lucent: Groups/Employers/
+Sonus: Groups/Employers/
+USO: Groups/Employers/
+Friends: Groups/Friends/
+RTPC: Groups/RTPC/
+Stranger: Groups/Strangers/
+Strangers: Groups/Strangers/
+
+US: Locations/US/
+DE: Locations/DE/
+Berlin: Locations/DE/Berlin/
+Ludwigsburg: Locations/DE/Ludwigsburg/
+Monrepos: Locations/DE/Ludwigsburg/Monrepos/
+Neckar: Locations/DE/Neckar/
+Stuttgart: Locations/DE/Stuttgart/
+Wildbad: Locations/DE/Wildbad/
+Kelly Barracks: Locations/DE/Stuttgart/Kelly Barracks/
+Dresden: Locations/DE/Dresden/
+Hohenzollern: Locations/DE/Castles/
+Lichtenstein: Locations/DE/Castles/
+Sigmaringen: Locations/DE/Castles/
+Castles: Locations/DE/Castles/
+
+AR: Locations/US/AR/
+CO: Locations/US/CO/
+DC: Locations/US/DC/
+ID: Locations/US/ID/
+FL: Locations/US/FL/
+KS: Locations/US/KS/
+LA: Locations/US/LA/
+NM: Locations/US/NM/
+NY: Locations/US/NY/
+OK: Locations/US/OK/
+TX: Locations/US/TX/
+UT: Locations/US/UT/
+WY: Locations/US/WY/
+
+NP: Locations/Parks/NP/
+SP: Locations/Parks/SP/
+
+BS: Locations/BS/
+CZ: Locations/CZ/
+ES: Locations/ES/
+FR: Locations/FR/
+HU: Locations/HU/
+MX: Locations/MX/
+IE: Locations/IE/ 
+IT: Locations/IT/
+UK: Locations/UK/
+Trip: Locations/Trips/
+
+
+
+Germany: Locations/DE/
+Childhood: Groups/Family/Childhood/
+The McCartys: Groups/Family/The McCartys/
+
+ECHPTA: Groups/ECHPTA/
+
+AT: Locations/AT/

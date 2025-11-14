@@ -44,6 +44,7 @@ Valentines Day: 1-Events/Holidays/
 Medical: 1-Events/Medical/
 
 Portrait: 1-Events/Portraits
+Portraits: 1-Events/Portraits/
 
 Anniversary: 1-Events/Relationships/
 Dating: 1-Events/Relationships/
@@ -59,6 +60,8 @@ Ancestors: 2-Groups/Family/
 Otto: 2-Groups/Family/Otto/
 Band: 2-Groups/Bands/
 Family: 2-Groups/Family/
+Monikda: 2-Groups/Family/Monikda/
+Shared: 2-Groups/Family/Shared/
 Employer: 2-Groups/Employers/
 Army: 2-Groups/Employers/Army/
 Aigner: 2-Groups/Employers/
@@ -74,7 +77,9 @@ Stranger: 2-Groups/Strangers/
 Strangers: 2-Groups/Strangers/
 
 US: 3-Locations/US/
+USA: 3-Locations/US/
 DE: 3-Locations/DE/
+Munich: 3-Locations/DE/Munich/
 DE Berlin: 3-Locations/DE/Berlin/
 Berlin: 3-Locations/DE/Berlin/
 Castle: 3-Locations/Castles/
@@ -139,3 +144,4 @@ AT: 3-Locations/AT/
 The McCartys: 4-Series/Videos/The McCartys/
 McCartys: 4-Series/Videos/The McCartys/
 Documents: 4-Series/Documents/
+Kodak Disc: 4-Series/Kodak Disc/
