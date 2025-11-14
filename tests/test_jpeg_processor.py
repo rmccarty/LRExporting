@@ -65,10 +65,18 @@ class TestJPEGExifProcessor(unittest.TestCase):
     def test_when_processing_new_file_then_renames(self):
         """Should rename new files with LRE suffix."""
         with patch.object(self.processor, 'read_exif'), \
-             patch.object(self.processor, 'rename_file', return_value=self.test_file):
+             patch.object(self.processor, 'rename_file', return_value=self.test_file), \
+             patch.object(self.processor, '_validate_file_ready', return_value=True):
              
             result = self.processor.process_image()
             self.assertEqual(result, self.test_file)
+            
+    def test_when_file_not_ready_then_raises_value_error(self):
+        """Should raise ValueError when file is not ready for processing."""
+        with patch.object(self.processor, '_validate_file_ready', return_value=False):
+            with self.assertRaises(ValueError) as context:
+                self.processor.process_image()
+            self.assertIn("not ready for processing", str(context.exception))
 
     def test_when_exif_data_empty_then_calls_read_exif(self):
         """Should call read_exif when exif_data is empty (line 44)."""

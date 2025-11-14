@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import subprocess
 import logging
+import time
 
 from processors.media_processor import MediaProcessor
 
@@ -69,6 +70,49 @@ class JPEGExifProcessor(MediaProcessor):
         self.logger.info(f"Extracted state from EXIF: {state}")
         
         return date_str, title, location, city, state, country
+    
+    def _validate_file_ready(self) -> bool:
+        """
+        Validate that the file is ready for processing (not zero bytes and stable).
+        
+        Returns:
+            bool: True if file is ready, False otherwise
+        """
+        try:
+            # Check if file exists
+            if not self.file_path.exists():
+                return False
+            
+            # Check initial file size
+            initial_size = self.file_path.stat().st_size
+            if initial_size == 0:
+                self.logger.warning(f"File is zero bytes: {self.file_path}")
+                return False
+            
+            # Wait a short time and check size again to ensure file writing is complete
+            time.sleep(0.1)
+            
+            # Check if file still exists (might have been moved/deleted)
+            if not self.file_path.exists():
+                return False
+                
+            final_size = self.file_path.stat().st_size
+            
+            # If size changed, file might still be writing
+            if initial_size != final_size:
+                self.logger.warning(f"File size changed during validation: {self.file_path} ({initial_size} -> {final_size})")
+                return False
+                
+            # Additional check - ensure file is at least 1KB (minimum viable JPEG)
+            if final_size < 1024:
+                self.logger.warning(f"File too small to be valid JPEG: {self.file_path} ({final_size} bytes)")
+                return False
+                
+            return True
+            
+        except (OSError, IOError) as e:
+            self.logger.error(f"Error validating file: {self.file_path} - {e}")
+            return False
         
     def process_image(self) -> Path:
         """
@@ -81,6 +125,11 @@ class JPEGExifProcessor(MediaProcessor):
         if self.file_path.stem.endswith('__LRE'):
             self.logger.info(f"Skipping already processed file: {self.file_path}")
             return self.file_path
+        
+        # Validate file is not zero bytes and is complete
+        if not self._validate_file_ready():
+            self.logger.warning(f"File not ready for processing: {self.file_path}")
+            raise ValueError(f"File not ready for processing: {self.file_path}")
             
         # Read EXIF data for filename generation
         self.read_exif()

@@ -121,15 +121,23 @@ class ImageWatcher(BaseWatcher):
             # Process the file based on type
             if file_path.suffix.lower() in ['.jpg', '.jpeg']:
                 sequence = self._get_next_sequence()
-                processor = JPEGExifProcessor(str(file_path), sequence=sequence)
-                new_path = processor.process_image()
-                self.logger.info(f"Image processed successfully: {new_path}")
-                print(f"         ✓ Processed to: {Path(new_path).name}")
-                
-                # Extract title to check for category format
-                post_processor = JPEGExifProcessor(str(new_path))
-                _, title, _, _, _, _ = post_processor.get_metadata_components()
-                self.logger.info(f"Extracted title: '{title}'")
+                try:
+                    processor = JPEGExifProcessor(str(file_path), sequence=sequence)
+                    new_path = processor.process_image()
+                    self.logger.info(f"Image processed successfully: {new_path}")
+                    print(f"         ✓ Processed to: {Path(new_path).name}")
+                    
+                    # Extract title to check for category format
+                    post_processor = JPEGExifProcessor(str(new_path))
+                    _, title, _, _, _, _ = post_processor.get_metadata_components()
+                    self.logger.info(f"Extracted title: '{title}'")
+                except ValueError as e:
+                    if "not ready for processing" in str(e):
+                        self.logger.warning(f"File not ready, skipping: {file_path} - {e}")
+                        print(f"         ⏳ File not ready - will retry later: {file_path.name}")
+                        return
+                    else:
+                        raise
                 
             else:
                 # For videos, skip - VideoWatcher handles videos
