@@ -49,11 +49,10 @@ class TestTransferWatcher(unittest.TestCase):
         mock_file1 = MagicMock(spec=Path)
         mock_file2 = MagicMock(spec=Path)
         mock_dir.glob.return_value = [mock_file1, mock_file2]
-        with patch.object(watcher, 'process_file', return_value=True) as mock_process_file:
+        with patch.object(watcher, 'process_batch', return_value=[True, True]) as mock_process_batch:
             watcher.check_directory(mock_dir)
-            mock_process_file.assert_any_call(mock_file1)
-            mock_process_file.assert_any_call(mock_file2)
-            self.assertEqual(mock_process_file.call_count, 2)
+            # Should call process_batch with both files
+            mock_process_batch.assert_called_once_with([mock_file1, mock_file2])
 
     def test_when_exception_occurs_then_logs_error(self):
         watcher = TransferWatcher(directories=self.test_dirs)
@@ -63,6 +62,46 @@ class TestTransferWatcher(unittest.TestCase):
         with self.assertLogs(watcher.logger, level='ERROR') as log:
             watcher.check_directory(mock_dir)
             self.assertIn("Error checking directory", log.output[0])
+
+    # 4. Batch Processing Tests
+    def test_when_process_batch_with_valid_files_then_processes_successfully(self):
+        """Should process batch of files and return results."""
+        watcher = TransferWatcher(directories=self.test_dirs)
+        mock_file1 = MagicMock(spec=Path)
+        mock_file2 = MagicMock(spec=Path)
+        mock_files = [mock_file1, mock_file2]
+        
+        # Mock transfer validation and processing
+        with patch.object(watcher.transfer, '_validate_file_for_transfer', return_value=True), \
+             patch.object(watcher, '_group_files_by_type', return_value=([], mock_files)), \
+             patch.object(watcher, '_process_regular_batch', return_value=[True, True]) as mock_regular:
+            
+            results = watcher.process_batch(mock_files)
+            
+            self.assertEqual(len(results), 2)
+            self.assertTrue(all(results))
+            mock_regular.assert_called_once_with(mock_files)
+    
+    def test_when_process_batch_with_invalid_files_then_skips_invalid(self):
+        """Should skip invalid files in batch processing."""
+        watcher = TransferWatcher(directories=self.test_dirs)
+        mock_file1 = MagicMock(spec=Path)
+        mock_file2 = MagicMock(spec=Path)
+        mock_files = [mock_file1, mock_file2]
+        
+        # Mock first file as invalid, second as valid
+        def validate_side_effect(file_path):
+            return file_path == mock_file2
+            
+        with patch.object(watcher.transfer, '_validate_file_for_transfer', side_effect=validate_side_effect), \
+             patch.object(watcher, '_group_files_by_type', return_value=([], [mock_file2])), \
+             patch.object(watcher, '_process_regular_batch', return_value=[True]):
+            
+            results = watcher.process_batch(mock_files)
+            
+            self.assertEqual(len(results), 2)
+            self.assertFalse(results[0])  # Invalid file
+            self.assertTrue(results[1])   # Valid file
 
 if __name__ == '__main__':
     unittest.main()

@@ -21,6 +21,10 @@ SLEEP_TIME = 10
 # All watchers will process up to this many items per cycle before yielding to the next watcher
 WATCHER_QUEUE_SIZE = 500
 
+# Transfer batch size - number of files to collect before processing as a batch
+# Higher values improve Apple Photos import performance but use more memory
+TRANSFER_BATCH_SIZE = 10
+
 # Apple Photos Watcher configuration
 # Maximum number of assets to fetch from Watching album per check (prevents performance issues with large albums)
 APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 5000

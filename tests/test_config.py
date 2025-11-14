@@ -13,7 +13,8 @@ from config import (
     MCCARTYS_PREFIX,
     MCCARTYS_REPLACEMENT,
     RON_INCOMING,
-    CLAUDIA_INCOMING
+    CLAUDIA_INCOMING,
+    TRANSFER_BATCH_SIZE
 )
 
 class TestConfig(unittest.TestCase):
@@ -92,6 +93,13 @@ class TestConfig(unittest.TestCase):
         
         # All Apple Photos paths should be in transfer paths
         self.assertTrue(apple_photos_paths.issubset(transfer_paths))
+
+    def test_transfer_batch_size(self):
+        """Should have positive integer value for transfer batch size."""
+        self.assertIsInstance(TRANSFER_BATCH_SIZE, int)
+        self.assertGreater(TRANSFER_BATCH_SIZE, 0)
+        # Should be reasonable for batch processing (not too high)
+        self.assertLessEqual(TRANSFER_BATCH_SIZE, 100)
 
 if __name__ == '__main__':
     unittest.main()
