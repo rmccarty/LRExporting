@@ -21,6 +21,7 @@ from typing import Optional
 # Import processors
 from processors.jpeg_processor import JPEGExifProcessor
 from processors.video_processor import VideoProcessor
+import config
 
 
 class IncomingWatcher:
@@ -29,14 +30,14 @@ class IncomingWatcher:
     """
     
     def __init__(self, 
-                 ron_incoming: str = "/Users/rmccarty/Transfers/Ron/Ron_Incoming",
-                 claudia_incoming: str = "/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs/Claudia_Incoming", 
-                 both_incoming: str = "/Users/rmccarty/Transfers/Both/Both_Incoming",
+                 ron_incoming: Optional[str] = None,
+                 claudia_incoming: Optional[str] = None, 
+                 both_incoming: Optional[str] = None,
                  sleep_time: int = 10):
         """Initialize the incoming watcher."""
-        self.ron_incoming = Path(ron_incoming)
-        self.claudia_incoming = Path(claudia_incoming) 
-        self.both_incoming = Path(both_incoming)
+        self.ron_incoming = Path(ron_incoming or config.RON_INCOMING)
+        self.claudia_incoming = Path(claudia_incoming or config.CLAUDIA_INCOMING) 
+        self.both_incoming = Path(both_incoming or config.BOTH_INCOMING)
         self.sleep_time = sleep_time
         
         # File patterns

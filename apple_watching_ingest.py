@@ -121,6 +121,14 @@ class AppleWatchingIngest:
             
             if success:
                 self.logger.info(f"Successfully imported {file_path} to Apple Photos Watching album")
+                
+                # Delete the source file after successful import
+                try:
+                    file_path.unlink()
+                    self.logger.info(f"Deleted source file after import: {file_path}")
+                except Exception as e:
+                    self.logger.error(f"Failed to delete source file {file_path}: {e}")
+                
                 return True
             else:
                 self.logger.error(f"Failed to import {file_path} to Apple Photos")
@@ -149,8 +157,11 @@ class AppleWatchingIngest:
             found_count = 0
             skipped_count = 0
             
-            # Look for __LRE files
-            for file_path in self.apple_photos_dir.glob('*__LRE.*'):
+            # Get all __LRE files and sort by modification time (oldest first)
+            all_lre_files = list(self.apple_photos_dir.glob('*__LRE.*'))
+            all_lre_files.sort(key=lambda f: f.stat().st_mtime)
+            
+            for file_path in all_lre_files:
                 found_count += 1
                 
                 can_import, reason = self._can_move_file(file_path)
@@ -217,7 +228,11 @@ class AppleWatchingIngest:
             found_count = 0
             skipped_count = 0
             
-            for file_path in self.apple_photos_dir.glob('*__LRE.*'):
+            # Get all __LRE files and sort by modification time (oldest first)
+            all_lre_files = list(self.apple_photos_dir.glob('*__LRE.*'))
+            all_lre_files.sort(key=lambda f: f.stat().st_mtime)
+            
+            for file_path in all_lre_files:
                 found_count += 1
                 
                 can_import, reason = self._can_move_file(file_path)

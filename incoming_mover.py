@@ -141,6 +141,11 @@ class IncomingMover:
             
             shutil.move(str(file_path), str(dest_path))
             
+            # Check if original file still exists (can happen with iCloud destinations)
+            if file_path.exists():
+                self.logger.info(f"Original file still exists after move, deleting: {file_path}")
+                file_path.unlink()
+            
             self.logger.info(f"Successfully moved: {file_path.name}")
             return True
             

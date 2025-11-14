@@ -55,6 +55,9 @@ Wedding: 1-Events/Relationships/
 School: 1-Events/School/
 Yearbook: 1-Events/School/
 Graduation: 1-Events/School/
+Drill Team: 1-Events/School/
+School Band: 1-Events/School/
+Soccer: 1-Events/School/
 
 Ancestors: 2-Groups/Family/
 Otto: 2-Groups/Family/Otto/
@@ -63,6 +66,7 @@ Family: 2-Groups/Family/
 Monikda: 2-Groups/Family/Monikda/
 Shared: 2-Groups/Family/Shared/
 Employer: 2-Groups/Employers/
+YNG: 2-Groups/Employers/YNG
 Army: 2-Groups/Employers/Army/
 Aigner: 2-Groups/Employers/
 First American: 2-Groups/Employers/
