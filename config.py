@@ -19,7 +19,7 @@ SLEEP_TIME = 10
 
 # Queue size limit - process only N items per cycle to prevent blocking
 # All watchers will process up to this many items per cycle before yielding to the next watcher
-WATCHER_QUEUE_SIZE = 5
+WATCHER_QUEUE_SIZE = 500
 
 # Apple Photos Watcher configuration
 # Maximum number of assets to fetch from Watching album per check (prevents performance issues with large albums)
