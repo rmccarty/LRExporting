@@ -5157,3 +5157,378 @@
 2025-11-14 09:32:52,972 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Drill Team: 2009-2013 (Garland)
 2025-11-14 09:32:52,973 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_11_02_Drill_Team_2009-2013_Garland_Texas_United_States_of_America_0300__LRE.jpg: Drill Team: 2009-2013 (Garland)
 2025-11-14 09:32:52,973 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_11_02_Drill_Team_2009-2013_Garland_Texas_United_States_of_America_0300__LRE.jpg
+2025-11-14 09:32:54,244 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001
+2025-11-14 09:32:54,244 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001: Drill Team: 2009-2013 (Garland)
+2025-11-14 09:32:54,280 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001: Drill Team: 2009-2013 (Garland)
+2025-11-14 09:32:54,287 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001
+2025-11-14 09:32:54,287 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:32:54,287 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:32:54,287 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:32:54,324 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:54,324 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:54,327 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:54,330 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001
+2025-11-14 09:32:54,333 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 23C20429-973F-4D72-8492-28E2A0DF3259/L0/001 to album Watching
+2025-11-14 09:32:54,354 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_11_02_Drill_Team_2009-2013_Garland_Texas_United_States_of_America_0300__LRE.jpg
+2025-11-14 09:32:54,354 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_11_02_Drill_Team_2009-2013_Garland_Texas_United_States_of_America_0300__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:54,355 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2007_04_06_US_TX_Dallas_Arboretum_2007_Texas_United_States_of_America_1642__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:54,454 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['LRC_Export_2024']
+2025-11-14 09:32:54,454 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_04_06_US_TX_Dallas_Arboretum_2007_Texas_United_States_of_America_1642__LRE.jpg: ['LRC_Export_2024']
+2025-11-14 09:32:54,549 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: US TX Dallas Arboretum 2007
+2025-11-14 09:32:54,550 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_04_06_US_TX_Dallas_Arboretum_2007_Texas_United_States_of_America_1642__LRE.jpg: US TX Dallas Arboretum 2007
+2025-11-14 09:32:54,550 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_04_06_US_TX_Dallas_Arboretum_2007_Texas_United_States_of_America_1642__LRE.jpg
+2025-11-14 09:32:55,131 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001
+2025-11-14 09:32:55,131 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001: US TX Dallas Arboretum 2007
+2025-11-14 09:32:55,155 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001: US TX Dallas Arboretum 2007
+2025-11-14 09:32:55,161 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001
+2025-11-14 09:32:55,161 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:32:55,162 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:32:55,162 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:32:55,194 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:55,194 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:55,196 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:55,199 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001
+2025-11-14 09:32:55,202 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset FBBBC9B0-1246-48AB-8EC1-E3EEAB61548E/L0/001 to album Watching
+2025-11-14 09:32:55,233 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_04_06_US_TX_Dallas_Arboretum_2007_Texas_United_States_of_America_1642__LRE.jpg
+2025-11-14 09:32:55,234 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_04_06_US_TX_Dallas_Arboretum_2007_Texas_United_States_of_America_1642__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:55,234 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2004_03_12_NM_2004_Spring_Break_United_States_of_America_1112__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:55,328 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['Ronald Wayne McCarty III', 'NM/', 'People', 'LRC_Export_2024']
+2025-11-14 09:32:55,328 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_03_12_NM_2004_Spring_Break_United_States_of_America_1112__LRE.jpg: ['Ronald Wayne McCarty III', 'NM/', 'People', 'LRC_Export_2024']
+2025-11-14 09:32:55,430 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: NM 2004 Spring Break
+2025-11-14 09:32:55,430 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_03_12_NM_2004_Spring_Break_United_States_of_America_1112__LRE.jpg: NM 2004 Spring Break
+2025-11-14 09:32:55,430 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_03_12_NM_2004_Spring_Break_United_States_of_America_1112__LRE.jpg
+2025-11-14 09:32:56,695 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001
+2025-11-14 09:32:56,696 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001: NM 2004 Spring Break
+2025-11-14 09:32:56,718 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001: NM 2004 Spring Break
+2025-11-14 09:32:56,724 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001
+2025-11-14 09:32:56,724 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:32:56,724 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:32:56,724 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:32:56,761 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:56,761 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:56,764 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:56,768 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001
+2025-11-14 09:32:56,770 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset EB3D628C-861D-4455-9DB4-6A6F8AE7E119/L0/001 to album Watching
+2025-11-14 09:32:56,788 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_03_12_NM_2004_Spring_Break_United_States_of_America_1112__LRE.jpg
+2025-11-14 09:32:56,789 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_03_12_NM_2004_Spring_Break_United_States_of_America_1112__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:56,789 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2015_05_18_Ronny_Band_Performance_Rowlett_Texas_United_States_of_America_1649__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:56,894 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:32:56,894 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_05_18_Ronny_Band_Performance_Rowlett_Texas_United_States_of_America_1649__LRE.jpg: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:32:56,983 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Ronny Band Performance
+2025-11-14 09:32:56,984 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_05_18_Ronny_Band_Performance_Rowlett_Texas_United_States_of_America_1649__LRE.jpg: Ronny Band Performance
+2025-11-14 09:32:56,984 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_05_18_Ronny_Band_Performance_Rowlett_Texas_United_States_of_America_1649__LRE.jpg
+2025-11-14 09:32:58,373 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001
+2025-11-14 09:32:58,373 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001: Ronny Band Performance
+2025-11-14 09:32:58,399 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001: Ronny Band Performance
+2025-11-14 09:32:58,404 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001
+2025-11-14 09:32:58,404 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:32:58,404 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:32:58,404 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:32:58,448 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:58,449 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:58,452 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:32:58,455 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001
+2025-11-14 09:32:58,458 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset B7D1D3CF-9AEF-4B0B-878B-500EDFFCEFE6/L0/001 to album Watching
+2025-11-14 09:32:58,490 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_05_18_Ronny_Band_Performance_Rowlett_Texas_United_States_of_America_1649__LRE.jpg
+2025-11-14 09:32:58,491 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_05_18_Ronny_Band_Performance_Rowlett_Texas_United_States_of_America_1649__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:58,492 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2008_08_12_Texas_United_States_of_America_2311__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:32:58,601 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'LRC_Export_2024']
+2025-11-14 09:32:58,601 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2008_08_12_Texas_United_States_of_America_2311__LRE.jpg: ['People', 'LRC_Export_2024']
+2025-11-14 09:32:58,691 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2008_08_12_Texas_United_States_of_America_2311__LRE.jpg
+2025-11-14 09:33:00,016 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: E08AE34F-8632-4B2A-805C-6281B9F4D76B/L0/001
+2025-11-14 09:33:00,016 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:00,017 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:00,017 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:00,054 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:00,054 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset E08AE34F-8632-4B2A-805C-6281B9F4D76B/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:00,057 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:00,061 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: E08AE34F-8632-4B2A-805C-6281B9F4D76B/L0/001
+2025-11-14 09:33:00,065 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset E08AE34F-8632-4B2A-805C-6281B9F4D76B/L0/001 to album Watching
+2025-11-14 09:33:00,106 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2008_08_12_Texas_United_States_of_America_2311__LRE.jpg
+2025-11-14 09:33:00,106 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2008_08_12_Texas_United_States_of_America_2311__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:00,107 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2006_04_11_US_TX_Dallas_Arboretum_2006_Texas_United_States_of_America_0531__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:00,203 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:00,204 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_04_11_US_TX_Dallas_Arboretum_2006_Texas_United_States_of_America_0531__LRE.jpg: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:00,295 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: US TX Dallas Arboretum 2006
+2025-11-14 09:33:00,295 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_04_11_US_TX_Dallas_Arboretum_2006_Texas_United_States_of_America_0531__LRE.jpg: US TX Dallas Arboretum 2006
+2025-11-14 09:33:00,296 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_04_11_US_TX_Dallas_Arboretum_2006_Texas_United_States_of_America_0531__LRE.jpg
+2025-11-14 09:33:01,822 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001
+2025-11-14 09:33:01,822 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001: US TX Dallas Arboretum 2006
+2025-11-14 09:33:01,852 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001: US TX Dallas Arboretum 2006
+2025-11-14 09:33:01,859 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001
+2025-11-14 09:33:01,860 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:01,860 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:01,860 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:01,904 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:01,904 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:01,908 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:01,914 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001
+2025-11-14 09:33:01,918 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset FA17C289-9F50-4BD7-9184-B7B124657C47/L0/001 to album Watching
+2025-11-14 09:33:01,945 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_04_11_US_TX_Dallas_Arboretum_2006_Texas_United_States_of_America_0531__LRE.jpg
+2025-11-14 09:33:01,945 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_04_11_US_TX_Dallas_Arboretum_2006_Texas_United_States_of_America_0531__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:01,945 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2009_07_06_DE_2009_Vacation_Monrepos_Palace_Ludwigsburg_Baden-Württemberg_Germany_1750__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:02,070 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['Monrepos: All', 'Monrepos/', 'Exported-2024-02-28', 'Monrepos: 2005', 'Vacation: All', 'LRC_Export_2024']
+2025-11-14 09:33:02,070 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2009_07_06_DE_2009_Vacation_Monrepos_Palace_Ludwigsburg_Baden-Württemberg_Germany_1750__LRE.jpg: ['Monrepos: All', 'Monrepos/', 'Exported-2024-02-28', 'Monrepos: 2005', 'Vacation: All', 'LRC_Export_2024']
+2025-11-14 09:33:02,170 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: DE: 2009 Vacation
+2025-11-14 09:33:02,171 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2009_07_06_DE_2009_Vacation_Monrepos_Palace_Ludwigsburg_Baden-Württemberg_Germany_1750__LRE.jpg: DE: 2009 Vacation
+2025-11-14 09:33:02,171 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2009_07_06_DE_2009_Vacation_Monrepos_Palace_Ludwigsburg_Baden-Württemberg_Germany_1750__LRE.jpg
+2025-11-14 09:33:03,808 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001
+2025-11-14 09:33:03,808 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001: DE: 2009 Vacation
+2025-11-14 09:33:03,834 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001: DE: 2009 Vacation
+2025-11-14 09:33:03,841 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001
+2025-11-14 09:33:03,841 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:03,841 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:03,841 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:03,885 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:03,885 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:03,888 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:03,891 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001
+2025-11-14 09:33:03,895 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 008A2CC1-FC26-458F-80D9-518F00AC09B2/L0/001 to album Watching
+2025-11-14 09:33:03,925 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2009_07_06_DE_2009_Vacation_Monrepos_Palace_Ludwigsburg_Baden-Württemberg_Germany_1750__LRE.jpg
+2025-11-14 09:33:03,925 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2009_07_06_DE_2009_Vacation_Monrepos_Palace_Ludwigsburg_Baden-Württemberg_Germany_1750__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:03,925 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2013_04_28_Rowlett_Texas_United_States_of_America_0250__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:04,118 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:04,118 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2013_04_28_Rowlett_Texas_United_States_of_America_0250__LRE.jpg: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:04,241 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2013_04_28_Rowlett_Texas_United_States_of_America_0250__LRE.jpg
+2025-11-14 09:33:05,783 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: A56FA5EE-ECBA-4474-B487-B6F09FE31F49/L0/001
+2025-11-14 09:33:05,784 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:05,784 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:05,784 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:05,826 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:05,826 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset A56FA5EE-ECBA-4474-B487-B6F09FE31F49/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:05,829 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:05,834 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: A56FA5EE-ECBA-4474-B487-B6F09FE31F49/L0/001
+2025-11-14 09:33:05,837 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset A56FA5EE-ECBA-4474-B487-B6F09FE31F49/L0/001 to album Watching
+2025-11-14 09:33:05,863 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2013_04_28_Rowlett_Texas_United_States_of_America_0250__LRE.jpg
+2025-11-14 09:33:05,863 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2013_04_28_Rowlett_Texas_United_States_of_America_0250__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:05,863 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2014_03_14_Spring_Break_2014_-_Cadilac_Ranch_Cadillac_Ranch_Amarillo_Texas_United_States_of_America_0666__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:05,987 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'NM/', 'LRC_Export_2024']
+2025-11-14 09:33:05,987 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_03_14_Spring_Break_2014_-_Cadilac_Ranch_Cadillac_Ranch_Amarillo_Texas_United_States_of_America_0666__LRE.jpg: ['People', 'NM/', 'LRC_Export_2024']
+2025-11-14 09:33:06,083 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Spring Break 2014 - Cadilac Ranch
+2025-11-14 09:33:06,083 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_03_14_Spring_Break_2014_-_Cadilac_Ranch_Cadillac_Ranch_Amarillo_Texas_United_States_of_America_0666__LRE.jpg: Spring Break 2014 - Cadilac Ranch
+2025-11-14 09:33:06,083 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_03_14_Spring_Break_2014_-_Cadilac_Ranch_Cadillac_Ranch_Amarillo_Texas_United_States_of_America_0666__LRE.jpg
+2025-11-14 09:33:07,273 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001
+2025-11-14 09:33:07,273 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001: Spring Break 2014 - Cadilac Ranch
+2025-11-14 09:33:07,298 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001: Spring Break 2014 - Cadilac Ranch
+2025-11-14 09:33:07,305 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001
+2025-11-14 09:33:07,305 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:07,305 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:07,305 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:07,352 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:07,353 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:07,356 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:07,361 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001
+2025-11-14 09:33:07,364 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 39A1FB21-3FA8-4F87-9C8C-30BC7F637CD4/L0/001 to album Watching
+2025-11-14 09:33:07,393 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_03_14_Spring_Break_2014_-_Cadilac_Ranch_Cadillac_Ranch_Amarillo_Texas_United_States_of_America_0666__LRE.jpg
+2025-11-14 09:33:07,394 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_03_14_Spring_Break_2014_-_Cadilac_Ranch_Cadillac_Ranch_Amarillo_Texas_United_States_of_America_0666__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:07,394 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2006_05_27_US_US_2006_Petra_United_States_of_America_1249__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:07,507 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'US/', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:07,507 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_05_27_US_US_2006_Petra_United_States_of_America_1249__LRE.jpg: ['People', 'US/', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:07,606 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: US: US 2006 Petra
+2025-11-14 09:33:07,607 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_05_27_US_US_2006_Petra_United_States_of_America_1249__LRE.jpg: US: US 2006 Petra
+2025-11-14 09:33:07,607 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_05_27_US_US_2006_Petra_United_States_of_America_1249__LRE.jpg
+2025-11-14 09:33:09,242 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 82FF9854-B611-439E-8899-DE9A11303225/L0/001
+2025-11-14 09:33:09,242 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 82FF9854-B611-439E-8899-DE9A11303225/L0/001: US: US 2006 Petra
+2025-11-14 09:33:09,277 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 82FF9854-B611-439E-8899-DE9A11303225/L0/001: US: US 2006 Petra
+2025-11-14 09:33:09,284 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 82FF9854-B611-439E-8899-DE9A11303225/L0/001
+2025-11-14 09:33:09,284 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:09,284 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:09,284 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:09,332 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:09,332 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 82FF9854-B611-439E-8899-DE9A11303225/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:09,334 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:09,338 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 82FF9854-B611-439E-8899-DE9A11303225/L0/001
+2025-11-14 09:33:09,340 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 82FF9854-B611-439E-8899-DE9A11303225/L0/001 to album Watching
+2025-11-14 09:33:09,367 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_05_27_US_US_2006_Petra_United_States_of_America_1249__LRE.jpg
+2025-11-14 09:33:09,367 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_05_27_US_US_2006_Petra_United_States_of_America_1249__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:09,367 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2010_11_27_San_Antonio_Texas_United_States_of_America_0645__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:09,467 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:09,468 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2010_11_27_San_Antonio_Texas_United_States_of_America_0645__LRE.jpg: ['Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:09,557 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2010_11_27_San_Antonio_Texas_United_States_of_America_0645__LRE.jpg
+2025-11-14 09:33:10,323 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: FC25EA25-D145-4169-A7FC-7E481869F831/L0/001
+2025-11-14 09:33:10,324 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:10,324 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:10,324 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:10,364 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:10,364 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset FC25EA25-D145-4169-A7FC-7E481869F831/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:10,366 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:10,371 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: FC25EA25-D145-4169-A7FC-7E481869F831/L0/001
+2025-11-14 09:33:10,373 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset FC25EA25-D145-4169-A7FC-7E481869F831/L0/001 to album Watching
+2025-11-14 09:33:10,410 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2010_11_27_San_Antonio_Texas_United_States_of_America_0645__LRE.jpg
+2025-11-14 09:33:10,411 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2010_11_27_San_Antonio_Texas_United_States_of_America_0645__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:10,411 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2011_10_16_Visiting_The_Whites_2011_10_Rockwall_Texas_United_States_of_America_0547__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:10,509 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['Ronald Wayne McCarty III', 'Alenna White', 'People', 'Maya White', 'LRC_Export_2024']
+2025-11-14 09:33:10,510 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2011_10_16_Visiting_The_Whites_2011_10_Rockwall_Texas_United_States_of_America_0547__LRE.jpg: ['Ronald Wayne McCarty III', 'Alenna White', 'People', 'Maya White', 'LRC_Export_2024']
+2025-11-14 09:33:10,599 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Visiting: The Whites 2011 (10)
+2025-11-14 09:33:10,599 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2011_10_16_Visiting_The_Whites_2011_10_Rockwall_Texas_United_States_of_America_0547__LRE.jpg: Visiting: The Whites 2011 (10)
+2025-11-14 09:33:10,599 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2011_10_16_Visiting_The_Whites_2011_10_Rockwall_Texas_United_States_of_America_0547__LRE.jpg
+2025-11-14 09:33:11,842 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001
+2025-11-14 09:33:11,842 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001: Visiting: The Whites 2011 (10)
+2025-11-14 09:33:11,869 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001: Visiting: The Whites 2011 (10)
+2025-11-14 09:33:11,874 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001
+2025-11-14 09:33:11,874 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:11,874 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:11,874 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:11,913 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:11,913 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:11,915 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:11,919 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001
+2025-11-14 09:33:11,921 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 7B3065C4-89D9-4408-AE54-1E14C2EB0D4A/L0/001 to album Watching
+2025-11-14 09:33:11,944 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2011_10_16_Visiting_The_Whites_2011_10_Rockwall_Texas_United_States_of_America_0547__LRE.jpg
+2025-11-14 09:33:11,944 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2011_10_16_Visiting_The_Whites_2011_10_Rockwall_Texas_United_States_of_America_0547__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:11,944 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2017_02_26_Houston_Space_Center_Texas_United_States_of_America_2076__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:12,043 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'LRC_Export_2024']
+2025-11-14 09:33:12,043 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_02_26_Houston_Space_Center_Texas_United_States_of_America_2076__LRE.jpg: ['People', 'LRC_Export_2024']
+2025-11-14 09:33:12,134 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Houston Space Center
+2025-11-14 09:33:12,134 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_02_26_Houston_Space_Center_Texas_United_States_of_America_2076__LRE.jpg: Houston Space Center
+2025-11-14 09:33:12,134 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_02_26_Houston_Space_Center_Texas_United_States_of_America_2076__LRE.jpg
+2025-11-14 09:33:13,326 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001
+2025-11-14 09:33:13,327 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001: Houston Space Center
+2025-11-14 09:33:13,359 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001: Houston Space Center
+2025-11-14 09:33:13,366 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001
+2025-11-14 09:33:13,366 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:13,366 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:13,366 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:13,401 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:13,401 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:13,404 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:13,408 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001
+2025-11-14 09:33:13,411 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset F6E946EA-5037-4D14-A1E6-BE98E0CD5CFA/L0/001 to album Watching
+2025-11-14 09:33:13,453 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_02_26_Houston_Space_Center_Texas_United_States_of_America_2076__LRE.jpg
+2025-11-14 09:33:13,453 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_02_26_Houston_Space_Center_Texas_United_States_of_America_2076__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:13,453 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 1999_06_03_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1884__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:13,554 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'M-scanned', 'Exported-2024-02-28', 'V-vacation', 'Shared_TBD', 'LRC_Export_2024']
+2025-11-14 09:33:13,554 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/1999_06_03_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1884__LRE.jpg: ['People', 'M-scanned', 'Exported-2024-02-28', 'V-vacation', 'Shared_TBD', 'LRC_Export_2024']
+2025-11-14 09:33:13,646 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/1999_06_03_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1884__LRE.jpg
+2025-11-14 09:33:15,585 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: B50423C3-4D3A-4560-B91A-1901C44AF2CB/L0/001
+2025-11-14 09:33:15,585 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:15,585 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:15,585 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:15,624 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:15,625 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset B50423C3-4D3A-4560-B91A-1901C44AF2CB/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:15,627 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:15,635 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: B50423C3-4D3A-4560-B91A-1901C44AF2CB/L0/001
+2025-11-14 09:33:15,637 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset B50423C3-4D3A-4560-B91A-1901C44AF2CB/L0/001 to album Watching
+2025-11-14 09:33:15,661 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/1999_06_03_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1884__LRE.jpg
+2025-11-14 09:33:15,662 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/1999_06_03_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1884__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:15,662 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2006_03_15_US_TX_Texas_Coast_2006_United_States_of_America_0252__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:15,761 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:15,761 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_03_15_US_TX_Texas_Coast_2006_United_States_of_America_0252__LRE.jpg: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:15,852 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: US TX: Texas Coast 2006
+2025-11-14 09:33:15,852 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_03_15_US_TX_Texas_Coast_2006_United_States_of_America_0252__LRE.jpg: US TX: Texas Coast 2006
+2025-11-14 09:33:15,852 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_03_15_US_TX_Texas_Coast_2006_United_States_of_America_0252__LRE.jpg
+2025-11-14 09:33:17,295 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001
+2025-11-14 09:33:17,296 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001: US TX: Texas Coast 2006
+2025-11-14 09:33:17,319 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001: US TX: Texas Coast 2006
+2025-11-14 09:33:17,325 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001
+2025-11-14 09:33:17,325 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:17,325 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:17,325 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:17,368 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:17,369 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:17,375 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:17,379 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001
+2025-11-14 09:33:17,382 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 5D9F83CD-D1BD-467D-89DA-53093E8CAB66/L0/001 to album Watching
+2025-11-14 09:33:17,415 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_03_15_US_TX_Texas_Coast_2006_United_States_of_America_0252__LRE.jpg
+2025-11-14 09:33:17,415 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2006_03_15_US_TX_Texas_Coast_2006_United_States_of_America_0252__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:17,415 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2015_06_29_DE_2015_Vacation_Burg_Hohenzollern_Baden-Württemberg_Germany_0394__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:17,515 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['Castles: All', 'Trip: Dachau 2017', 'Label_TK#_jle_x', 'Uli Unknown', 'Vacation: All', 'Label_TK#_jli_x', 'Label_TK#_jlm_keep', 'LRC_Export_2024']
+2025-11-14 09:33:17,515 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_06_29_DE_2015_Vacation_Burg_Hohenzollern_Baden-Württemberg_Germany_0394__LRE.jpg: ['Castles: All', 'Trip: Dachau 2017', 'Label_TK#_jle_x', 'Uli Unknown', 'Vacation: All', 'Label_TK#_jli_x', 'Label_TK#_jlm_keep', 'LRC_Export_2024']
+2025-11-14 09:33:17,605 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: DE 2015 Vacation
+2025-11-14 09:33:17,605 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_06_29_DE_2015_Vacation_Burg_Hohenzollern_Baden-Württemberg_Germany_0394__LRE.jpg: DE 2015 Vacation
+2025-11-14 09:33:17,605 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_06_29_DE_2015_Vacation_Burg_Hohenzollern_Baden-Württemberg_Germany_0394__LRE.jpg
+2025-11-14 09:33:18,330 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001
+2025-11-14 09:33:18,331 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001: DE 2015 Vacation
+2025-11-14 09:33:18,354 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001: DE 2015 Vacation
+2025-11-14 09:33:18,363 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001
+2025-11-14 09:33:18,363 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:18,363 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:18,363 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:18,400 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:18,400 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:18,403 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:18,407 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001
+2025-11-14 09:33:18,410 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset F4D0699D-977A-4DF0-877B-E4E8A78B7FD1/L0/001 to album Watching
+2025-11-14 09:33:18,453 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_06_29_DE_2015_Vacation_Burg_Hohenzollern_Baden-Württemberg_Germany_0394__LRE.jpg
+2025-11-14 09:33:18,453 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2015_06_29_DE_2015_Vacation_Burg_Hohenzollern_Baden-Württemberg_Germany_0394__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:18,453 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2014_09_13_School_Soccer_2014_09_Soccer_Fields_Rowlett_Texas_United_States_of_America_1727__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:18,557 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'LRC_Export_2024']
+2025-11-14 09:33:18,557 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_09_13_School_Soccer_2014_09_Soccer_Fields_Rowlett_Texas_United_States_of_America_1727__LRE.jpg: ['People', 'LRC_Export_2024']
+2025-11-14 09:33:18,660 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: School: Soccer 2014 (09)
+2025-11-14 09:33:18,660 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_09_13_School_Soccer_2014_09_Soccer_Fields_Rowlett_Texas_United_States_of_America_1727__LRE.jpg: School: Soccer 2014 (09)
+2025-11-14 09:33:18,660 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_09_13_School_Soccer_2014_09_Soccer_Fields_Rowlett_Texas_United_States_of_America_1727__LRE.jpg
+2025-11-14 09:33:19,737 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001
+2025-11-14 09:33:19,738 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001: School: Soccer 2014 (09)
+2025-11-14 09:33:19,759 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001: School: Soccer 2014 (09)
+2025-11-14 09:33:19,766 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001
+2025-11-14 09:33:19,766 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:19,766 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:19,766 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:19,800 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:19,800 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:19,803 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:19,806 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001
+2025-11-14 09:33:19,808 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset D35E69FB-3AC2-45A8-A209-EE755165DD4B/L0/001 to album Watching
+2025-11-14 09:33:19,848 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_09_13_School_Soccer_2014_09_Soccer_Fields_Rowlett_Texas_United_States_of_America_1727__LRE.jpg
+2025-11-14 09:33:19,848 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2014_09_13_School_Soccer_2014_09_Soccer_Fields_Rowlett_Texas_United_States_of_America_1727__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:19,849 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2004_10_15_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1934__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:19,947 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'LRC_Export_2024', 'Shared: Claudia M', 'Shared_Claudia']
+2025-11-14 09:33:19,947 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_10_15_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1934__LRE.jpg: ['People', 'LRC_Export_2024', 'Shared: Claudia M', 'Shared_Claudia']
+2025-11-14 09:33:20,051 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_10_15_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1934__LRE.jpg
+2025-11-14 09:33:21,539 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 1F33FB1B-A89F-4E52-A4F5-684455C37CC9/L0/001
+2025-11-14 09:33:21,539 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:21,539 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:21,539 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:21,580 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:21,581 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 1F33FB1B-A89F-4E52-A4F5-684455C37CC9/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:21,583 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:21,589 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 1F33FB1B-A89F-4E52-A4F5-684455C37CC9/L0/001
+2025-11-14 09:33:21,592 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 1F33FB1B-A89F-4E52-A4F5-684455C37CC9/L0/001 to album Watching
+2025-11-14 09:33:21,618 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_10_15_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1934__LRE.jpg
+2025-11-14 09:33:21,618 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2004_10_15_6305_Bobbie_Lane_Rowlett_Texas_United_States_of_America_1934__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:21,618 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2012_01_31_Plano_Photo_Walk_Haggard_Park_Texas_United_States_of_America_0839__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:21,732 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:21,733 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_01_31_Plano_Photo_Walk_Haggard_Park_Texas_United_States_of_America_0839__LRE.jpg: ['People', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:21,832 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Plano Photo Walk
+2025-11-14 09:33:21,832 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_01_31_Plano_Photo_Walk_Haggard_Park_Texas_United_States_of_America_0839__LRE.jpg: Plano Photo Walk
+2025-11-14 09:33:21,832 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_01_31_Plano_Photo_Walk_Haggard_Park_Texas_United_States_of_America_0839__LRE.jpg
+2025-11-14 09:33:23,345 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 26182582-E917-4B30-B56C-240CE70FD65B/L0/001
+2025-11-14 09:33:23,345 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 26182582-E917-4B30-B56C-240CE70FD65B/L0/001: Plano Photo Walk
+2025-11-14 09:33:23,369 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 26182582-E917-4B30-B56C-240CE70FD65B/L0/001: Plano Photo Walk
+2025-11-14 09:33:23,374 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 26182582-E917-4B30-B56C-240CE70FD65B/L0/001
+2025-11-14 09:33:23,374 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:23,374 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:23,374 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:23,421 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:23,421 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 26182582-E917-4B30-B56C-240CE70FD65B/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:23,425 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:23,430 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 26182582-E917-4B30-B56C-240CE70FD65B/L0/001
+2025-11-14 09:33:23,433 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 26182582-E917-4B30-B56C-240CE70FD65B/L0/001 to album Watching
+2025-11-14 09:33:23,461 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_01_31_Plano_Photo_Walk_Haggard_Park_Texas_United_States_of_America_0839__LRE.jpg
+2025-11-14 09:33:23,461 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2012_01_31_Plano_Photo_Walk_Haggard_Park_Texas_United_States_of_America_0839__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:23,461 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2007_09_17_Drill_Team_2006-2009_Austin_Garland_Texas_United_States_of_America_0326__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:23,562 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'Ronald Wayne McCarty III', 'Drill Team: All', 'LRC_Export_2024']
+2025-11-14 09:33:23,562 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_09_17_Drill_Team_2006-2009_Austin_Garland_Texas_United_States_of_America_0326__LRE.jpg: ['People', 'Ronald Wayne McCarty III', 'Drill Team: All', 'LRC_Export_2024']
+2025-11-14 09:33:23,653 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: Drill Team: 2006-2009 (Austin)
+2025-11-14 09:33:23,653 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_09_17_Drill_Team_2006-2009_Austin_Garland_Texas_United_States_of_America_0326__LRE.jpg: Drill Team: 2006-2009 (Austin)
+2025-11-14 09:33:23,653 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_09_17_Drill_Team_2006-2009_Austin_Garland_Texas_United_States_of_America_0326__LRE.jpg
+2025-11-14 09:33:25,259 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 340 - Asset verified in Photos library: 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001
+2025-11-14 09:33:25,259 - apple_photos_sdk.import_manager - INFO - import_manager.py - 344 - Setting title on asset 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001: Drill Team: 2006-2009 (Austin)
+2025-11-14 09:33:25,405 - apple_photos_sdk.import_manager - INFO - import_manager.py - 237 - Set title on asset 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001: Drill Team: 2006-2009 (Austin)
+2025-11-14 09:33:25,411 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 241 - Verified title was set on asset 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001
+2025-11-14 09:33:25,411 - apple_photos_sdk.import_manager - INFO - import_manager.py - 351 - Adding photo to albums: ['Watching']
+2025-11-14 09:33:25,411 - apple_photos_sdk.album - INFO - album.py - 427 - Processing album path: Watching
+2025-11-14 09:33:25,411 - apple_photos_sdk.album - INFO - album.py - 432 - Creating/finding top-level album: Watching
+2025-11-14 09:33:25,450 - apple_photos_sdk.album - INFO - album.py - 498 - Top-level album already exists: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:25,450 - apple_photos_sdk.album - DEBUG - album.py - 457 - Adding asset 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001 to album 'Watching' (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:25,453 - apple_photos_sdk.album - DEBUG - album.py - 172 - Found album for adding photo: Watching (ID: 030932E7-DF23-4189-BF85-662B24DDDE70/L0/040)
+2025-11-14 09:33:25,457 - apple_photos_sdk.album - DEBUG - album.py - 180 - Found asset to add: 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001
+2025-11-14 09:33:25,461 - apple_photos_sdk.album - DEBUG - album.py - 190 - Added asset 373D87FE-0056-45D3-B72C-62DDAC313E95/L0/001 to album Watching
+2025-11-14 09:33:25,484 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 365 - Deleted original file: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_09_17_Drill_Team_2006-2009_Austin_Garland_Texas_United_States_of_America_0326__LRE.jpg
+2025-11-14 09:33:25,484 - __main__ - INFO - apple_watching_ingest.py - 123 - Successfully imported /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2007_09_17_Drill_Team_2006-2009_Austin_Garland_Texas_United_States_of_America_0326__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:25,484 - __main__ - INFO - apple_watching_ingest.py - 116 - Importing 2017_06_14_DE_2017_Vacation_Besigheim_Baden-Württemberg_Germany_0025__LRE.jpg to Apple Photos Watching album
+2025-11-14 09:33:25,592 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 151 - Found original keywords: ['People', 'DE/', 'Lilly Ritzal', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:25,592 - apple_photos_sdk.import_manager - INFO - import_manager.py - 295 - Original keywords for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_06_14_DE_2017_Vacation_Besigheim_Baden-Württemberg_Germany_0025__LRE.jpg: ['People', 'DE/', 'Lilly Ritzal', 'Ronald Wayne McCarty III', 'LRC_Export_2024']
+2025-11-14 09:33:25,684 - apple_photos_sdk.import_manager - DEBUG - import_manager.py - 183 - Found original title: DE: 2017 Vacation
+2025-11-14 09:33:25,685 - apple_photos_sdk.import_manager - INFO - import_manager.py - 300 - Original title for /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_06_14_DE_2017_Vacation_Besigheim_Baden-Württemberg_Germany_0025__LRE.jpg: DE: 2017 Vacation
+2025-11-14 09:33:25,685 - apple_photos_sdk.import_manager - INFO - import_manager.py - 313 - Importing photo: /Users/rmccarty/Transfers/Ron/Ron_Apple_Photos/2017_06_14_DE_2017_Vacation_Besigheim_Baden-Württemberg_Germany_0025__LRE.jpg
