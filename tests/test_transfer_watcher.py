@@ -71,9 +71,8 @@ class TestTransferWatcher(unittest.TestCase):
         mock_file2 = MagicMock(spec=Path)
         mock_files = [mock_file1, mock_file2]
         
-        # Mock transfer validation and processing
-        with patch.object(watcher.transfer, '_validate_file_for_transfer', return_value=True), \
-             patch.object(watcher, '_group_files_by_type', return_value=([], mock_files)), \
+        # Mock file grouping and processing
+        with patch.object(watcher, '_group_files_by_type', return_value=([], mock_files)), \
              patch.object(watcher, '_process_regular_batch', return_value=[True, True]) as mock_regular:
             
             results = watcher.process_batch(mock_files)
@@ -82,26 +81,22 @@ class TestTransferWatcher(unittest.TestCase):
             self.assertTrue(all(results))
             mock_regular.assert_called_once_with(mock_files)
     
-    def test_when_process_batch_with_invalid_files_then_skips_invalid(self):
-        """Should skip invalid files in batch processing."""
+    def test_when_process_batch_with_mixed_file_types_then_groups_correctly(self):
+        """Should group Apple Photos and regular files correctly."""
         watcher = TransferWatcher(directories=self.test_dirs)
         mock_file1 = MagicMock(spec=Path)
         mock_file2 = MagicMock(spec=Path)
         mock_files = [mock_file1, mock_file2]
         
-        # Mock first file as invalid, second as valid
-        def validate_side_effect(file_path):
-            return file_path == mock_file2
-            
-        with patch.object(watcher.transfer, '_validate_file_for_transfer', side_effect=validate_side_effect), \
-             patch.object(watcher, '_group_files_by_type', return_value=([], [mock_file2])), \
+        # Mock grouping with one Apple Photos file and one regular file
+        with patch.object(watcher, '_group_files_by_type', return_value=([mock_file1], [mock_file2])), \
+             patch.object(watcher, '_process_apple_photos_batch', return_value=[True]), \
              patch.object(watcher, '_process_regular_batch', return_value=[True]):
             
             results = watcher.process_batch(mock_files)
             
             self.assertEqual(len(results), 2)
-            self.assertFalse(results[0])  # Invalid file
-            self.assertTrue(results[1])   # Valid file
+            self.assertTrue(all(results))  # Both files should succeed
 
 if __name__ == '__main__':
     unittest.main()

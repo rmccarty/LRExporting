@@ -19,7 +19,7 @@ SLEEP_TIME = 10
 
 # Queue size limit - process only N items per cycle to prevent blocking
 # All watchers will process up to this many items per cycle before yielding to the next watcher
-WATCHER_QUEUE_SIZE = 500
+WATCHER_QUEUE_SIZE = 50
 
 # Transfer batch size - number of files to collect before processing as a batch
 # Higher values improve Apple Photos import performance but use more memory

@@ -231,7 +231,7 @@ class MediaProcessor(ABC):
                 
             new_path = self.file_path.parent / new_name
             self.file_path.rename(new_path)
-            self.logger.info(f"Renamed file to: {new_name}")
+            self.logger.info(f"Renamed file from: {self.file_path.name} to: {new_name}")
             return new_path
         except Exception as e:
             self.logger.error(f"Failed to rename file: {e}")

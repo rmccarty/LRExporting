@@ -64,21 +64,10 @@ class TransferWatcher:
             
         self.logger.info(f"Processing batch of {len(file_paths)} files")
         
-        # Validate all files first (age, lock status, etc.)
-        valid_files = []
-        results = []
-        
-        for file_path in file_paths:
-            if self.transfer._validate_file_for_transfer(file_path):
-                valid_files.append(file_path)
-                results.append(None)  # Will be updated with actual result
-            else:
-                self.logger.debug(f"Skipping invalid file in batch: {file_path}")
-                results.append(False)
-        
-        if not valid_files:
-            self.logger.warning(f"No valid files in batch of {len(file_paths)}")
-            return results
+        # Don't pre-validate files here - let transfer_file() handle validation
+        # This allows Apple Photos directories to be processed correctly
+        valid_files = file_paths
+        results = [None] * len(file_paths)  # Will be updated with actual results
         
         # Group files by processing type for batch optimization
         apple_photos_files, regular_files = self._group_files_by_type(valid_files)
@@ -90,16 +79,16 @@ class TransferWatcher:
         regular_results = self._process_regular_batch(regular_files)
         
         # Merge results back to original order
-        valid_index = 0
-        for i, result in enumerate(results):
-            if result is None:  # This was a valid file
-                if valid_files[valid_index] in apple_photos_files:
-                    ap_index = apple_photos_files.index(valid_files[valid_index])
-                    results[i] = apple_photos_results[ap_index]
-                else:
-                    reg_index = regular_files.index(valid_files[valid_index])
-                    results[i] = regular_results[reg_index]
-                valid_index += 1
+        for i, file_path in enumerate(file_paths):
+            if file_path in apple_photos_files:
+                ap_index = apple_photos_files.index(file_path)
+                results[i] = apple_photos_results[ap_index]
+            elif file_path in regular_files:
+                reg_index = regular_files.index(file_path)
+                results[i] = regular_results[reg_index]
+            else:
+                # This shouldn't happen, but handle gracefully
+                results[i] = False
         
         success_count = sum(1 for r in results if r)
         self.logger.info(f"Batch processing complete: {success_count}/{len(file_paths)} files successful")
