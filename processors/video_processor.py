@@ -50,7 +50,7 @@ class VideoProcessor(MediaProcessor):
         """Read metadata from XMP sidecar file."""
         if not self.xmp_file.exists():
             self.logger.warning(f"No XMP sidecar file found: {self.xmp_file}")
-            return (None, None, None, None, (None, None, None))
+            return (None, None, None, None, (None, None, None), None)
             
         try:
             tree = ET.parse(str(self.xmp_file))
@@ -60,7 +60,7 @@ class VideoProcessor(MediaProcessor):
             description = root.find('.//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description')
             if description is None:
                 self.logger.warning("No Description element found in XMP")
-                return (None, None, None, None, (None, None, None))
+                return (None, None, None, None, (None, None, None), None)
                 
             # Extract metadata fields
             title = self.get_title_from_rdf(description)
@@ -68,6 +68,7 @@ class VideoProcessor(MediaProcessor):
             date_str = self.exiftool.read_date_from_xmp(self.xmp_file)
             caption = self.get_caption_from_rdf(description)
             location = self.get_location_from_rdf(description)
+            gps_data = self.get_gps_from_rdf(description)
             
             # Log extracted XMP data
             self.logger.warning("XMP metadata extracted:")
@@ -75,16 +76,17 @@ class VideoProcessor(MediaProcessor):
             self.logger.warning(f"  ├─ Keywords: {keywords}")
             self.logger.warning(f"  ├─ Date:     '{date_str}'")
             self.logger.warning(f"  ├─ Caption:  '{caption}'")
-            self.logger.warning(f"  └─ Location: {location}")
+            self.logger.warning(f"  ├─ Location: {location}")
+            self.logger.warning(f"  └─ GPS:      {gps_data}")
             
-            return (title, keywords, date_str, caption, location)
+            return (title, keywords, date_str, caption, location, gps_data)
             
         except ET.ParseError as e:
             self.logger.error(f"Error parsing XMP file: {str(e)}")
-            return (None, None, None, None, (None, None, None))
+            return (None, None, None, None, (None, None, None), None)
         except Exception as e:
             self.logger.error(f"Error reading XMP metadata: {str(e)}")
-            return (None, None, None, None, (None, None, None))
+            return (None, None, None, None, (None, None, None), None)
             
     def _get_keywords_from_hierarchical(self, rdf) -> list[str] | None:
         """Get keywords from hierarchical subjects."""
@@ -211,17 +213,96 @@ class VideoProcessor(MediaProcessor):
             
         return ", ".join(parts)
         
+    def get_gps_from_rdf(self, rdf) -> tuple[str | None, str | None, str | None]:
+        """Extract GPS coordinates from RDF."""
+        try:
+            # Look for EXIF GPS data in Description attributes
+            for desc in rdf.iter('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'):
+                latitude = desc.get('{http://ns.adobe.com/exif/1.0/}GPSLatitude')
+                longitude = desc.get('{http://ns.adobe.com/exif/1.0/}GPSLongitude')
+                altitude = desc.get('{http://ns.adobe.com/exif/1.0/}GPSAltitude')
+                
+                if latitude or longitude:
+                    self.logger.debug(f"Found GPS coordinates: lat={latitude}, lon={longitude}, alt={altitude}")
+                    return latitude, longitude, altitude
+                    
+        except Exception as e:
+            self.logger.error(f"Error extracting GPS from RDF: {e}")
+            
+        return None, None, None
+        
+    def _convert_gps_to_quicktime_format(self, latitude: str, longitude: str, altitude: str = None) -> dict:
+        """Convert XMP GPS format to QuickTime GPS format."""
+        if not latitude or not longitude:
+            return {}
+            
+        try:
+            # Convert latitude: "32,54.99N" -> "32 deg 54' 59.40\" N"
+            lat_deg, lat_min_dir = latitude.split(',')
+            lat_min = lat_min_dir[:-1]  # Remove direction
+            lat_dir = lat_min_dir[-1]   # Get direction
+            
+            # Convert decimal minutes to minutes/seconds
+            lat_min_float = float(lat_min)
+            lat_min_int = int(lat_min_float)
+            lat_sec = (lat_min_float - lat_min_int) * 60
+            
+            lat_formatted = f"{lat_deg} deg {lat_min_int}' {lat_sec:.2f}\" {lat_dir}"
+            
+            # Convert longitude: "96,32.052W" -> "96 deg 32' 3.12\" W"
+            lon_deg, lon_min_dir = longitude.split(',')
+            lon_min = lon_min_dir[:-1]  # Remove direction
+            lon_dir = lon_min_dir[-1]   # Get direction
+            
+            # Convert decimal minutes to minutes/seconds
+            lon_min_float = float(lon_min)
+            lon_min_int = int(lon_min_float)
+            lon_sec = (lon_min_float - lon_min_int) * 60
+            
+            lon_formatted = f"{lon_deg} deg {lon_min_int}' {lon_sec:.2f}\" {lon_dir}"
+            
+            # Build GPS fields
+            gps_fields = {}
+            gps_fields['-GPSLatitude'] = lat_formatted
+            gps_fields['-GPSLongitude'] = lon_formatted
+            
+            # Handle altitude if present
+            if altitude:
+                # Convert fraction like "741/5" to decimal
+                if '/' in altitude:
+                    num, den = altitude.split('/')
+                    alt_meters = float(num) / float(den)
+                else:
+                    alt_meters = float(altitude)
+                    
+                gps_fields['-GPSAltitude'] = f"{alt_meters:.3f} m"
+                gps_fields['-GPSAltitudeRef'] = "Above Sea Level"
+                
+                # Create combined coordinate string
+                gps_coords = f"{lat_formatted}, {lon_formatted}, {alt_meters:.3f} m Above Sea Level"
+            else:
+                gps_coords = f"{lat_formatted}, {lon_formatted}"
+                
+            gps_fields['-QuickTime:GPSCoordinates'] = gps_coords
+            
+            self.logger.debug(f"Converted GPS: {gps_fields}")
+            return gps_fields
+            
+        except Exception as e:
+            self.logger.error(f"Error converting GPS format: {e}")
+            return {}
+        
     def get_metadata_from_xmp(self):
         """Get metadata from XMP file."""
         metadata = self.read_metadata_from_xmp()
-        title, keywords, date_str, caption, location_data = metadata
+        title, keywords, date_str, caption, location_data, gps_data = metadata
         
         self._log_metadata_status(metadata)
         return metadata
         
     def _log_metadata_status(self, metadata: tuple) -> None:
         """Log status of metadata fields."""
-        title, keywords, date_str, caption, location_data = metadata
+        title, keywords, date_str, caption, location_data, gps_data = metadata
         
         if self._is_metadata_empty(metadata):
             self.logger.warning("No metadata found in XMP file")
@@ -392,6 +473,21 @@ class VideoProcessor(MediaProcessor):
                 
         return fields
         
+    def _prepare_gps_fields(self, gps_data: tuple | None) -> dict:
+        """Prepare GPS metadata fields from XMP GPS data."""
+        if not gps_data:
+            return {}
+            
+        latitude, longitude, altitude = gps_data
+        if not latitude or not longitude:
+            return {}
+            
+        # Convert XMP format to QuickTime format
+        gps_fields = self._convert_gps_to_quicktime_format(latitude, longitude, altitude)
+        
+        self.logger.debug(f"Prepared GPS fields: {gps_fields}")
+        return gps_fields
+        
     def _verify_location_component(self, value: str | None, field_type: str) -> bool:
         """Verify a location component (location, city, or country)."""
         if not value:
@@ -457,7 +553,7 @@ class VideoProcessor(MediaProcessor):
         self.logger.debug(f"Expected fields: {expected_fields}")
         
         # Verify each component
-        title, keywords, date_str, caption, location_data = expected_metadata
+        title, keywords, date_str, caption, location_data, gps_data = expected_metadata
         location, city, country = location_data if location_data else (None, None, None)
         
         verification_results = {
@@ -590,13 +686,13 @@ class VideoProcessor(MediaProcessor):
         
         Args:
             metadata (tuple): Tuple containing metadata values
-                (title, keywords, date_str, caption, location_data)
+                (title, keywords, date_str, caption, location_data, gps_data)
                 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            title, keywords, date_str, caption, location_data = metadata
+            title, keywords, date_str, caption, location_data, gps_data = metadata
             
             # Prepare all metadata fields
             metadata_fields = {}
@@ -605,6 +701,7 @@ class VideoProcessor(MediaProcessor):
             metadata_fields.update(self._prepare_caption_fields(caption))
             metadata_fields.update(self._prepare_keyword_fields(keywords))
             metadata_fields.update(self._prepare_location_fields(location_data))
+            metadata_fields.update(self._prepare_gps_fields(gps_data))
             
             if not metadata_fields:
                 self.logger.debug("No metadata fields to write")
@@ -645,7 +742,7 @@ class VideoProcessor(MediaProcessor):
             # Read all metadata from the video file
             video_metadata = self.exiftool.read_all_metadata(self.file_path)
             
-            title, keywords, date_str, caption, location_data = original_metadata
+            title, keywords, date_str, caption, location_data, gps_data = original_metadata
             
             # Check title fields
             title_found = False
@@ -718,7 +815,7 @@ class VideoProcessor(MediaProcessor):
         Returns:
             dict: Dictionary of expected field values
         """
-        title, keywords, date_str, caption, location_data = expected_metadata
+        title, keywords, date_str, caption, location_data, gps_data = expected_metadata
         location, city, country = location_data if location_data else (None, None, None)
         
         return {
@@ -797,7 +894,7 @@ class VideoProcessor(MediaProcessor):
             metadata = self._get_and_validate_metadata()
             
             # Initialize metadata for filename
-            title, keywords, date_str, caption, location_data = metadata if metadata else (None, None, None, None, None)
+            title, keywords, date_str, caption, location_data, gps_data = metadata if metadata else (None, None, None, None, None, None)
             location, city, country = location_data if location_data else (None, None, None)
             
             # Always initialize metadata_for_filename, even if empty

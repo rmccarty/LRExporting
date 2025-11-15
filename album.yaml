@@ -1,17 +1,20 @@
 # Attractions
-
 Aquarium: 1-Events/Attractions/Aquariums/
 Arboretum: 1-Events/Attractions/Arboretums/
 Burg: 1-Events/Attractions/Castles/
+Castle: 1-Events/Attractions/Castles/
+Castles: 1-Events/Attractions/Castles/
+Concert: 1-Events/Attractions/Concerts/
+Concerts: 1-Events/Attractions/Concerts/
+Destination: 1-Events/Attractions/Destinations/
+Fair: 1-Events/Attractions/Fairs/
+Faire: 1-Events/Attractions/Fairs/
 Fest: 1-Events/Attractions/Festivals/
 Festival: 1-Events/Attractions/Festivals/
 Palace: 1-Events/Attractions/Castles/
 Residence: 1-Events/Attractions/Castles/
-Schloss: 1-Events/Attractions/Castles/
-Fair: 1-Events/Attractions/Fairs/
-Faire: 1-Events/Attractions/Fairs/
-Destination: 1-Events/Attractions/Destinations/
 Rodeo: 1-Events/Attractions/Rodeos/
+Schloss: 1-Events/Attractions/Castles/
 Zoo: 1-Events/Attractions/Zoos/
 
 Birthday: 1-Events/Birthdays/
@@ -59,93 +62,86 @@ Drill Team: 1-Events/School/
 School Band: 1-Events/School/
 Soccer: 1-Events/School/
 
-Ancestors: 2-Groups/Family/
-Otto: 2-Groups/Family/Otto/
-Band: 2-Groups/Bands/
-Family: 2-Groups/Family/
-Monikda: 2-Groups/Family/Monikda/
-Shared: 2-Groups/Family/Shared/
-Employer: 2-Groups/Employers/
-YNG: 2-Groups/Employers/YNG
-Army: 2-Groups/Employers/Army/
 Aigner: 2-Groups/Employers/
+Ancestors: 2-Groups/Family/
+Ryan: 2-Groups/Family/Ryan/
+Army: 2-Groups/Employers/Army/
+Band: 2-Groups/Bands/
+Childhood: 2-Groups/Family/Childhood/
+ECHPTA: 2-Groups/ECHPTA/
+Employer: 2-Groups/Employers/
+Family: 2-Groups/Family/
 First American: 2-Groups/Employers/
+Friends: 2-Groups/Friends/
 Iomega: 2-Groups/Employers/
 Lucent: 2-Groups/Employers/
-Sonus: 2-Groups/Employers/
-USO: 2-Groups/Employers/
-Friends: 2-Groups/Friends/
-RTPC: 2-Groups/RTPC/
+Monikda: 2-Groups/Family/Monikda/
+Otto: 2-Groups/Family/Otto/
 RTPC Street: 2-Groups/RTPC Street/
+RTPC: 2-Groups/RTPC/
+Shared: 2-Groups/Family/Shared/
+Sonus: 2-Groups/Employers/
 Stranger: 2-Groups/Strangers/
 Strangers: 2-Groups/Strangers/
+USO: 2-Groups/Employers/
+YNG: 2-Groups/Employers/YNG
 
-US: 3-Locations/US/
-USA: 3-Locations/US/
-DE: 3-Locations/DE/
-Munich: 3-Locations/DE/Munich/
-DE Berlin: 3-Locations/DE/Berlin/
+AR: 3-Locations/US/AR/
+BS: 3-Locations/BS/
 Berlin: 3-Locations/DE/Berlin/
+Bobbie Lane: 3-Locations/US/TX/Rowlett/Bobbie Lane/
+CO: 3-Locations/US/CO/
+CZ: 3-Locations/CZ/
 Castle: 3-Locations/Castles/
 Castles: 3-Locations/Attractions/
-
-
-Move: 3-Locations/Moves/
-Home: 3-Locations/Home/
-Hohernzollern: 3-Locations/DE/Hohernzollern/
-Ludwigsburg: 3-Locations/DE/Ludwigsburg/
-Monrepos: 3-Locations/DE/Ludwigsburg/Monrepos/
-Stuttgart: 3-Locations/DE/Stuttgart/
+DE Berlin: 3-Locations/DE/Berlin/
 DE Stuttgart: 3-Locations/DE/Stuttgart/
-Wildbad: 3-Locations/DE/Wildbad/
-Kelley Barracks: 3-Locations/DE/Stuttgart/Kelley Barracks/
-US AR: 3-Locations/US/AR/
-AR: 3-Locations/US/AR/
-US CO: 3-Locations/US/CO/
-CO: 3-Locations/US/CO/
-US FL: 3-Locations/US/FL/
-FL: 3-Locations/US/FL/
-
-US LA: 3-Locations/US/LA/ 
-LA: 3-Locations/US/LA/
-US NM: 3-Locations/US/NM/
-US NY: 3-Locations/US/NY/
-US TX: 3-Locations/US/TX/
-
-US UT: 3-Locations/US/UT/
-US OK: 3-Locations/US/OK/
-OK: 3-Locations/US/OK/
-
+DE: 3-Locations/DE/
 Davis: 3-Locations/US/OK/Davis/
-Turner Falls: 3-Locations/US/OK/Turner Falls/
-Sulphur: 3-Locations/US/OK/Sulphur/
-MS: 3-Locations/US/MS/
-TX: 3-Locations/US/TX/
-Rowlett: 3-Locations/US/TX/Rowlett/
-Bobbie Lane: 3-Locations/US/TX/Rowlett/Bobbie Lane/
-BS: 3-Locations/BS/
-CZ: 3-Locations/CZ/
 ES: 3-Locations/ES/
+FL: 3-Locations/US/FL/
 FR: 3-Locations/FR/
+Germany: 3-Locations/DE/
 HU: 3-Locations/HU/
-MX: 3-Locations/MX/
+Hohernzollern: 3-Locations/DE/Hohernzollern/
+Home: 3-Locations/Home/
 IE: 3-Locations/IE/ 
 IT: 3-Locations/IT/
-UK: 3-Locations/UK/
-Trip: 3-Locations/Trips/
-Germany: 3-Locations/DE/
-
+Kelley Barracks: 3-Locations/DE/Stuttgart/Kelley Barracks/
+LA: 3-Locations/US/LA/
+Ludwigsburg: 3-Locations/DE/Ludwigsburg/
+MS: 3-Locations/US/MS/
+MX: 3-Locations/MX/
+Monrepos: 3-Locations/DE/Ludwigsburg/Monrepos/
+Move: 3-Locations/Moves/
+Munich: 3-Locations/DE/Munich/
+OK: 3-Locations/US/OK/
 Postcards: 3-Locations/Postcards/
-
-Childhood: 2-Groups/Family/Childhood/
-
-ECHPTA: 2-Groups/ECHPTA/
-
+Rowlett: 3-Locations/US/TX/Rowlett/
+Stuttgart: 3-Locations/DE/Stuttgart/
+Sulphur: 3-Locations/US/OK/Sulphur/
+TX: 3-Locations/US/TX/
+Trip: 3-Locations/Trips/
+Turner Falls: 3-Locations/US/OK/Turner Falls/
+UK: 3-Locations/UK/
+US AR: 3-Locations/US/AR/
+US CO: 3-Locations/US/CO/
+US FL: 3-Locations/US/FL/
+US LA: 3-Locations/US/LA/ 
+US NM: 3-Locations/US/NM/
+US NY: 3-Locations/US/NY/
+US OK: 3-Locations/US/OK/
+US TX: 3-Locations/US/TX/
+US UT: 3-Locations/US/UT/
+US: 3-Locations/US/
+USA: 3-Locations/US/
+Wildbad: 3-Locations/DE/Wildbad/
 AT: 3-Locations/AT/
 
 #series 
 
-The McCartys: 4-Series/Videos/The McCartys/
-McCartys: 4-Series/Videos/The McCartys/
 Documents: 4-Series/Documents/
 Kodak Disc: 4-Series/Kodak Disc/
+McCartys: 4-Series/Videos/The McCartys/
+The McCartys: 4-Series/Videos/The McCartys/
+Videos: 4-Series/Videos/
