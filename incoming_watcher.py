@@ -59,6 +59,49 @@ class IncomingWatcher:
         print(f"   📁 Both Incoming: {self.both_incoming}")
         print(f"   ⏰ Sleep Time: {self.sleep_time} seconds")
         
+    def _is_file_ready(self, file_path: Path, min_file_age: int = 5) -> tuple[bool, str]:
+        """
+        Check if file is ready for distribution.
+        
+        Args:
+            file_path: Path to the file to check
+            min_file_age: Minimum age in seconds before file is considered ready
+            
+        Returns:
+            tuple: (is_ready, reason)
+        """
+        try:
+            # Check if file exists
+            if not file_path.exists():
+                return False, "File does not exist"
+                
+            # Check if it's a regular file
+            if not file_path.is_file():
+                return False, "Not a regular file"
+                
+            # Check file size
+            file_size = file_path.stat().st_size
+            if file_size == 0:
+                return False, "Zero-byte file"
+            
+            # Check file age
+            import time
+            file_age = time.time() - file_path.stat().st_mtime
+            if file_age < min_file_age:
+                return False, f"File too new (< {min_file_age} seconds old)"
+            
+            # Check if file is locked
+            try:
+                with open(file_path, 'r+'):
+                    pass
+            except IOError:
+                return False, "File is locked"
+            
+            return True, "Ready"
+            
+        except Exception as e:
+            return False, f"Error checking file: {e}"
+        
     def _get_next_sequence(self) -> str:
         """Get next sequence number for filename uniqueness."""
         self._sequence_counter += 1
@@ -85,32 +128,30 @@ class IncomingWatcher:
                 if not file.is_file():
                     continue
                     
-                found_files = True  # Mark as found even if locked
+                found_files = True  # Mark as found even if not ready
                 file_count += 1
                 
-                # Check if the file is open
-                try:
-                    with open(file, 'r+'):
-                        # File is not open, proceed to copy
-                        print(f"   📤 Distributing: {file.name}")
-                        
-                        # Copy the file to all incoming directories
-                        for incoming_dir in self.incoming_directories:
-                            # Ensure destination directory exists
-                            incoming_dir.mkdir(parents=True, exist_ok=True)
-                            dest_path = incoming_dir / file.name
-                            shutil.copy(file, dest_path)
-                            self.logger.info(f"Copied {file.name} to {incoming_dir.name} directory.")
-                            print(f"      → Copied to {incoming_dir.name}")
-                        
-                        # Delete the original file
-                        file.unlink()
-                        self.logger.info(f"Deleted {file.name} from Both_Incoming.")
-                        print(f"      ✓ Deleted from Both_Incoming")
-                        
-                except IOError:
-                    self.logger.warning(f"File {file.name} is currently open. Skipping copy.")
-                    print(f"   ⏳ File {file.name} is locked - will retry later")
+                # Check if file is ready for distribution
+                is_ready, reason = self._is_file_ready(file)
+                if is_ready:
+                    print(f"   📤 Distributing: {file.name}")
+                    
+                    # Copy the file to all incoming directories
+                    for incoming_dir in self.incoming_directories:
+                        # Ensure destination directory exists
+                        incoming_dir.mkdir(parents=True, exist_ok=True)
+                        dest_path = incoming_dir / file.name
+                        shutil.copy(file, dest_path)
+                        self.logger.info(f"Copied {file.name} to {incoming_dir.name} directory.")
+                        print(f"      → Copied to {incoming_dir.name}")
+                    
+                    # Delete the original file
+                    file.unlink()
+                    self.logger.info(f"Deleted {file.name} from Both_Incoming.")
+                    print(f"      ✓ Deleted from Both_Incoming")
+                else:
+                    self.logger.warning(f"File {file.name} not ready for distribution: {reason}")
+                    print(f"   ⏳ Skipping {file.name}: {reason}")
                     continue  # Skip to the next file
         
         except Exception as e:
