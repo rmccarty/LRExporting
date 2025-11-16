@@ -6,7 +6,7 @@ This file contains all video metadata field mappings and settings optimized for 
 """
 
 # Video file patterns
-VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v']  # Will handle case sensitivity in the watcher
+VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v', '*.mpg', '*.mpeg']  # Will handle case sensitivity in the watcher
 
 # Video metadata field mappings - optimized for Apple Photos compatibility
 VIDEO_METADATA_FIELDS = {

@@ -53,7 +53,7 @@ APPLE_PHOTOS_BATCH_REMOVE_SIZE = 5000
 
 # File patterns
 JPEG_PATTERN = '*.[Jj][Pp][Gg]'
-VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v']  # Will handle case sensitivity in the watcher
+VIDEO_PATTERN = ['*.mp4', '*.mov', '*.m4v', '*.mpg', '*.mpeg']  # Will handle case sensitivity in the watcher
 
 # Combined pattern for Apple Photos
 ALL_PATTERN = [JPEG_PATTERN] + [pat.upper() for pat in VIDEO_PATTERN] + [pat.lower() for pat in VIDEO_PATTERN]

@@ -42,7 +42,7 @@ class IncomingWatcher:
         
         # File patterns
         self.jpeg_pattern = '*.[Jj][Pp][Gg]'
-        self.video_patterns = ['*.mp4', '*.mov', '*.m4v', '*.MP4', '*.MOV', '*.M4V']
+        self.video_patterns = ['*.mp4', '*.mov', '*.m4v', '*.mpg', '*.mpeg', '*.MP4', '*.MOV', '*.M4V', '*.MPG', '*.MPEG']
         
         # Incoming directories to process
         self.incoming_directories = [self.ron_incoming, self.claudia_incoming]

@@ -143,7 +143,7 @@ class ImportManager:
             
             # For videos, check the Apple Photos compatible fields our video processor writes to
             ext = photo_path.suffix.lower()
-            if ext in ['.mp4', '.mov', '.m4v']:
+            if ext in ['.mp4', '.mov', '.m4v', '.mpg', '.mpeg']:
                 # Check the primary Apple Photos video keyword fields
                 cmd = ["exiftool", "-QuickTime:Keywords", "-XMP:Subject", "-IPTC:Keywords", "-s", "-s", "-sep", "||", str(photo_path)]
             else:
@@ -159,7 +159,7 @@ class ImportManager:
                 # Parse the output to extract keywords from any field that has them
                 keywords = []
                 
-                if ext in ['.mp4', '.mov', '.m4v']:
+                if ext in ['.mp4', '.mov', '.m4v', '.mpg', '.mpeg']:
                     # Parse video metadata output (can have multiple fields)
                     lines = result.stdout.strip().split('\n')
                     for line in lines:
