@@ -139,15 +139,48 @@ class ImportManager:
     def _get_original_keywords(self, photo_path: Path) -> list[str]:
         """Get keywords from original photo before import."""
         try:
-            # Run exiftool to get XMP Subject which contains our hierarchical keywords
             import subprocess
-            cmd = ["exiftool", "-XMP:Subject", "-s", "-s", "-sep", "||", str(photo_path)]
+            
+            # For videos, check the Apple Photos compatible fields our video processor writes to
+            ext = photo_path.suffix.lower()
+            if ext in ['.mp4', '.mov', '.m4v']:
+                # Check the primary Apple Photos video keyword fields
+                cmd = ["exiftool", "-QuickTime:Keywords", "-XMP:Subject", "-IPTC:Keywords", "-s", "-s", "-sep", "||", str(photo_path)]
+            else:
+                # For images, use the original XMP Subject approach
+                cmd = ["exiftool", "-XMP:Subject", "-s", "-s", "-sep", "||", str(photo_path)]
+                
+            self.logger.debug(f"Running keyword extraction command: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True)
+            
             if result.returncode == 0 and result.stdout.strip():
-                # Split on our custom separator and strip any whitespace
-                keywords = [k.strip() for k in result.stdout.strip().split("||")]
+                self.logger.debug(f"ExifTool keyword output: {result.stdout}")
+                
+                # Parse the output to extract keywords from any field that has them
+                keywords = []
+                
+                if ext in ['.mp4', '.mov', '.m4v']:
+                    # Parse video metadata output (can have multiple fields)
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines:
+                        if line.strip():
+                            # Split on our custom separator and add to keywords
+                            line_keywords = [k.strip() for k in line.split("||") if k.strip()]
+                            keywords.extend(line_keywords)
+                else:
+                    # Parse image metadata output (single XMP:Subject field)
+                    keywords = [k.strip() for k in result.stdout.strip().split("||")]
+                
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_keywords = []
+                for k in keywords:
+                    if k not in seen:
+                        unique_keywords.append(k)
+                        seen.add(k)
+                
                 # Always strip 'Subject: ' prefix if present
-                normalized_keywords = [k[9:] if k.startswith("Subject: ") else k for k in keywords]
+                normalized_keywords = [k[9:] if k.startswith("Subject: ") else k for k in unique_keywords]
                 self.logger.debug(f"Found original keywords: {normalized_keywords}")
                 
                 # Check for targeted album keywords
@@ -272,9 +305,43 @@ class ImportManager:
             self.logger.error(f"Error verifying asset title: {e}")
             return False
 
+    def _set_keywords_on_asset(self, asset_id: str, keywords: list[str]) -> bool:
+        """Set keywords on an asset in Photos library using AppleScript."""
+        if not keywords:
+            return False
+            
+        try:
+            import subprocess
+            import time
+            
+            # Convert keywords list to AppleScript format
+            keyword_list = '{' + ', '.join(f'"{k}"' for k in keywords) + '}'
+            
+            # Use AppleScript to set keywords on the asset  
+            applescript = f'tell application "Photos" to set keywords of (media item id "{asset_id}") to {keyword_list}'
+            
+            self.logger.debug(f"Setting keywords on asset {asset_id} using AppleScript: {keywords}")
+            result = subprocess.run(
+                ['osascript', '-e', applescript], 
+                capture_output=True, 
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                self.logger.info(f"Successfully set keywords on asset {asset_id}: {keywords}")
+                return True
+            else:
+                self.logger.error(f"AppleScript failed to set keywords on asset {asset_id}: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error setting keywords on asset {asset_id}: {e}")
+            return False
+
     def import_photo(self, photo_path: Path, album_paths: list[str] = None) -> tuple[bool, str | None]:
         """
-        Import a photo or video into Apple Photos.
+        Import a photo or video into Apple Photos and apply metadata from processed file.
 
         Args:
             photo_path: Path to the photo or video to import
@@ -289,18 +356,14 @@ class ImportManager:
                 self.logger.error(f"File does not exist: {photo_path}")
                 return False, None
 
-            # Get original keywords before import
+            # Extract metadata from the processed file before import
             original_keywords = self._get_original_keywords(photo_path)
             if original_keywords:
-                self.logger.info(f"Original keywords for {photo_path}: {original_keywords}")
+                self.logger.info(f"Found keywords in processed file: {original_keywords}")
                 
-            # Get original title before import
             original_title = self._get_original_title(photo_path)
             if original_title:
-                self.logger.info(f"Original title for {photo_path}: {original_title}")
-
-            # Get targeted album keywords
-            targeted_keywords = [k for k in original_keywords if self._is_targeted_keyword(k)]
+                self.logger.info(f"Found title in processed file: {original_title}")
 
             # Identify asset type
             try:
@@ -309,8 +372,8 @@ class ImportManager:
                 self.logger.error(f"Failed to identify asset type: {e}")
                 return False, None
 
-            # Import the photo/video
-            self.logger.info(f"Importing photo: {photo_path}")
+            # Import the photo/video using Photos framework
+            self.logger.info(f"Importing {asset_type}: {photo_path}")
             success = False
             placeholder = None
 
@@ -337,26 +400,26 @@ class ImportManager:
 
             # Get the imported asset's ID
             asset_id = placeholder.localIdentifier()
-            self.logger.debug(f"Asset verified in Photos library: {asset_id}")
+            self.logger.debug(f"Asset imported to Photos library: {asset_id}")
 
-            # Set title if available
+            # Apply metadata to the imported asset
             if original_title:
                 self.logger.info(f"Setting title on asset {asset_id}: {original_title}")
                 if not self._set_title_on_asset(asset_id, original_title):
                     self.logger.warning(f"Failed to set title on asset {asset_id}")
-                    # Continue with import even if title setting fails
 
-            # Album assignment now handled by caller, but support for backward compatibility
+            if original_keywords:
+                self.logger.info(f"Setting keywords on asset {asset_id}: {original_keywords}")
+                if not self._set_keywords_on_asset(asset_id, original_keywords):
+                    self.logger.warning(f"Failed to set keywords on asset {asset_id}")
+
+            # Album assignment
             if album_paths:
                 self.logger.info(f"Adding photo to albums: {album_paths}")
                 if asset_id:
                     self.album_manager.add_to_albums(asset_id, album_paths)
                 else:
                     self.logger.warning("No asset_id available to add to albums.")
-
-            # Remove album assignment via targeted keywords
-            # if not self.album_manager.add_asset_to_targeted_albums(asset_id, targeted_keywords):
-            #     self.logger.error("Failed to add asset to one or more targeted albums")
 
             # Delete original if configured
             if DELETE_ORIGINAL:

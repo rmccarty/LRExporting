@@ -10,20 +10,56 @@ import re
 from datetime import datetime
 
 from config import (
-    XML_NAMESPACES,
-    METADATA_FIELDS,
-    VERIFY_FIELDS,
-    VIDEO_PATTERN,
     MCCARTYS_PREFIX,
-    MCCARTYS_REPLACEMENT,
-    LRE_SUFFIX
+    MCCARTYS_REPLACEMENT
 )
+# Import video-specific configuration
+try:
+    import config_videos
+    from config_videos import (
+        VIDEO_XML_NAMESPACES as XML_NAMESPACES,
+        VIDEO_METADATA_FIELDS as METADATA_FIELDS,
+        VIDEO_VERIFY_FIELDS as VERIFY_FIELDS,
+        VIDEO_PATTERN,
+        VIDEO_LRE_SUFFIX as LRE_SUFFIX,
+        APPLE_PHOTOS_VIDEO_OPTIMIZATIONS,
+        VIDEO_DEBUG_SETTINGS
+    )
+except ImportError:
+    # Fallback to main config if video config not available
+    from config import (
+        XML_NAMESPACES,
+        METADATA_FIELDS,
+        VERIFY_FIELDS,
+        VIDEO_PATTERN,
+        LRE_SUFFIX
+    )
+    APPLE_PHOTOS_VIDEO_OPTIMIZATIONS = {
+        'use_quicktime_primary': True,
+        'convert_gps_decimal': False,
+        'keyword_format': 'comma_separated',
+        'preserve_original_dates': True,
+        'add_composite_fields': True
+    }
+    VIDEO_DEBUG_SETTINGS = {
+        'debug': False,
+        'log_metadata_extraction': False,
+        'log_field_mapping': False,
+        'log_verification': False,
+        'log_keyword_processing': False,
+        'save_debug_metadata': False
+    }
 from processors.media_processor import MediaProcessor
 from utils.exiftool import ExifTool  # Import the new ExifTool class
 from utils.date_normalizer import DateNormalizer  # Import DateNormalizer
 
 class VideoProcessor(MediaProcessor):
     """A class to process video files and their metadata using exiftool."""
+    
+    def _debug_log(self, message: str, debug_type: str = 'debug') -> None:
+        """Log debug message only if debug is enabled for the specified type."""
+        if VIDEO_DEBUG_SETTINGS.get('debug', False) and VIDEO_DEBUG_SETTINGS.get(debug_type, False):
+            self.logger.debug(f"[VIDEO DEBUG] {message}")
     
     def __init__(self, file_path: str, sequence: str = None):
         """Initialize with video file path."""
@@ -38,8 +74,18 @@ class VideoProcessor(MediaProcessor):
             
         # Check for XMP sidecar file
         self.xmp_file = Path(file_path).with_suffix('.xmp')
+        self.logger.debug(f"Looking for XMP file at: {self.xmp_file}")
+        self.logger.debug(f"XMP file absolute path: {self.xmp_file.absolute()}")
+        self.logger.debug(f"XMP file exists: {self.xmp_file.exists()}")
+        
         if not self.xmp_file.exists():
-            self.logger.warning(f"No XMP sidecar file found: {self.xmp_file}")
+            self.logger.error(f"CRITICAL: No XMP sidecar file found at: {self.xmp_file}")
+            self.logger.error(f"Video processing requires XMP file for metadata")
+            # Don't exit - let the process continue but flag this as an error
+            self._xmp_available = False
+        else:
+            self.logger.info(f"Found XMP sidecar file: {self.xmp_file}")
+            self._xmp_available = True
             
         # Initialize the ExifTool class
         self.exiftool = ExifTool()
@@ -98,8 +144,8 @@ class VideoProcessor(MediaProcessor):
                 keywords.append(elem.text)
         return keywords if keywords else None
         
-    def _get_keywords_from_flat(self, rdf) -> list[str] | None:
-        """Get keywords from flat subject list."""
+    def _get_keywords_from_flat_bag(self, rdf) -> list[str] | None:
+        """Get keywords from flat subject list using rdf:Bag (Lightroom format)."""
         ns = XML_NAMESPACES
         keywords = []
         subject_path = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Bag/{{{ns["rdf"]}}}li'
@@ -108,21 +154,39 @@ class VideoProcessor(MediaProcessor):
                 keywords.append(elem.text)
         return keywords if keywords else None
         
+    def _get_keywords_from_flat_seq(self, rdf) -> list[str] | None:
+        """Get keywords from flat subject list using rdf:Seq (Apple Photos format)."""
+        ns = XML_NAMESPACES
+        keywords = []
+        subject_path = f'.//{{{ns["dc"]}}}subject/{{{ns["rdf"]}}}Seq/{{{ns["rdf"]}}}li'
+        for elem in rdf.findall(subject_path):
+            if elem.text:
+                keywords.append(elem.text)
+        return keywords if keywords else None
+        
     def get_keywords_from_rdf(self, rdf):
         """Extract keywords from RDF data using multiple strategies."""
         try:
-            # Try hierarchical subjects first, then fall back to flat subjects
+            # Try multiple keyword formats: hierarchical, flat bag (Lightroom), flat seq (Apple Photos)
             strategies = [
                 self._get_keywords_from_hierarchical,
-                self._get_keywords_from_flat
+                self._get_keywords_from_flat_bag,
+                self._get_keywords_from_flat_seq
             ]
             
+            self._debug_log("Trying multiple keyword extraction strategies", 'log_keyword_processing')
+            
             for strategy in strategies:
+                self._debug_log(f"Trying strategy: {strategy.__name__}", 'log_keyword_processing')
                 keywords = strategy(rdf)
                 if keywords:
-                    self.logger.debug(f"Found keywords: {keywords}")
+                    self._debug_log(f"Found keywords using {strategy.__name__}: {keywords}", 'log_keyword_processing')
+                    self.logger.debug(f"Found keywords using {strategy.__name__}: {keywords}")
                     return keywords
+                else:
+                    self._debug_log(f"No keywords found with {strategy.__name__}", 'log_keyword_processing')
                     
+            self._debug_log("No keywords found in RDF with any strategy", 'log_keyword_processing')
             self.logger.debug("No keywords found in RDF")
             return None
             
@@ -294,11 +358,19 @@ class VideoProcessor(MediaProcessor):
         
     def get_metadata_from_xmp(self):
         """Get metadata from XMP file."""
-        metadata = self.read_metadata_from_xmp()
-        title, keywords, date_str, caption, location_data, gps_data = metadata
-        
-        self._log_metadata_status(metadata)
-        return metadata
+        if not hasattr(self, '_xmp_available') or not self._xmp_available:
+            self.logger.error("Cannot read metadata - XMP file not available")
+            return None
+            
+        try:
+            metadata = self.read_metadata_from_xmp()
+            title, keywords, date_str, caption, location_data, gps_data = metadata
+            
+            self._log_metadata_status(metadata)
+            return metadata
+        except Exception as e:
+            self.logger.error(f"Failed to read metadata from XMP: {e}")
+            return None
         
     def _log_metadata_status(self, metadata: tuple) -> None:
         """Log status of metadata fields."""
@@ -444,10 +516,39 @@ class VideoProcessor(MediaProcessor):
         return {field: caption for field in METADATA_FIELDS['caption']}
         
     def _prepare_keyword_fields(self, keywords: list | None) -> dict:
-        """Prepare keyword metadata fields."""
+        """Prepare keyword metadata fields optimized for Apple Photos compatibility."""
         if not keywords:
+            self._debug_log("No keywords to prepare", 'log_keyword_processing')
             return {}
-        return {field: keywords for field in METADATA_FIELDS['keywords']}
+            
+        fields = {}
+        
+        # Get Apple Photos optimization settings
+        keyword_format = APPLE_PHOTOS_VIDEO_OPTIMIZATIONS.get('keyword_format', 'comma_separated')
+        self._debug_log(f"Using keyword format: {keyword_format}", 'log_keyword_processing')
+        
+        # Prepare keywords in different formats
+        keywords_str = ', '.join(keywords) if isinstance(keywords, list) else str(keywords)
+        keywords_list = keywords if isinstance(keywords, list) else [str(keywords)]
+        
+        self._debug_log(f"Keywords as string: '{keywords_str}'", 'log_keyword_processing')
+        self._debug_log(f"Keywords as list: {keywords_list}", 'log_keyword_processing')
+        
+        # Apply Apple Photos optimized field mapping
+        apple_photos_fields = ['-QuickTime:Keywords', '-XMP:Subject', '-IPTC:Keywords']
+        for field in METADATA_FIELDS['keywords']:
+            if field in apple_photos_fields:
+                # These fields work best with comma-separated strings for Apple Photos
+                fields[field] = keywords_str
+                self._debug_log(f"Apple Photos field {field} = '{keywords_str}'", 'log_keyword_processing')
+            else:
+                # Other fields use list format
+                fields[field] = keywords_list
+                self._debug_log(f"Standard field {field} = {keywords_list}", 'log_keyword_processing')
+        
+        self._debug_log(f"Total keyword fields prepared: {len(fields)}", 'log_keyword_processing')
+        self.logger.debug(f"Prepared keyword fields for Apple Photos: {fields}")
+        return fields
         
     def _prepare_location_fields(self, location_data: tuple | None) -> dict:
         """Prepare location metadata fields."""
@@ -593,20 +694,25 @@ class VideoProcessor(MediaProcessor):
     def _verify_keywords(self, keywords: list | None) -> bool:
         """Verify keywords metadata field."""
         if not keywords:
+            self._debug_log("No keywords to verify", 'log_verification')
             return True  # Skip verification for empty field
             
+        self._debug_log(f"Starting keyword verification for: {keywords}", 'log_verification')
         self.logger.debug(f"Verifying keywords: {keywords}")
         
         # Check all keyword-related fields in the metadata
         found_keywords = []
         for field in METADATA_FIELDS['keywords']:
             clean_field = field.replace('-', '').split(':')[-1]
+            self._debug_log(f"Checking for field pattern: {clean_field}", 'log_verification')
             for key in self.exif_data:
                 if key.endswith(clean_field) or clean_field.lower() in key.lower():
                     current_keywords = self.exif_data[key]
+                    self._debug_log(f"Found matching field {key} with value: {current_keywords}", 'log_verification')
                     if isinstance(current_keywords, str):
                         # Split comma-separated keywords
                         current_keywords = [kw.strip() for kw in current_keywords.split(',')]
+                        self._debug_log(f"Parsed string keywords: {current_keywords}", 'log_verification')
                     elif isinstance(current_keywords, list):
                         # Handle list of keywords, also check for comma-separated items
                         expanded_keywords = []
@@ -616,22 +722,30 @@ class VideoProcessor(MediaProcessor):
                             else:
                                 expanded_keywords.append(kw)
                         current_keywords = expanded_keywords
+                        self._debug_log(f"Processed list keywords: {current_keywords}", 'log_verification')
                     found_keywords.extend(current_keywords)
                     self.logger.debug(f"Found keywords in {key}: {current_keywords}")
         
         # Remove duplicates and empty strings
         found_keywords = list(set([kw for kw in found_keywords if kw.strip()]))
+        self._debug_log(f"Final unique keywords found: {found_keywords}", 'log_verification')
         
         # Check if all expected keywords are present (case-insensitive)
         expected_lower = [k.lower() for k in keywords]
         found_lower = [k.lower() for k in found_keywords]
         
+        self._debug_log(f"Expected keywords (lowercase): {expected_lower}", 'log_verification')
+        self._debug_log(f"Found keywords (lowercase): {found_lower}", 'log_verification')
+        
         missing_keywords = []
         for expected in expected_lower:
             if expected not in found_lower:
                 missing_keywords.append(keywords[expected_lower.index(expected)])
+                
+        self._debug_log(f"Missing keywords: {missing_keywords}", 'log_verification')
         
         if missing_keywords:
+            self._debug_log("Some keywords are missing - verification failed", 'log_verification')
             self.logger.warning(f"Keywords verification: Some keywords not found")
             self.logger.warning(f"  Expected: {keywords}")
             self.logger.warning(f"  Found: {found_keywords}")
@@ -837,14 +951,21 @@ class VideoProcessor(MediaProcessor):
         
     def _get_and_validate_metadata(self) -> tuple | None:
         """Read and validate metadata from XMP file."""
+        self.logger.debug(f"Attempting to read metadata from XMP file: {self.xmp_file}")
+        
         metadata = self.get_metadata_from_xmp()
         if not metadata:
-            self.logger.warning("No metadata found in XMP file")
+            self.logger.error("CRITICAL: No metadata found in XMP file")
+            self.logger.error(f"XMP file path: {self.xmp_file}")
+            self.logger.error(f"XMP file exists: {self.xmp_file.exists() if hasattr(self, 'xmp_file') else 'Unknown'}")
             return None
             
+        self.logger.debug(f"Successfully read metadata: {metadata}")
+        
         if self._is_metadata_empty(metadata):
-            self.logger.info("All metadata fields are empty")
-            return None
+            self.logger.warning("All metadata fields are empty but XMP was read successfully")
+            # Don't return None for empty metadata - let it process
+            # return None
             
         return metadata
         

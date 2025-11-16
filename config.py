@@ -80,13 +80,25 @@ METADATA_FIELDS = {
         '-QuickTime:MediaCreateDate',
         '-Photoshop:DateCreated'
     ],
-    'keywords': ['-Keys:Keywords', '-ItemList:Keyword'],  # Dual keyword approach for Apple Photos video compatibility
+    'keywords': [
+        '-IPTC:Keywords',           # IPTC keywords (Apple Photos recognizes this!)
+        '-XMP:Subject',             # XMP Subject (base processor reads this)
+        '-Keys:Keywords',           # iTunes-style keywords
+        '-ItemList:Keyword',        # MP4 ItemList keywords 
+        '-XMP-dc:Subject',          # XMP Dublin Core subject
+        '-DC:Subject',              # Direct Dublin Core subject
+        '-QuickTime:Keywords',      # QuickTime keywords
+        '-UserData:Keywords'        # MP4 UserData keywords
+    ],
     'location': ['-Location', '-XMP:Location', '-LocationName'],
     'city': ['-City', '-XMP:City'],
     'state': ['-State', '-XMP:State'],
     'country': ['-Country', '-XMP:Country'],
     'gps': [
         '-GPSLatitude', '-GPSLongitude',
+        '-QuickTime:GPSLatitude', '-QuickTime:GPSLongitude',
+        '-QuickTime:GPSAltitude', '-QuickTime:GPSAltitudeRef',
+        '-QuickTime:GPSCoordinates',
         '-EXIF:GPSLatitude', '-EXIF:GPSLongitude',
         '-EXIF:GPSLatitudeRef', '-EXIF:GPSLongitudeRef',
         '-EXIF:GPSAltitude', '-EXIF:GPSAltitudeRef',
