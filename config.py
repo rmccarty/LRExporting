@@ -125,7 +125,7 @@ VERIFY_FIELDS = [
 # Transfer configuration
 TRANSFER_PATHS = {
     RON_INCOMING: Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos"),
-    CLAUDIA_INCOMING: Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs")
+    CLAUDIA_INCOMING: Path("/Users/rmccarty/Transfers/Claudia/Claudia_Transfer")
 }
 
 # Apple Photos configuration - paths that should be imported to Photos

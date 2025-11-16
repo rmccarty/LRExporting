@@ -5,7 +5,7 @@ Directory Monitor - Monitors file counts in all LRExporting directories
 
 Continuously monitors and reports file counts for:
 - Incoming directories: Ron_Incoming, Claudia_Incoming, Both_Incoming
-- Destination directories: Ron_Apple_Photos, Claudia's iCloud directory
+- Destination directories: Ron_Apple_Photos, Claudia_Transfer directory
 
 Updates every few seconds to provide real-time visibility into the system.
 """
@@ -47,7 +47,7 @@ class DirectoryMonitor:
             if source == RON_INCOMING:
                 self.directories["Ron_Apple_Photos"] = dest
             elif source == CLAUDIA_INCOMING:
-                self.directories["Claudia_iCloud"] = dest
+                self.directories["Claudia_Transfer"] = dest
         
         # Setup logging
         self.logger = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ class DirectoryMonitor:
                 elif suffix in ['.jpg', '.jpeg']:
                     jpg_count += 1
                 # Count video files
-                elif suffix in ['.mp4', '.mov', '.m4v']:
+                elif suffix in ['.mp4', '.mov', '.m4v', '.mpg', '.mpeg']:
                     video_count += 1
                 else:
                     other_count += 1
