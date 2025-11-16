@@ -133,6 +133,10 @@ APPLE_PHOTOS_PATHS = {
     Path("/Users/rmccarty/Transfers/Ron/Ron_Apple_Photos")  # Only Ron's path goes to Apple Photos
 }
 
+# iCloud backfill configuration
+ICLOUD_OLDPHOTOGRAPHS = Path("/Users/rmccarty/Library/Mobile Documents/com~apple~CloudDocs/Shared/OldPhotographs")
+ICLOUD_TARGET_FILE_COUNT = 100  # Keep iCloud directory at this many files
+
 # Flag to enable/disable Apple Photos processing
 ENABLE_APPLE_PHOTOS = True
 

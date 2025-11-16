@@ -5,7 +5,11 @@ Incoming Mover - Moves processed __LRE files from incoming directories to destin
 
 Monitors and transfers files from:
 1. Ron_Incoming → Ron_Apple_Photos (for Apple Photos import)
-2. Claudia_Incoming → Old Photographs directory (for iCloud storage)
+2. Claudia_Incoming → Claudia_Transfer (local staging)
+
+Additional features:
+- iCloud Backfill: Maintains 50 files in iCloud OldPhotographs by moving oldest files
+  from Claudia_Transfer when iCloud directory has fewer than target count
 
 Only moves files that are not locked and have __LRE suffix.
 """
@@ -17,8 +21,17 @@ import shutil
 import sys
 from typing import Optional, Dict
 
-from config import TRANSFER_PATHS, MIN_FILE_AGE
+from config import (
+    TRANSFER_PATHS, 
+    MIN_FILE_AGE, 
+    CLAUDIA_INCOMING,
+    ICLOUD_OLDPHOTOGRAPHS,
+    ICLOUD_TARGET_FILE_COUNT
+)
 from datetime import datetime, timedelta
+
+# Get Claudia's transfer directory from config
+CLAUDIA_TRANSFER = TRANSFER_PATHS[CLAUDIA_INCOMING]
 
 
 class IncomingMover:
@@ -201,6 +214,96 @@ class IncomingMover:
         except Exception as e:
             self.logger.error(f"Error checking directory {source_dir}: {e}")
             return 0
+
+    def _count_files_in_directory(self, directory: Path) -> int:
+        """Count total files in a directory."""
+        if not directory.exists():
+            return 0
+        try:
+            return len([f for f in directory.iterdir() if f.is_file()])
+        except Exception as e:
+            self.logger.error(f"Error counting files in {directory}: {e}")
+            return 0
+
+    def backfill_icloud(self) -> int:
+        """
+        Backfill iCloud OldPhotographs directory from Claudia_Transfer if needed.
+        
+        Maintains ICLOUD_TARGET_FILE_COUNT files in iCloud by moving files
+        from Claudia_Transfer when iCloud has fewer files.
+        
+        Returns:
+            int: Number of files moved to iCloud
+        """
+        try:
+            # Count current files in iCloud
+            icloud_count = self._count_files_in_directory(ICLOUD_OLDPHOTOGRAPHS)
+            
+            # Check if backfill is needed
+            if icloud_count >= ICLOUD_TARGET_FILE_COUNT:
+                self.logger.debug(f"iCloud has {icloud_count} files (>= {ICLOUD_TARGET_FILE_COUNT}), no backfill needed")
+                return 0
+                
+            # Calculate how many files to move
+            files_needed = ICLOUD_TARGET_FILE_COUNT - icloud_count
+            
+            # Check if Claudia_Transfer has files available
+            if not CLAUDIA_TRANSFER.exists():
+                self.logger.warning(f"Claudia_Transfer directory does not exist: {CLAUDIA_TRANSFER}")
+                return 0
+                
+            # Get available files from Claudia_Transfer (oldest first)
+            available_files = []
+            try:
+                for file_path in CLAUDIA_TRANSFER.iterdir():
+                    if file_path.is_file():
+                        available_files.append(file_path)
+                        
+                # Sort by modification time (oldest first)
+                available_files.sort(key=lambda f: f.stat().st_mtime)
+                
+            except Exception as e:
+                self.logger.error(f"Error listing files in {CLAUDIA_TRANSFER}: {e}")
+                return 0
+            
+            if not available_files:
+                self.logger.debug(f"No files available in {CLAUDIA_TRANSFER} for backfill")
+                return 0
+                
+            # Move files to iCloud
+            files_to_move = min(files_needed, len(available_files))
+            moved_count = 0
+            
+            print(f"🔄 ICLOUD BACKFILL: Need {files_needed} files, moving {files_to_move}")
+            print(f"   📊 iCloud: {icloud_count} files, Transfer: {len(available_files)} files")
+            
+            for i in range(files_to_move):
+                file_path = available_files[i]
+                
+                # Check if file can be moved
+                can_move, reason = self._can_move_file(file_path)
+                if not can_move:
+                    self.logger.debug(f"Cannot move {file_path.name} to iCloud: {reason}")
+                    continue
+                    
+                # Move to iCloud
+                if self.move_file(file_path, ICLOUD_OLDPHOTOGRAPHS):
+                    moved_count += 1
+                    print(f"      ☁️  Moved {file_path.name} to iCloud")
+                else:
+                    self.logger.warning(f"Failed to move {file_path.name} to iCloud")
+                    
+            if moved_count > 0:
+                print(f"   ✅ Backfilled {moved_count} files to iCloud")
+            else:
+                print(f"   ⚠️  No files could be moved to iCloud")
+                
+            return moved_count
+            
+        except Exception as e:
+            self.logger.error(f"Error during iCloud backfill: {e}")
+            print(f"   ❌ iCloud backfill failed: {e}")
+            return 0
     
     def run_cycle(self) -> None:
         """Run one complete move cycle."""
@@ -216,6 +319,9 @@ class IncomingMover:
                 moved = self.check_directory(source_dir, dest_dir)
                 total_moved += moved
             
+            # Perform iCloud backfill
+            backfilled = self.backfill_icloud()
+            
             # Summary
             print(f"{'='*60}")
             print(f"✅ INCOMING MOVER: Cycle complete")
@@ -223,6 +329,8 @@ class IncomingMover:
                 print(f"   📊 Total files moved: {total_moved}")
             else:
                 print(f"   📊 No files moved this cycle")
+            if backfilled > 0:
+                print(f"   ☁️  iCloud backfilled: {backfilled}")
             print(f"{'='*60}\n")
             
         except Exception as e:

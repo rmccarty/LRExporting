@@ -5,7 +5,7 @@ Directory Monitor - Monitors file counts in all LRExporting directories
 
 Continuously monitors and reports file counts for:
 - Incoming directories: Ron_Incoming, Claudia_Incoming, Both_Incoming
-- Destination directories: Ron_Apple_Photos, Claudia_Transfer directory
+- Destination directories: Ron_Apple_Photos, Claudia_Transfer, iCloud_OldPhotographs
 
 Updates every few seconds to provide real-time visibility into the system.
 """
@@ -22,7 +22,8 @@ from config import (
     CLAUDIA_INCOMING, 
     BOTH_INCOMING,
     TRANSFER_PATHS,
-    APPLE_PHOTOS_PATHS
+    APPLE_PHOTOS_PATHS,
+    ICLOUD_OLDPHOTOGRAPHS
 )
 
 
@@ -48,6 +49,9 @@ class DirectoryMonitor:
                 self.directories["Ron_Apple_Photos"] = dest
             elif source == CLAUDIA_INCOMING:
                 self.directories["Claudia_Transfer"] = dest
+        
+        # Add iCloud directory for backfill monitoring
+        self.directories["iCloud_OldPhotographs"] = ICLOUD_OLDPHOTOGRAPHS
         
         # Setup logging
         self.logger = logging.getLogger(__name__)
