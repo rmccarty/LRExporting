@@ -40,6 +40,7 @@ School Band: Events/School/School Band
 
 Ancestors: Groups/Family/
 Band: Groups/Bands/
+Hang Time: Groups/Bands/
 Family: Groups/Family/
 Employer: Groups/Employers/
 Army: Groups/Employers/
@@ -47,6 +48,7 @@ Aigner: Groups/Employers/
 First American: Groups/Employers/
 Freinet: Groups/Employers/
 Iomega: Groups/Employers/
+ISA: Groups/Employers/
 Lucent: Groups/Employers/
 Sonus: Groups/Employers/
 USO: Groups/Employers/
@@ -62,6 +64,7 @@ Ludwigsburg: Locations/DE/Ludwigsburg/
 Monrepos: Locations/DE/Ludwigsburg/Monrepos/
 Neckar: Locations/DE/Neckar/
 Stuttgart: Locations/DE/Stuttgart/
+Triberg: Locations/DE/Stuttgart/
 Wildbad: Locations/DE/Wildbad/
 Kelly Barracks: Locations/DE/Stuttgart/Kelly Barracks/
 Dresden: Locations/DE/Dresden/

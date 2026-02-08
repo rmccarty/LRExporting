@@ -1,149 +1,241 @@
 # Attractions
-Aquarium: 1-Events/Attractions/Aquariums/
-Arboretum: 1-Events/Attractions/Arboretums/
-Burg: 1-Events/Attractions/Castles/
-Castle: 1-Events/Attractions/Castles/
-Castles: 1-Events/Attractions/Castles/
-Concert: 1-Events/Attractions/Concerts/
-Concerts: 1-Events/Attractions/Concerts/
-Destination: 1-Events/Attractions/Destinations/
-Fair: 1-Events/Attractions/Fairs/
-Faire: 1-Events/Attractions/Fairs/
-Fest: 1-Events/Attractions/Festivals/
-Festival: 1-Events/Attractions/Festivals/
-Palace: 1-Events/Attractions/Castles/
-Residence: 1-Events/Attractions/Castles/
-Rodeo: 1-Events/Attractions/Rodeos/
-Schloss: 1-Events/Attractions/Castles/
-Zoo: 1-Events/Attractions/Zoos/
+Aquarium: 3-Where/Attractions/Aquariums/
+Arboretum: 3-Where/Attractions/Arboretums/
+Burg: 3-Where/Attractions/Castles/
+Castle: 3-Where/Attractions/Castles/
+Castles: 3-Where/Attractions/Castles/
+Concert: 3-Where/Attractions/Concerts/
+Concerts: 3-Where/Attractions/Concerts/
+Destination: 3-Where/Attractions/Destinations/
+Fair: 3-Where/Attractions/Fairs/
+Faire: 3-Where/Attractions/Fairs/
+Fest: 3-Where/Attractions/Festivals/
+Festival: 3-Where/Attractions/Festivals/
+Museum: 3-Where/Attractions/Museums/
+Palace: 3-Where/Attractions/Castles/
+Residence: 3-Where/Attractions/Castles/
+Rodeo: 3-Where/Attractions/Rodeos/
+Schloss: 3-Where/Attractions/Castles/
+Zoo: 3-Where/Attractions/Zoos/
 
-Birthday: 1-Events/Birthdays/
-Pregnancy: 1-Events/Birthdays/
-Event: 1-Events/
-Funeral: 1-Events/Deaths/ 
-Gravestones: 1-Events/Deaths/
-Gravestone: 1-Events/Deaths/
+# Birth
+
+Birthday: 2-What/Birthdays/
+Pregnacy: 2-What/Birthdays/
+
+Event: 2-What/
+
+# Death 
+Funeral: 2-What/Deaths/ 
+Gravestones: 2-What/Deaths/Gravestones/
+Gravestone: 2-What/Deaths/Gravestones/
+Memorial: 2-What/Deaths/Memorials/
 
 
-Hospice: 1-Events/Deaths/
-Obituary: 1-Events/Deaths/
-Tribute: 1-Events/Deaths/
-Vacation: 1-Events/Vacation/
+Hospice: 2-What/Deaths/
+Obituary: 2-What/Deaths/
+Tribute: 2-What/Deaths/
+Vacation: 2-What/Vacation/
 
-Baptism: 1-Events/Faith/
-Communion: 1-Events/Faith/
-Confirmation: 1-Events/Faith/
+Baptism: 2-What/Faith/
+Communion: 2-What/Faith/
+Confirmation: 2-What/Faith/
 
-Christmas: 1-Events/Holidays/
-Easter: 1-Events/Holidays/
-Fathers Day: 1-Events/Holidays/
-Halloween: 1-Events/Holidays/
-Independence Day: 1-Events/Holidays/
-Mothers Day: 1-Events/Holidays/
-New Years: 1-Events/Holidays/
-Thanksgiving: 1-Events/Holidays/
-Valentines Day: 1-Events/Holidays/ 
+#Holidays 
+Christmas: 2-What/Holidays/Christmas/
+Easter: 2-What/Holidays/Easter/
+Fathers Day: 2-What/Holidays/Fathers Day/
+Halloween: 2-What/Holidays/Halloween/
+Independence Day: 2-What/Holidays/Independence Day/
+Memorial Day: 2-What/Holidays/Memorial Day/
+Mothers Day: 2-What/Holidays/Mothers Day/
+New Years: 2-What/Holidays/New Years/
+Thanksgiving: 2-What/Holidays/Thanksgiving/
+Valentines Day: 2-What/Holidays/Valentines Day/
 
-Medical: 1-Events/Medical/
+Medical: 2-What/Medical/
 
-Portrait: 1-Events/Portraits
-Portraits: 1-Events/Portraits/
+Portrait: 2-What/Portraits/
+Portraits: 2-What/Portraits/
 
-Anniversary: 1-Events/Relationships/
-Dating: 1-Events/Relationships/
-Engagement: 1-Events/Relationships/
-Honeymoon: 1-Events/Relationships/
-Wedding: 1-Events/Relationships/ 
+Anniversary: 2-What/Relationships/Anniversaries/
+Dating: 2-What/Relationships/Dating/
+Engagement: 2-What/Relationships/Engagements/
+Honeymoon: 2-What/Relationships/Honeymoons/
+Visiting: 2-What/Visitig/
+Wedding: 2-What/Relationships/Weddings/ 
+School: 2-What/School/
+Yearbook: 2-What/School/
+Graduation: 2-What/School/
+Drill Team: 2-What/School/
+School Band: 2-What/School/
+Soccer: 2-What/School/
 
-School: 1-Events/School/
-Yearbook: 1-Events/School/
-Graduation: 1-Events/School/
-Drill Team: 1-Events/School/
-School Band: 1-Events/School/
-Soccer: 1-Events/School/
+Aigner: 1-Who/Employers/
+Ancestors: 1-Who/Family/
+Army: 1-Who/Employers/Army/
+Band: 1-Who/Bands/
+Bands: 1-Who/Bands/
 
-Aigner: 2-Groups/Employers/
-Ancestors: 2-Groups/Family/
-Ryan: 2-Groups/Family/Ryan/
-Army: 2-Groups/Employers/Army/
-Band: 2-Groups/Bands/
-Childhood: 2-Groups/Family/Childhood/
-ECHPTA: 2-Groups/ECHPTA/
-Employer: 2-Groups/Employers/
-Family: 2-Groups/Family/
-First American: 2-Groups/Employers/
-Friends: 2-Groups/Friends/
-Iomega: 2-Groups/Employers/
-Lucent: 2-Groups/Employers/
-Monikda: 2-Groups/Family/Monikda/
-Otto: 2-Groups/Family/Otto/
-RTPC Street: 2-Groups/RTPC Street/
-RTPC: 2-Groups/RTPC/
-Shared: 2-Groups/Family/Shared/
-Sonus: 2-Groups/Employers/
-Stranger: 2-Groups/Strangers/
-Strangers: 2-Groups/Strangers/
-USO: 2-Groups/Employers/
-YNG: 2-Groups/Employers/YNG
+Childhood: 1-Who/Family/Childhood/
 
-AR: 3-Locations/US/AR/
-AT: 3-Locations/AT/
-BS: 3-Locations/BS/
-Berlin: 3-Locations/DE/Berlin/
-Bobbie Lane: 3-Locations/US/TX/Rowlett/Bobbie Lane/
-CO: 3-Locations/US/CO/
-CZ: 3-Locations/CZ/
-Castle: 3-Locations/Castles/
-Castles: 3-Locations/Attractions/
-DE Berlin: 3-Locations/DE/Berlin/
-DE Stuttgart: 3-Locations/DE/Stuttgart/
-DE: 3-Locations/DE/
-Davis: 3-Locations/US/OK/Davis/
-ES: 3-Locations/ES/
-FL: 3-Locations/US/FL/
-FR: 3-Locations/FR/
-Germany: 3-Locations/DE/
-HU: 3-Locations/HU/
-Hohernzollern: 3-Locations/DE/Hohernzollern/
-Home: 3-Locations/Home/
-IE: 3-Locations/IE/ 
-IT: 3-Locations/IT/
-Kelley Barracks: 3-Locations/DE/Stuttgart/Kelley Barracks/
-LA: 3-Locations/US/LA/
-Ludwigsburg: 3-Locations/DE/Ludwigsburg/
-MS: 3-Locations/US/MS/
-MX: 3-Locations/MX/
-Monrepos: 3-Locations/DE/Ludwigsburg/Monrepos/
-Move: 3-Locations/Moves/
-Munich: 3-Locations/DE/Munich/
-OK: 3-Locations/US/OK/
-Postcards: 3-Locations/Postcards/
-Rowlett: 3-Locations/US/TX/Rowlett/
-SD: 3-Locations/US/SD/
-Stuttgart: 3-Locations/DE/Stuttgart/
-Sulphur: 3-Locations/US/OK/Sulphur/
-TX: 3-Locations/US/TX/
-Trip: 3-Locations/Trips/
-Turner Falls: 3-Locations/US/OK/Turner Falls/
-UK: 3-Locations/UK/
-US AR: 3-Locations/US/AR/
-US CO: 3-Locations/US/CO/
-US FL: 3-Locations/US/FL/
-US LA: 3-Locations/US/LA/ 
-US NM: 3-Locations/US/NM/
-US NY: 3-Locations/US/NY/
-US OK: 3-Locations/US/OK/
-US TX: 3-Locations/US/TX/
-US UT: 3-Locations/US/UT/
-US: 3-Locations/US/
-USA: 3-Locations/US/
-Wildbad: 3-Locations/DE/Wildbad/
+ECHPTA: 1-Who/ECHPTA/
+
+Friends: 1-Who/Friends/
+
+Family: 1-Who/Family/
+McCarty: 1-Who/Family/McCartys/
+Ritzal: 1-Who/Family/Ritzals/
+
+Monikda: 1-Who/Family/Monikda/
+Otto: 1-Who/Family/Otto/
+Shared: 1-Who/Family/Shared/
+Employer: 1-Who/Employers/
+
+First American: 1-Who/Employers/
+Iomega: 1-Who/Employers/
+Lucent: 1-Who/Employers/
+
+
+RTPC Street: 1-Who/RTPC Street/
+RTPC: 1-Who/RTPC/
+
+Sonus: 1-Who/Employers/
+Stranger: 1-Who/Strangers/
+Strangers: 1-Who/Strangers/
+USO: 1-Who/Employers/
+YNG: 1-Who/Employers/
+Your Net Guard: 1-Who/Employers/YNG/
+
+
+AT: 3-Where/AT/
+Pitztal: 3-Where/AT/Pitztal/
+BS: 3-Where/BS/
+Berlin: 3-Where/DE/Berlin/
+Bobbie Lane: 3-Where/US/TX/Rowlett/Bobbie Lane/
+Church: 3-Where/Attractions/Church/
+Croatia: 3-Where/HR/
+CO: 3-Where/US/CO/
+CZ: 3-Where/CZ/
+
+
+Dachau: 3-Where/DE/Dachau/
+DE Berlin: 3-Where/DE/Berlin/
+DE Stuttgart: 3-Where/DE/Stuttgart/
+DE: 3-Where/DE/
+
+Doc Holidays: 3-Where/DE/Kornwestheim/Doc Holidays/
+
+Eglosheim: 3-Where/DE/Eglosheim/
+ES: 3-Where/ES/
+Esslingen: 3-Where/DE/Esslingen/
+Freiburg: 3-Where/DE/Freiburg/
+
+FR: 3-Where/FR/
+Germany: 3-Where/DE/
+HU: 3-Where/HU/
+Hohenzollern: 3-Where/DE/Hohernzollern/
+Home: 3-Where/Home/
+Frankfurter Str: 2-What/Home/Frankfurter Str/
+IE: 3-Where/IE/ 
+Hungary: 3-Where/HU/
+IT: 3-Where/IT/
+
+Kapfstrasse: 3-Where/DE/Freiburg/Kapfstrasse/
+Kelley Barracks: 3-Where/DE/Stuttgart/Kelley Barracks/
+Lichtenstein: 3-Where/DE/Lichtenstein/
+
+Ludwigsburg: 3-Where/DE/Ludwigsburg/
+Marbach: 3-Where/DE/Marbach/
+Munich: 3-Where/DE/Munich/
+Neckar: 3-Where/DE/Neckar/
+Triberg: 3-Where/DE/Triberg/
+
+
+MX: 3-Where/MX/
+Monrepos: 3-Where/DE/Ludwigsburg/Monrepos/
+Move: 2-What/Moves/
+
+
+Poland: 3-Where/PL/
+Postcards: 2-What/Postcards/
+Post Cards: 2-What/Postcards/
+Rock Fabrik: 3-Where/DE/Ludwigsburg/Rock Fabrik/
+
+Street: 2-What/Street/
+Stuttgart: 3-Where/DE/Stuttgart/
+
+TX: 3-Where/US/TX/
+Trip: 3-Where/Trips/
+Tübingen: 3-Where/DE/Tübingen/
+
+Wildbad: 3-Where/DE/Wildbad/
+
+#US States 
+
+Turner Falls: 3-Where/US/OK/Turner Falls/
+UK: 3-Where/UK/
+US AR: 3-Where/US/AR/
+US CO: 3-Where/US/CO/
+US FL: 3-Where/US/FL/
+US LA: 3-Where/US/LA/ 
+US NM: 3-Where/US/NM/
+US NY: 3-Where/US/NY/
+US OK: 3-Where/US/OK/
+US TX: 3-Where/US/TX/
+US UT: 3-Where/US/UT/
+US: 3-Where/US/
+USA: 3-Where/US/
+FL: 3-Where/US/FL/
+NM: 3-Where/US/NM/
+NV: 3-Where/US/NV/
+OK: 3-Where/US/OK/
+MS: 3-Where/US/MS/
+AR: 3-Where/US/AR/
+LA: 3-Where/US/LA/
+SD: 3-Where/US/SD/
+
+DE City: 3-Where/Cities/
+# US Cities 
+
+Davis: 3-Where/US/OK/Davis/
+Sulphur: 3-Where/US/OK/Sulphur/
+Palo Duro Canyon: 3-Where/US/TX/Palo Duro Canyon/
+Rowlett: 3-Where/US/TX/Rowlett/
+Santa Fe: 3-Where/US/NM/Santa Fe/
+
 
 #series 
+Architecture: 2-What/Architecture/
+52 Week: 2-What/Series/52 Weeks/
+Documents: 2-What/Series/Documents/
+Kodak Disc: 2-What/Series/Kodak Disc/
+Fandom: 2-What/Series/Fandom/
+Fine Art: 2-What/Series/Fine Art/
+File: 2-What/Series/File/
+Films: 2-What/Series/Film/
+Film: 2-What/Series/Film/
+Genre: 2-What/Series/Genre
+Josef Media: 2-What/Series/The Ritzals/
+Home Movies: 2-What/Series/Home Movies/
+Home Movie: 2-What/Series/Home Movies/
+Instant: 2-What/Series/Instant/
+Keywords: 2-What/Series/Keywords/
+Photographer: 2-What/Series/Photographers/
+Polaroid: 2-What/Series/Instant/
+Slides: 2-What/Series/Slides/
+The 4-Series: 2-What/Series/
+The McCartys: 2-What/Series/Videos/The McCartys/
+McCartys: 2-What/Series/Videos/The McCartys/
+The Ritzals: 2-What/Series/Videos/The Ritzals/
+Ratings: 2-What/Series/Ratings
+Videos: 2-What/Series/Videos/The McCartys/Videos/
+Video: 2-What/Series/Videos/The McCartys/Videos/
+VHS: 2-What/Series/Videos/VHS/
+Weather: 2-What/Series/Weather/
+World War II: 2-What/Series/Documents/World War II/
 
-Documents: 4-Series/Documents/
-Kodak Disc: 4-Series/Kodak Disc/
-McCartys: 4-Series/Videos/The McCartys/
-The McCartys: 4-Series/Videos/The McCartys/
-Videos: 4-Series/Videos/
-VHS: 4-Series/Videos/
+
+#when
+
+Period: 4-When/Periods/

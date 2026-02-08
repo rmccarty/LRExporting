@@ -225,6 +225,20 @@ class Transfer:
 
     def _import_to_photos(self, photo_path: Path) -> bool:
         """Import a photo into Apple Photos to Watching album only."""
+        from apple_photos_sdk.config import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+        
+        # Check if file is a valid media file (not XMP or other sidecar files)
+        file_extension = photo_path.suffix.lower()
+        if file_extension not in IMAGE_EXTENSIONS and file_extension not in VIDEO_EXTENSIONS:
+            self.logger.warning(f"Skipping non-media file: {photo_path} (extension: {file_extension})")
+            # Delete non-media files like XMP since they shouldn't be in Apple Photos directories
+            if file_extension == '.xmp':
+                try:
+                    photo_path.unlink()
+                    self.logger.info(f"Deleted XMP file that was incorrectly moved to Apple Photos directory: {photo_path}")
+                except Exception as e:
+                    self.logger.error(f"Failed to delete XMP file: {e}")
+            return True  # Return true to avoid blocking other transfers
         
         photo_name = photo_path.name
         watching_album = [str(APPLE_PHOTOS_WATCHING).rstrip('/')]

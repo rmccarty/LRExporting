@@ -330,7 +330,7 @@ class VideoProcessor(MediaProcessor):
             gps_fields['-GPSLatitude'] = lat_formatted
             gps_fields['-GPSLongitude'] = lon_formatted
             
-            # Handle altitude if present
+            # Handle altitude - use provided altitude or default for Apple Photos compatibility
             if altitude:
                 # Convert fraction like "741/5" to decimal
                 if '/' in altitude:
@@ -338,14 +338,15 @@ class VideoProcessor(MediaProcessor):
                     alt_meters = float(num) / float(den)
                 else:
                     alt_meters = float(altitude)
-                    
-                gps_fields['-GPSAltitude'] = f"{alt_meters:.3f} m"
-                gps_fields['-GPSAltitudeRef'] = "Above Sea Level"
-                
-                # Create combined coordinate string
-                gps_coords = f"{lat_formatted}, {lon_formatted}, {alt_meters:.3f} m Above Sea Level"
             else:
-                gps_coords = f"{lat_formatted}, {lon_formatted}"
+                # Default altitude for Apple Photos compatibility
+                alt_meters = 0.0
+                
+            gps_fields['-GPSAltitude'] = f"{alt_meters:.3f} m"
+            gps_fields['-GPSAltitudeRef'] = "Above Sea Level"
+            
+            # Always include altitude in coordinates for Apple Photos compatibility
+            gps_coords = f"{lat_formatted}, {lon_formatted}, {alt_meters:.3f} m Above Sea Level"
                 
             gps_fields['-QuickTime:GPSCoordinates'] = gps_coords
             
@@ -583,10 +584,26 @@ class VideoProcessor(MediaProcessor):
         if not latitude or not longitude:
             return {}
             
-        # Convert XMP format to QuickTime format
-        gps_fields = self._convert_gps_to_quicktime_format(latitude, longitude, altitude)
+        # Convert GPS coordinates to QuickTime format
+        gps_fields = {}
         
-        self.logger.debug(f"Prepared GPS fields: {gps_fields}")
+        # Convert XMP format to degree/minute/second format
+        converted_gps = self._convert_gps_to_quicktime_format(latitude, longitude, altitude)
+        if not converted_gps:
+            return {}
+            
+        # Write ONLY QuickTime GPS fields to match iPhone format exactly
+        if 'gps' in METADATA_FIELDS:
+            for field in METADATA_FIELDS['gps']:
+                if 'GPSCoordinates' in field and '-QuickTime:GPSCoordinates' in converted_gps:
+                    gps_fields[field] = converted_gps['-QuickTime:GPSCoordinates']
+                elif 'LocationAccuracyHorizontal' in field:
+                    gps_fields[field] = '5.0'  # Default GPS accuracy in meters
+        else:
+            # Fallback to converted GPS if no config
+            gps_fields = converted_gps
+        
+        self.logger.debug(f"Prepared GPS fields using config mappings: {gps_fields}")
         return gps_fields
         
     def _verify_location_component(self, value: str | None, field_type: str) -> bool:
@@ -1038,7 +1055,7 @@ class VideoProcessor(MediaProcessor):
                 self.logger.debug(f"  Date: {date_str}")
                 self.logger.debug(f"  Caption: {caption}")
                 self.logger.debug(f"  Location: {location_data}")
-                
+            
             # Write metadata and verify
             self.logger.info("Writing metadata to video file")
             if not self._write_and_verify_metadata(metadata):

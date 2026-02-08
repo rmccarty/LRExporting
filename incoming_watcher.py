@@ -41,7 +41,7 @@ class IncomingWatcher:
         self.sleep_time = sleep_time
         
         # File patterns
-        self.jpeg_pattern = '*.[Jj][Pp][Gg]'
+        self.jpeg_patterns = ['*.[Jj][Pp][Gg]', '*.[Jj][Pp][Ee][Gg]']
         self.video_patterns = ['*.mp4', '*.mov', '*.m4v', '*.mpg', '*.mpeg', '*.MP4', '*.MOV', '*.M4V', '*.MPG', '*.MPEG']
         
         # Incoming directories to process
@@ -271,9 +271,10 @@ class IncomingWatcher:
             processed_count = 0
             
             # Process JPEG files
-            for file_path in directory.glob(self.jpeg_pattern):
-                if self.process_file(file_path):
-                    processed_count += 1
+            for pattern in self.jpeg_patterns:
+                for file_path in directory.glob(pattern):
+                    if self.process_file(file_path):
+                        processed_count += 1
                     
             # Process video files
             for pattern in self.video_patterns:

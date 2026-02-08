@@ -67,28 +67,9 @@ VIDEO_METADATA_FIELDS = {
         '-Country'                      # Generic country
     ],
     'gps': [
-        # QuickTime GPS fields (Apple Photos compatible)
-        '-QuickTime:GPSLatitude',       # QuickTime GPS latitude
-        '-QuickTime:GPSLongitude',      # QuickTime GPS longitude
-        '-QuickTime:GPSAltitude',       # QuickTime GPS altitude
-        '-QuickTime:GPSCoordinates',    # Combined GPS coordinates
-        
-        # Standard GPS fields
-        '-GPSLatitude',                 # Standard GPS latitude
-        '-GPSLongitude',                # Standard GPS longitude
-        '-GPSAltitude',                 # Standard GPS altitude
-        
-        # XMP GPS fields
-        '-XMP:GPSLatitude',             # XMP GPS latitude
-        '-XMP:GPSLongitude',            # XMP GPS longitude
-        '-XMP:GPSAltitude',             # XMP GPS altitude
-        
-        # Extended GPS metadata
-        '-GPSAltitudeRef',              # GPS altitude reference
-        '-GPSLatitudeRef',              # GPS latitude reference  
-        '-GPSLongitudeRef',             # GPS longitude reference
-        '-GPSTimeStamp',                # GPS timestamp
-        '-GPSVersionID'                 # GPS version
+        # Match iPhone video format EXACTLY - only essential fields
+        '-QuickTime:GPSCoordinates',              # PRIMARY: Combined GPS coordinates (Apple Photos key field)
+        '-QuickTime:LocationAccuracyHorizontal'   # GPS accuracy (iPhone compatibility)
     ]
 }
 

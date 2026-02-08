@@ -27,7 +27,7 @@ TRANSFER_BATCH_SIZE = 10
 
 # Apple Photos Watcher configuration
 # Maximum number of assets to fetch from Watching album per check (prevents performance issues with large albums)
-APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 5000
+APPLE_PHOTOS_MAX_ASSETS_PER_CHECK = 1500
 
 # Watching album size management
 # Maximum number of assets allowed in Watching album before pausing additions
@@ -155,4 +155,4 @@ MCCARTYS_REPLACEMENT = 'The McCartys: '
 CATEGORY_PREFIX = '02'
 
 # Folder for unmapped category albums
-TBD_FOLDER = 'TBD'
+TBD_FOLDER = '5-TBD'

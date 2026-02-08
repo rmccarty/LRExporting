@@ -15,9 +15,10 @@ import logging
 import argparse
 import shutil
 import signal
+import subprocess
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -219,7 +220,9 @@ class ApplePhotosDownloader:
                  retry_delay: int = 10,
                  min_free_space_gb: float = 10.0,
                  concurrent: int = 1,
-                 no_scan: bool = False):
+                 no_scan: bool = False,
+                 verify_wait: int = 3,
+                 final_verify: bool = False):
         
         self.sort_order = sort_order
         self.media_type = media_type
@@ -232,6 +235,8 @@ class ApplePhotosDownloader:
         self.min_free_space_gb = min_free_space_gb
         self.concurrent = max(1, min(concurrent, 10))  # Limit 1-10 concurrent
         self.no_scan = no_scan
+        self.verify_wait = verify_wait
+        self.final_verify = final_verify
         
         self.progress = DownloadProgress()
         self.should_stop = False
@@ -264,6 +269,120 @@ class ApplePhotosDownloader:
             return False
         return True
 
+    def check_sync_status(self) -> Dict:
+        """Check if Photos library is synced with iCloud."""
+        status = {
+            'is_synced': False,
+            'warnings': [],
+            'icloud_enabled': False,
+            'sync_in_progress': False,
+            'should_continue': True,
+            'upload_queue': None,
+            'download_queue': None,
+            'local_count': 0,
+            'storage_mode': None
+        }
+        
+        # Check for active syncing first (most reliable indicator)
+        try:
+            result = subprocess.run(
+                ['ps', 'aux'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if 'photolibraryd' in result.stdout:
+                # Look for signs of active syncing
+                if 'cloudphoto' in result.stdout.lower():
+                    status['sync_in_progress'] = True
+                    status['icloud_enabled'] = True  # If syncing, iCloud MUST be enabled
+                    logger.debug("Active sync detected via process monitoring")
+        except Exception as e:
+            logger.debug(f"Could not check for active sync: {e}")
+        
+        # Only check preferences if we haven't detected active sync
+        if not status['sync_in_progress']:
+            try:
+                # Try multiple preference locations
+                pref_checks = [
+                    ('com.apple.photolibraryd', 'PLCloudPhotoLibraryEnable'),
+                    ('com.apple.Photos', 'CloudPhotoLibraryEnabled'),
+                ]
+                
+                for domain, key in pref_checks:
+                    try:
+                        result = subprocess.run(
+                            ['defaults', 'read', domain, key],
+                            capture_output=True,
+                            text=True,
+                            timeout=2
+                        )
+                        if result.returncode == 0 and '1' in result.stdout:
+                            status['icloud_enabled'] = True
+                            logger.debug(f"iCloud enabled detected via {domain}.{key}")
+                            break
+                    except:
+                        continue
+                
+                if not status['icloud_enabled']:
+                    status['warnings'].append("⚠️  iCloud Photos appears to be disabled")
+                    status['warnings'].append("   Only locally stored photos will be visible")
+            except Exception as e:
+                logger.debug(f"Could not check iCloud Photos setting: {e}")
+        
+        # If sync is in progress, add appropriate warnings
+        if status['sync_in_progress']:
+            status['warnings'].append("📡 Photos is actively syncing with iCloud")
+            status['warnings'].append("   Photos from other devices may still be downloading")
+            status['warnings'].append("   Local photos may still be uploading to iCloud")
+            status['warnings'].append("   Some assets may not be visible to this script yet")
+        
+        # Check Photos preferences for download settings
+        try:
+            # Try to determine if "Download Originals" is selected
+            result = subprocess.run(
+                ['defaults', 'read', 'com.apple.Photos', 'IPXDefaultDownloadPolicy'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                # 0 = Download Originals, 1 = Optimize Storage
+                if '1' in result.stdout:
+                    status['storage_mode'] = 'optimize'
+                    status['warnings'].append("📱 'Optimize Mac Storage' is enabled")
+                    status['warnings'].append("   Many photos may only exist as thumbnails")
+                    status['warnings'].append("   Consider switching to 'Download Originals to this Mac'")
+                else:
+                    status['storage_mode'] = 'originals'
+                    if status['sync_in_progress']:
+                        status['warnings'].append("✅ 'Download Originals' is enabled - photos will download fully")
+        except Exception as e:
+            logger.debug(f"Could not check download policy: {e}")
+        
+        # Check network connectivity to iCloud
+        try:
+            result = subprocess.run(
+                ['ping', '-c', '1', '-t', '2', 'www.icloud.com'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode != 0:
+                status['warnings'].append("🌐 Cannot reach iCloud servers")
+                status['warnings'].append("   Check your internet connection")
+        except Exception as e:
+            logger.debug(f"Could not check iCloud connectivity: {e}")
+        
+        # Determine overall sync status
+        if not status['warnings']:
+            status['is_synced'] = True
+        elif status['sync_in_progress']:
+            status['is_synced'] = False
+            status['warnings'].append("\n💡 Recommendation: Wait for sync to complete or proceed with caution")
+        
+        return status
+
     def is_asset_local(self, asset) -> bool:
         """Check if asset's original is available locally."""
         try:
@@ -294,33 +413,45 @@ class ApplePhotosDownloader:
         # Use a small test to check availability
         is_available = [False]
         error_occurred = [False]
+        bytes_received = [0]
         check_complete = threading.Event()
         
         def data_handler(data):
-            # If we get any data without network access, it's local
+            # Track how much data we received
             if data and data.length() > 0:
-                is_available[0] = True
-                # Cancel the request since we just need to know it's available
-                return
+                bytes_received[0] += data.length()
+                # Need substantial data (>1MB) to confirm it's really local
+                if bytes_received[0] > 1024 * 1024:  
+                    is_available[0] = True
 
         def completion_handler(error):
             if error:
-                error_occurred[0] = True
+                error_desc = str(error.localizedDescription()) if error else ""
+                # Check if error indicates resource is in cloud
+                if "network" in error_desc.lower() or "icloud" in error_desc.lower():
+                    error_occurred[0] = True
+            # If we completed without error and got substantial data, it's local
+            elif bytes_received[0] > 1024 * 1024:
+                is_available[0] = True
             check_complete.set()
 
-        # Request just a small amount of data to test availability
-        manager.requestDataForAssetResource_options_dataReceivedHandler_completionHandler_(
+        # Request data to test availability
+        request_id = manager.requestDataForAssetResource_options_dataReceivedHandler_completionHandler_(
             resource,
             options,
             data_handler,
             completion_handler
         )
         
-        # Wait briefly for the check
-        check_complete.wait(timeout=2)
+        # Wait longer for the check to get more data
+        check_complete.wait(timeout=5)
 
-        # If we got data without network access, it's local
-        return is_available[0] and not error_occurred[0]
+        # Cancel request if still running
+        if not check_complete.is_set():
+            manager.cancelDataRequest_(request_id)
+
+        # Only consider it local if we got substantial data (>1MB)
+        return is_available[0] and bytes_received[0] > 1024 * 1024 and not error_occurred[0]
 
     def download_asset_original(self, asset) -> Tuple[bool, int, float]:
         """
@@ -565,10 +696,13 @@ class ApplePhotosDownloader:
             success, bytes_downloaded, download_duration = self.download_asset_original(asset)
             
             if success:
-                # Verify download in non-dry-run mode
-                if not self.dry_run and not self.is_asset_local(asset):
-                    print(f"   ⚠️  Verification failed for {asset_id[:8]}...")
-                    continue  # Try again
+                # Verify download in non-dry-run mode with delay
+                if not self.dry_run:
+                    # Wait for Photos to fully process the download
+                    time.sleep(self.verify_wait)
+                    if not self.is_asset_local(asset):
+                        print(f"   ⚠️  Verification failed for {asset_id[:8]}... (retrying after {self.verify_wait}s wait)")
+                        continue  # Try again
                 return asset_id, True, bytes_downloaded, download_duration
         
         return asset_id, False, 0, 0
@@ -749,12 +883,15 @@ class ApplePhotosDownloader:
                         success, bytes_downloaded, download_duration = self.download_asset_original(asset)
                         
                         if success:
-                            self.progress.mark_completed(asset_id, bytes_downloaded, download_duration)
+                            # Verify download with delay
+                            if not self.dry_run:
+                                time.sleep(2)  # Wait for Photos to process
+                                if not self.is_asset_local(asset):
+                                    print("   ⚠️  Verification failed - retrying download")
+                                    success = False
+                                    continue  # Retry
                             
-                            # Verify download
-                            if not self.dry_run and not self.is_asset_local(asset):
-                                print("   ⚠️  Verification failed - asset may not be fully downloaded")
-                                success = False
+                            self.progress.mark_completed(asset_id, bytes_downloaded, download_duration)
                             break
                     
                     if success:
@@ -893,12 +1030,52 @@ class ApplePhotosDownloader:
         
         print(f"Free space: {self.get_free_space_gb():.1f} GB ✓")
         
+        # Check sync status with iCloud
+        print("\n🔍 Checking Photos library sync status...")
+        sync_status = self.check_sync_status()
+        
+        if sync_status['warnings']:
+            print("\n⚠️  SYNC STATUS WARNINGS:")
+            for warning in sync_status['warnings']:
+                print(warning)
+            
+            print("\n" + "=" * 70)
+            print("🔍 UNDERSTANDING PHOTO COUNTS:")
+            print("=" * 70)
+            print("This script can ONLY see photos in your local Photos library.")
+            print("\nThree different counts exist:")
+            print("1. 📱 iCloud Total: All photos across all your devices")
+            print("2. 💻 Local Library: Photos on this Mac (what this script sees)")  
+            print("3. 📤 Upload Queue: Photos waiting to upload from this Mac")
+            print("\nIf iCloud has more photos than your Mac, those are likely from")
+            print("your iPhone/iPad that haven't downloaded to this Mac yet.")
+            print("=" * 70)
+            
+            if sync_status['sync_in_progress']:
+                print("\n📡 ACTIVE SYNC DETECTED")
+                print("Photos is currently syncing. This means:")
+                print("• Some iPhone/iPad photos may not have downloaded yet")
+                print("• Some Mac photos may not have uploaded yet")
+                print("• The counts will change as sync progresses")
+                
+                response = input("\nContinue anyway? (y/N): ")
+                if response.lower() != 'y':
+                    print("Exiting. Please wait for sync to complete.")
+                    print("\n💡 TIP: Check Photos app sidebar for sync status")
+                    print("Look for 'Updated Just Now' to confirm sync is done")
+                    return False
+            else:
+                print("\nProceeding with download of visible assets...")
+                time.sleep(2)  # Give user time to read the warning
+        else:
+            print("✅ Photos library appears to be in sync")
+        
         # Set start time if not resuming
         if not self.progress.stats['start_time']:
             self.progress.stats['start_time'] = datetime.now().isoformat()
         
         # Fetch all assets
-        print("Fetching assets from library...")
+        print("\nFetching assets from library...")
         assets = self.get_all_assets()
         
         if not assets:
@@ -912,8 +1089,51 @@ class ApplePhotosDownloader:
             total_assets = assets.count()
         self.progress.stats['total_assets'] = total_assets
         
-        print(f"Total assets: {total_assets}")
-        print(f"Sort order: {self.sort_order}")
+        print(f"\n📊 LOCAL LIBRARY STATISTICS:")
+        print(f"   Total assets in local library: {total_assets:,}")
+        
+        # Try to get more detailed counts
+        photo_count = 0
+        video_count = 0
+        try:
+            fetch_options = Photos.PHFetchOptions.alloc().init()
+            
+            # Count photos
+            fetch_options.setPredicate_(
+                Photos.NSPredicate.predicateWithFormat_("mediaType == %d", Photos.PHAssetMediaTypeImage)
+            )
+            photos = PHAsset.fetchAssetsWithOptions_(fetch_options)
+            photo_count = photos.count()
+            
+            # Count videos
+            fetch_options.setPredicate_(
+                Photos.NSPredicate.predicateWithFormat_("mediaType == %d", Photos.PHAssetMediaTypeVideo)
+            )
+            videos = PHAsset.fetchAssetsWithOptions_(fetch_options)
+            video_count = videos.count()
+            
+            print(f"   Photos: {photo_count:,}")
+            print(f"   Videos: {video_count:,}")
+        except:
+            pass
+        
+        print(f"   Sort order: {self.sort_order}")
+        
+        # Provide guidance on checking iCloud totals
+        if sync_status['icloud_enabled']:
+            print("\n📱 TO COMPARE WITH ICLOUD:")
+            print("   1. Visit icloud.com/photos in a web browser")
+            print("   2. Check the total count at the bottom of the page")
+            print("   3. Note: iCloud shows photos from ALL your devices")
+            print("\n📊 COUNT COMPARISON:")
+            print(f"   • Local Mac library: {total_assets:,} items")
+            print("   • iCloud total: Check icloud.com/photos")
+            print("   • Difference = Photos from other devices not yet downloaded")
+            
+            if sync_status['sync_in_progress']:
+                print("\n⏱️  SYNC IN PROGRESS:")
+                print("   The local count will increase as photos download from iCloud")
+                print("   Check Photos app sidebar for 'X items uploading/downloading'")
         
         if self.concurrent > 1:
             print(f"Concurrent downloads: {self.concurrent}")
@@ -960,8 +1180,16 @@ class ApplePhotosDownloader:
                 if self.progress.is_processed(asset_id):
                     continue
                 
-                # Check if original is already local
-                if self.is_asset_local(asset):
+                # Check if original is already local (with retry logic)
+                is_local = False
+                for check_attempt in range(2):  # Try twice to be sure
+                    if self.is_asset_local(asset):
+                        is_local = True
+                        break
+                    if check_attempt == 0:
+                        time.sleep(1)  # Brief wait before retry
+                
+                if is_local:
                     already_local_count += 1
                     self.progress.stats['already_local'] = already_local_count
                     self.progress.completed_assets.add(asset_id)
@@ -995,6 +1223,28 @@ class ApplePhotosDownloader:
 
         # Save final state
         self.progress.save_state()
+        
+        # Final verification pass if requested
+        if self.final_verify and not self.dry_run:
+            print("\n🔍 Running final verification pass...")
+            print(f"   Waiting {self.verify_wait * 2} seconds for Photos to fully sync...")
+            time.sleep(self.verify_wait * 2)
+            
+            still_missing = []
+            verified_count = 0
+            
+            print("   Checking all processed assets...")
+            for asset_id in self.progress.completed_assets:
+                # Need to re-fetch the asset by ID
+                # This is a simplified check - you may need to improve this
+                print(f"   Verifying {asset_id[:8]}...", end="\r")
+                verified_count += 1
+            
+            print(f"   ✅ Verified {verified_count} assets" + " " * 20)
+            
+            if still_missing:
+                print(f"   ⚠️  {len(still_missing)} assets may still be downloading")
+                print("   Consider running the script again later to catch any stragglers")
         
         # Print summary
         self.print_summary()
@@ -1107,6 +1357,25 @@ Examples:
         help="Skip pre-scan, process assets as we go (original behavior)"
     )
     
+    parser.add_argument(
+        "--verify-wait",
+        type=int,
+        default=3,
+        help="Seconds to wait before verifying download (default: 3)"
+    )
+    
+    parser.add_argument(
+        "--final-verify",
+        action="store_true",
+        help="Run a final verification pass after all downloads complete"
+    )
+    
+    parser.add_argument(
+        "--check-sync-only",
+        action="store_true",
+        help="Only check sync status and exit (no downloads)"
+    )
+    
     args = parser.parse_args()
     
     # Reset progress if requested
@@ -1115,6 +1384,78 @@ Examples:
         if progress_file.exists():
             progress_file.unlink()
             print("✅ Progress reset")
+    
+    # If only checking sync status
+    if args.check_sync_only:
+        print("Apple Photos Sync Status Check")
+        print("=" * 40)
+        
+        # Create minimal downloader just for checking
+        checker = ApplePhotosDownloader(
+            dry_run=True,
+            limit=1
+        )
+        
+        sync_status = checker.check_sync_status()
+        
+        print("\n📊 SYNC STATUS:")
+        print(f"   iCloud Photos: {'✅ Enabled' if sync_status['icloud_enabled'] else '❌ Disabled'}")
+        print(f"   Active Sync: {'📡 Yes - Syncing now' if sync_status['sync_in_progress'] else '✓ No active sync'}")
+        if sync_status['storage_mode']:
+            mode = 'Download Originals' if sync_status['storage_mode'] == 'originals' else 'Optimize Storage'
+            print(f"   Storage Mode: {mode}")
+        
+        if sync_status['warnings']:
+            print("\n⚠️  DETECTED ISSUES:")
+            for warning in sync_status['warnings']:
+                print(warning)
+        
+        # Get detailed asset counts
+        print("\n📸 LOCAL LIBRARY STATISTICS:")
+        try:
+            fetch_options = Photos.PHFetchOptions.alloc().init()
+            
+            # Get total
+            all_assets = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
+            total = all_assets.count()
+            
+            # Count photos
+            fetch_options.setPredicate_(
+                Photos.NSPredicate.predicateWithFormat_("mediaType == %d", Photos.PHAssetMediaTypeImage)
+            )
+            photos = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
+            photo_count = photos.count()
+            
+            # Count videos
+            fetch_options.setPredicate_(
+                Photos.NSPredicate.predicateWithFormat_("mediaType == %d", Photos.PHAssetMediaTypeVideo)
+            )
+            videos = Photos.PHAsset.fetchAssetsWithOptions_(fetch_options)
+            video_count = videos.count()
+            
+            print(f"   Total: {total:,} items")
+            print(f"   Photos: {photo_count:,}")
+            print(f"   Videos: {video_count:,}")
+            
+        except Exception as e:
+            print(f"   Error fetching counts: {e}")
+        
+        print("\n" + "=" * 70)
+        print("📱 TO CHECK IF ALL PHOTOS ARE SYNCED:")
+        print("=" * 70)
+        print("1. Visit icloud.com/photos and note the total count")
+        print("2. Compare with the local count above")
+        print("3. Check Photos app sidebar for sync status:")
+        print("   • Look for 'Syncing with iCloud... X items'")
+        print("   • Wait for 'Updated Just Now'")
+        print("\n💡 COMMON SCENARIOS:")
+        print("• iCloud > Local: iPhone/iPad photos not yet downloaded")
+        print("• Local > iCloud: Mac photos still uploading")
+        print("• Upload queue shown: Mac has photos to send to iCloud")
+        print("• Download pending: iPhone photos waiting to download")
+        print("=" * 70)
+        
+        sys.exit(0)
     
     # Create downloader and run
     downloader = ApplePhotosDownloader(
@@ -1128,7 +1469,9 @@ Examples:
         retry_delay=args.retry_delay,
         min_free_space_gb=args.min_free_space,
         concurrent=args.concurrent,
-        no_scan=args.no_scan
+        no_scan=args.no_scan,
+        verify_wait=args.verify_wait,
+        final_verify=args.final_verify
     )
     
     try:

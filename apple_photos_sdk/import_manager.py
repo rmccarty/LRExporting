@@ -37,6 +37,7 @@ from Foundation import (
     NSData,
     NSString,
 )
+from CoreLocation import CLLocation
 from .config import (
     DELETE_ORIGINAL,
     IMAGE_EXTENSIONS,
@@ -194,6 +195,69 @@ class ImportManager:
             self.logger.error(f"Error getting original keywords: {e}")
             return []
 
+    def _get_original_location(self, photo_path: Path) -> CLLocation | None:
+        """Get GPS coordinates from original photo before import."""
+        try:
+            import subprocess
+            import re
+            
+            # Extract GPS coordinates using exiftool
+            cmd = ["exiftool", "-GPSLatitude", "-GPSLongitude", "-GPSLatitudeRef", "-GPSLongitudeRef", "-s", "-s", "-j", str(photo_path)]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                import json
+                data = json.loads(result.stdout)
+                if not data or not isinstance(data, list) or len(data) == 0:
+                    return None
+                    
+                metadata = data[0]
+                
+                # Get GPS coordinates
+                lat_str = metadata.get('GPSLatitude')
+                lon_str = metadata.get('GPSLongitude')
+                lat_ref = metadata.get('GPSLatitudeRef', 'N')
+                lon_ref = metadata.get('GPSLongitudeRef', 'E')
+                
+                if lat_str and lon_str:
+                    try:
+                        # Parse coordinate string - could be in various formats
+                        def parse_coordinate(coord_str):
+                            # Handle formats like "48 deg 48' 5.00" N" or "48.801389"
+                            if 'deg' in coord_str:
+                                # Parse degrees, minutes, seconds format
+                                match = re.search(r'(\d+)(?:\s*deg)?\s*(\d+)(?:\s*\')?\s*([\d.]+)?', coord_str)
+                                if match:
+                                    deg = float(match.group(1))
+                                    min_val = float(match.group(2)) if match.group(2) else 0
+                                    sec_val = float(match.group(3)) if match.group(3) else 0
+                                    return deg + min_val/60 + sec_val/3600
+                            else:
+                                # Parse decimal format
+                                return float(coord_str)
+                            return None
+                        
+                        latitude = parse_coordinate(lat_str)
+                        longitude = parse_coordinate(lon_str)
+                        
+                        if latitude is not None and longitude is not None:
+                            # Apply hemisphere references
+                            if lat_ref in ['S', 'South']:
+                                latitude = -latitude
+                            if lon_ref in ['W', 'West']:
+                                longitude = -longitude
+                                
+                            self.logger.debug(f"Found GPS coordinates: {latitude}, {longitude}")
+                            return CLLocation.alloc().initWithLatitude_longitude_(latitude, longitude)
+                    
+                    except (ValueError, AttributeError) as e:
+                        self.logger.warning(f"Failed to parse GPS coordinates: {e}")
+                        
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting original location: {e}")
+            return None
+
     def _get_original_title(self, photo_path: Path) -> str | None:
         """Get title from original photo before import."""
         try:
@@ -305,6 +369,68 @@ class ImportManager:
             self.logger.error(f"Error verifying asset title: {e}")
             return False
 
+    def _set_location_on_asset(self, asset_id: str, location: CLLocation) -> bool:
+        """Set GPS location on an asset in Photos library."""
+        if not location:
+            return False
+            
+        try:
+            with autorelease_pool():
+                # Get the asset
+                asset_list = PHAsset.fetchAssetsWithLocalIdentifiers_options_([asset_id], None)
+                
+                if asset_list.count() == 0:
+                    self.logger.error(f"Asset not found: {asset_id}")
+                    return False
+                    
+                asset = asset_list.firstObject()
+                success = [False]  # Use a list so it can be modified in the completion handler
+                error_ref = [None]  # To capture any error
+                semaphore = threading.Semaphore(0)  # For synchronization
+                
+                def handle_change():
+                    try:
+                        # Create a change request for the asset
+                        request = PHAssetChangeRequest.changeRequestForAsset_(asset)
+                        # Set the location
+                        request.setLocation_(location)
+                    except Exception as e:
+                        self.logger.error(f"Error in change request: {e}")
+                        raise  # Re-raise to be caught by Photos API
+                
+                def completion_handler(result, error):
+                    success[0] = result
+                    error_ref[0] = error
+                    semaphore.release()  # Signal that the operation is complete
+                
+                # Perform changes in a change block with completion handler
+                PHPhotoLibrary.sharedPhotoLibrary().performChanges_completionHandler_(
+                    handle_change,
+                    completion_handler
+                )
+                
+                # Wait for completion (with timeout)
+                if not semaphore.acquire(timeout=10):  # 10 second timeout
+                    self.logger.error(f"Timeout waiting for location update on asset {asset_id}")
+                    return False
+                
+                # Check results
+                if success[0]:
+                    lat = location.coordinate().latitude
+                    lon = location.coordinate().longitude
+                    self.logger.info(f"Set location on asset {asset_id}: {lat}, {lon}")
+                else:
+                    if error_ref[0]:
+                        self.logger.error(f"Error setting location on asset {asset_id}: {error_ref[0]}")
+                    else:
+                        self.logger.error(f"Failed to set location on asset {asset_id}, no error details available")
+                
+                return success[0]
+                
+        except Exception as e:
+            self.logger.error(f"Error setting location on asset: {e}")
+            return False
+
     def _set_keywords_on_asset(self, asset_id: str, keywords: list[str]) -> bool:
         """Set keywords on an asset in Photos library using AppleScript."""
         if not keywords:
@@ -364,6 +490,12 @@ class ImportManager:
             original_title = self._get_original_title(photo_path)
             if original_title:
                 self.logger.info(f"Found title in processed file: {original_title}")
+                
+            original_location = self._get_original_location(photo_path)
+            if original_location:
+                lat = original_location.coordinate().latitude
+                lon = original_location.coordinate().longitude
+                self.logger.info(f"Found GPS location in processed file: {lat}, {lon}")
 
             # Identify asset type
             try:
@@ -412,6 +544,13 @@ class ImportManager:
                 self.logger.info(f"Setting keywords on asset {asset_id}: {original_keywords}")
                 if not self._set_keywords_on_asset(asset_id, original_keywords):
                     self.logger.warning(f"Failed to set keywords on asset {asset_id}")
+
+            if original_location:
+                lat = original_location.coordinate().latitude
+                lon = original_location.coordinate().longitude
+                self.logger.info(f"Setting GPS location on asset {asset_id}: {lat}, {lon}")
+                if not self._set_location_on_asset(asset_id, original_location):
+                    self.logger.warning(f"Failed to set GPS location on asset {asset_id}")
 
             # Album assignment
             if album_paths:
